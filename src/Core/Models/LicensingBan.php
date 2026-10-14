@@ -4,8 +4,6 @@ namespace LicenseKit\Core\Models;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
-use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -28,9 +26,10 @@ use LicenseKit\Database\Factories\Core\LicensingBanFactory;
  * @property Model|null $user
  * @property Product $product
  */
-#[Fillable(['user_id', 'product_id', 'reason', 'created_by', 'expires_at', 'lifted_at', 'lifted_by', 'lift_reason'])]
 class LicensingBan extends Model
 {
+    protected $fillable = ['user_id', 'product_id', 'reason', 'created_by', 'expires_at', 'lifted_at', 'lifted_by', 'lift_reason'];
+
     /** @use HasFactory<LicensingBanFactory> */
     use HasFactory;
 
@@ -61,8 +60,7 @@ class LicensingBan extends Model
     }
 
     /** @param Builder<LicensingBan> $query */
-    #[Scope]
-    protected function active(Builder $query): void
+    public function scopeActive(Builder $query): void
     {
         $query->whereNull('lifted_at')->where(fn (Builder $query) => $query->whereNull('expires_at')->orWhere('expires_at', '>', now('UTC')));
     }

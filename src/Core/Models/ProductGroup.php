@@ -2,7 +2,6 @@
 
 namespace LicenseKit\Core\Models;
 
-use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -15,10 +14,11 @@ use LicenseKit\Database\Factories\Core\ProductGroupFactory;
  * @property int $id
  * @property string $name
  */
-#[Fillable(['name'])]
 #[ObservedBy([LicensingConfigurationObserver::class])]
 class ProductGroup extends Model
 {
+    protected $fillable = ['name'];
+
     /** @internal Actor supplied by supported catalog operations for synchronous auditing. */
     public ?string $auditActor = null;
 

@@ -137,7 +137,7 @@ test('ban forms support configured UUID and ULID user selection and lifting', fu
     expect($ban->user_id)->toBe($customer->getKey());
     Livewire::test(ManageBansPage::class)->callTableAction('lift', $ban, data: ['reason' => 'Appeal'])->assertHasNoActionErrors();
     $this->assertDatabaseHas('licensekit_audit_events', ['event' => 'licensing_ban_lifted', 'actor' => 'user:'.$admin->getKey()]);
-})->with([UuidAdminUser::class, UlidAdminUser::class]);
+})->with([[UuidAdminUser::class], [UlidAdminUser::class]]);
 
 test('disabled bans are not registered and mounted actions refuse execution', function () {
     $admin = adminUser();

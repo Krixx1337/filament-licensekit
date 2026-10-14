@@ -4,8 +4,6 @@ namespace LicenseKit\Core\Models;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
-use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -29,10 +27,12 @@ use LicenseKit\Database\Factories\Core\DeviceResetHistoryFactory;
  * @property Product|null $product
  * @property array<string, mixed>|null $before_hwid
  */
-#[Fillable(['user_id', 'scope', 'product_id', 'reset_at', 'performed_by', 'actor_id', 'reason', 'before_hwid'])]
-#[Hidden(['before_hwid'])]
 class DeviceResetHistory extends Model
 {
+    protected $fillable = ['user_id', 'scope', 'product_id', 'reset_at', 'performed_by', 'actor_id', 'reason', 'before_hwid'];
+
+    protected $hidden = ['before_hwid'];
+
     /** @use HasFactory<DeviceResetHistoryFactory> */
     use HasFactory;
 

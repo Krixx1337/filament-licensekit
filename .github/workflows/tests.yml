@@ -1,0 +1,130 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    name: PHP ${{ matrix.php }} / Laravel ${{ matrix.laravel }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - php: '8.3'
+            laravel: '12.*'
+            testbench: '10.*'
+          - php: '8.3'
+            laravel: '13.*'
+            testbench: '11.*'
+          - php: '8.5'
+            laravel: '13.*'
+            testbench: '11.*'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: intl, mbstring, pdo_sqlite, zip
+          tools: composer:v2
+          coverage: none
+      - name: Resolve dependencies
+        run: |
+          composer require --dev "laravel/framework:${{ matrix.laravel }}" "orchestra/testbench:${{ matrix.testbench }}" --no-update --no-interaction
+          composer update --prefer-dist --no-interaction --no-progress
+      - name: Run package tests
+        run: composer test
+      - name: Check package quality
+        if: matrix.php == '8.3' && matrix.laravel == '13.*'
+        run: |
+          composer validate --strict
+          php vendor/bin/pint --test
+          composer analyse
+          composer audit
+      - name: Verify distribution archive
+        if: matrix.php == '8.3' && matrix.laravel == '13.*'
+        run: |
+          git archive --format=zip --output="$RUNNER_TEMP/licensekit.zip" HEAD
+          php .github/scripts/check-archive.php "$RUNNER_TEMP/licensekit.zip"
+
+  minimum-runtime:
+    name: Lowest secure runtime / Laravel ${{ matrix.laravel }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        laravel: ['^12.0', '^13.0']
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: '8.3'
+          extensions: intl, mbstring, pdo_sqlite, zip
+          tools: composer:v2
+          coverage: none
+      - name: Install runtime consumer without package development tools
+        run: |
+          php .github/scripts/prepare-consumer.php "$RUNNER_TEMP/licensekit-consumer" "${{ matrix.laravel }}"
+          composer --working-dir="$RUNNER_TEMP/licensekit-consumer" update --prefer-lowest --no-dev --prefer-dist --no-interaction --no-progress
+          composer --working-dir="$RUNNER_TEMP/licensekit-consumer" audit
+      - name: Verify runtime compatibility
+        working-directory: ${{ runner.temp }}/licensekit-consumer
+        run: php "$GITHUB_WORKSPACE/.github/scripts/runtime-smoke.php"
+
+  mysql:
+    name: MySQL concurrency
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_RANDOM_ROOT_PASSWORD: 'yes'
+          MYSQL_DATABASE: licensekit_package_test
+          MYSQL_USER: licensekit_test
+          MYSQL_PASSWORD: licensekit_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -u licensekit_test -plicensekit_test --silent"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: '8.3'
+          extensions: intl, mbstring, pdo_mysql, zip
+          tools: composer:v2
+          coverage: none
+      - name: Resolve dependencies
+        run: |
+          composer require --dev 'laravel/framework:13.*' 'orchestra/testbench:11.*' --no-update --no-interaction
+          composer update --prefer-dist --no-interaction --no-progress
+      - name: Run MySQL concurrency tests
+        run: php vendor/bin/pest tests/Outages/Integration
+        env:
+          LICENSEKIT_MYSQL_TESTS: '1'
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_DATABASE: licensekit_package_test
+          DB_USERNAME: licensekit_test
+          DB_PASSWORD: licensekit_test

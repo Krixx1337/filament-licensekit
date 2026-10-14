@@ -2,7 +2,6 @@
 
 namespace LicenseKit\Core\Models;
 
-use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -21,10 +20,11 @@ use LicenseKit\Database\Factories\Core\LicensePlanFactory;
  * @property bool $is_enabled
  * @property Product $product
  */
-#[Fillable(['product_id', 'name', 'duration_days', 'is_enabled'])]
 #[ObservedBy([LicensingConfigurationObserver::class])]
 class LicensePlan extends Model
 {
+    protected $fillable = ['product_id', 'name', 'duration_days', 'is_enabled'];
+
     /** @internal Actor supplied by supported catalog operations for synchronous auditing. */
     public ?string $auditActor = null;
 

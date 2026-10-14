@@ -3,8 +3,6 @@
 namespace LicenseKit\Tests\Core\Fixtures;
 
 use Illuminate\Contracts\Auth\Authenticatable;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
-use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -23,10 +21,12 @@ use LicenseKit\Core\Users\ConfiguredUserModel;
  * @property string $user_fingerprint
  * @property array<string, mixed> $hwid
  */
-#[Fillable(['user_id', 'product_id', 'personal_access_token_id', 'hwid', 'user_fingerprint'])]
-#[Hidden(['hwid', 'personal_access_token_id', 'user_fingerprint'])]
 class ClientSession extends Model
 {
+    protected $fillable = ['user_id', 'product_id', 'personal_access_token_id', 'hwid', 'user_fingerprint'];
+
+    protected $hidden = ['hwid', 'personal_access_token_id', 'user_fingerprint'];
+
     protected $table = 'client_sessions';
 
     protected static function newFactory(): ClientSessionFactory

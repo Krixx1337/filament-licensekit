@@ -97,7 +97,7 @@ test('string host user IDs survive administrative claims and audit actors', func
     Livewire::test(ManageLicenseKeys::class)->callTableAction('claim', $key, data: ['user_id' => $customer->getKey()])->assertHasNoActionErrors();
     $this->assertDatabaseHas('licensekit_entitlements', ['user_id' => $customer->getKey()]);
     $this->assertDatabaseHas('licensekit_audit_events', ['event' => 'key_claimed', 'actor' => 'user:'.$admin->getKey()]);
-})->with([UuidAdminUser::class, UlidAdminUser::class]);
+})->with([[UuidAdminUser::class], [UlidAdminUser::class]]);
 
 test('product outage and custom credit actions target selected product', function () {
     $this->travelTo(now()->startOfSecond());

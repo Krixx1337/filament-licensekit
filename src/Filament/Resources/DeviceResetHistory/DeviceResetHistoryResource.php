@@ -37,8 +37,8 @@ class DeviceResetHistoryResource extends LicensingResource
                 TextColumn::make('user.'.$display)->label('User')->searchable()->placeholder(fn (DeviceResetHistory $record): string => $record->user_id ?: 'Unavailable')->toggleable(),
                 TextColumn::make('scope')->label('Scope')->formatStateUsing(fn (string $state): string => $state === 'global' ? 'All products' : 'Per product')->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('product_id')->label('Product ID')->placeholder('All products')->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('product.name')->label('Product')->placeholder(fn (DeviceResetHistory $record): string => $record->scope === 'global' ? 'All products' : ($record->product_id ?: 'Unavailable'))->toggleable(),
-                TextColumn::make('device_cleared')->label('Device cleared')->state(fn (DeviceResetHistory $record): string => static::deviceClearedLabel($record->before_hwid))->wrap()->toggleable(),
+                TextColumn::make('product.name')->label('Product')->placeholder(fn (DeviceResetHistory $record): string => $record->scope === 'global' ? 'All products' : ($record->product_id === null ? 'Unavailable' : (string) $record->product_id))->toggleable(),
+                TextColumn::make('device_cleared')->label('Device cleared')->state(fn (DeviceResetHistory $record): string => self::deviceClearedLabel($record->before_hwid))->wrap()->toggleable(),
                 TextColumn::make('reset_at')->dateTime()->timezone('UTC')->label('Reset at (UTC)')->toggleable(),
                 TextColumn::make('performed_by')->label('Performed by')->badge()->toggleable(),
                 TextColumn::make('actor_id')->label('Actor ID')->searchable()->toggleable(isToggledHiddenByDefault: true),
@@ -46,9 +46,9 @@ class DeviceResetHistoryResource extends LicensingResource
                 TextColumn::make('reason')->limit(60)->wrap()->toggleable(),
             ])->filters([
                 SelectFilter::make('user_id')->label('User')->searchable()->preload()
-                    ->options(fn (): array => static::userOptions(''))
-                    ->getSearchResultsUsing(fn (string $search): array => static::userOptions($search))
-                    ->getOptionLabelUsing(fn (mixed $value): string => static::userLabel($value)),
+                    ->options(fn (): array => self::userOptions(''))
+                    ->getSearchResultsUsing(fn (string $search): array => self::userOptions($search))
+                    ->getOptionLabelUsing(fn (mixed $value): string => self::userLabel($value)),
                 SelectFilter::make('scope')->options(['global' => 'All products', 'per_product' => 'Per product']),
                 SelectFilter::make('product')->relationship('product', 'name')->searchable(),
                 SelectFilter::make('performed_by')->options(['customer' => 'Customer', 'admin' => 'Admin']),

@@ -129,7 +129,7 @@ test('reset history uses configured UUID and ULID host identities', function (st
     $history = DeviceResetHistory::firstOrFail();
     expect($history->user_id)->toBe($user->getKey())->and($history->actor_id)->toBe($admin->getKey())
         ->and($history->user->getKey())->toBe($user->getKey())->and($history->actor->getKey())->toBe($admin->getKey());
-})->with([UuidUser::class, UlidUser::class]);
+})->with([[UuidUser::class], [UlidUser::class]]);
 
 test('missing reset history schema fails diagnostics without blocking unrelated authorization', function () {
     Schema::drop('licensekit_device_reset_history');

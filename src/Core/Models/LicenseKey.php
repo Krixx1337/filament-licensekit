@@ -3,8 +3,6 @@
 namespace LicenseKit\Core\Models;
 
 use Carbon\CarbonImmutable;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
-use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -24,10 +22,12 @@ use LicenseKit\Database\Factories\Core\LicenseKeyFactory;
  * @property LicensePlan $plan
  * @property Batch $batch
  */
-#[Fillable(['license_plan_id', 'batch_id', 'entitlement_id', 'key', 'note', 'duration_days', 'claimed_at', 'revoked_at'])]
-#[Hidden(['key', 'note'])]
 class LicenseKey extends Model
 {
+    protected $fillable = ['license_plan_id', 'batch_id', 'entitlement_id', 'key', 'note', 'duration_days', 'claimed_at', 'revoked_at'];
+
+    protected $hidden = ['key', 'note'];
+
     protected $table = 'licensekit_license_keys';
 
     protected static function newFactory(): LicenseKeyFactory

@@ -3,7 +3,6 @@
 namespace LicenseKit\Modules\Outages\Models;
 
 use Carbon\CarbonImmutable;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -24,9 +23,10 @@ use LicenseKit\Database\Factories\Outages\OutageFactory;
  * @property Product $product
  * @property LicensingOperation $operation
  */
-#[Fillable(['product_id', 'reference', 'request_hash', 'reason', 'access_blocked', 'started_at', 'stopped_at', 'ended_at'])]
 class Outage extends Model
 {
+    protected $fillable = ['product_id', 'reference', 'request_hash', 'reason', 'access_blocked', 'started_at', 'stopped_at', 'ended_at'];
+
     /** @use HasFactory<OutageFactory> */
     use HasFactory;
 

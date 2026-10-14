@@ -2,7 +2,6 @@
 
 namespace LicenseKit\Core\Models;
 
-use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -22,10 +21,11 @@ use LicenseKit\Database\Factories\Core\ProductFactory;
  * @property bool $is_blocked
  * @property Collection<int, LicensePlan> $plans
  */
-#[Fillable(['name', 'slug', 'product_group_id', 'is_enabled', 'is_blocked'])]
 #[ObservedBy([LicensingConfigurationObserver::class])]
 class Product extends Model
 {
+    protected $fillable = ['name', 'slug', 'product_group_id', 'is_enabled', 'is_blocked'];
+
     /** @internal Actor supplied by supported catalog operations for synchronous auditing. */
     public ?string $auditActor = null;
 

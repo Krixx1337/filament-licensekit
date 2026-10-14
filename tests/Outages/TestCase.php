@@ -28,6 +28,7 @@ class TestCase extends OrchestraTestCase
         $app['config']->set('licensekit.modules.outages', true);
         $app['config']->set('session.driver', 'array');
         $app['config']->set('cache.default', 'array');
+        $app['config']->set('queue.default', 'null');
     }
 
     protected function defineDatabaseMigrations(): void

@@ -4,7 +4,6 @@ namespace LicenseKit\Core\Models;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -26,9 +25,10 @@ use LicenseKit\Database\Factories\Core\EntitlementFactory;
  * @property Model|null $user
  * @property DeviceBinding|null $binding
  */
-#[Fillable(['user_id', 'product_id', 'is_lifetime', 'is_revoked', 'is_blocked', 'expires_at'])]
 class Entitlement extends Model
 {
+    protected $fillable = ['user_id', 'product_id', 'is_lifetime', 'is_revoked', 'is_blocked', 'expires_at'];
+
     protected $table = 'licensekit_entitlements';
 
     protected static function newFactory(): EntitlementFactory

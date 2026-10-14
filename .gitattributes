@@ -23,3 +23,12 @@ CHANGELOG.md export-ignore
 /database/*.sqlite* export-ignore
 /boost.json export-ignore
 /opencode.json export-ignore
+
+/composer.lock export-ignore
+/workbench export-ignore
+/.editorconfig export-ignore
+/.gitattributes export-ignore
+/.gitignore export-ignore
+/phpunit.xml export-ignore
+/phpstan.neon export-ignore
+/pint.json export-ignore

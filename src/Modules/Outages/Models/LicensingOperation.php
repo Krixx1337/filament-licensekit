@@ -3,7 +3,6 @@
 namespace LicenseKit\Modules\Outages\Models;
 
 use Carbon\CarbonImmutable;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use LicenseKit\Core\Casts\UtcDateTime;
@@ -25,9 +24,10 @@ use LicenseKit\Core\Models\Product;
  * @property int $skipped_count
  * @property Outage|null $outage
  */
-#[Fillable(['product_id', 'outage_id', 'kind', 'reference', 'request_hash', 'status', 'seconds', 'eligible_at', 'reason', 'actor', 'target_count', 'credited_count', 'skipped_count', 'failure', 'applied_at'])]
 class LicensingOperation extends Model
 {
+    protected $fillable = ['product_id', 'outage_id', 'kind', 'reference', 'request_hash', 'status', 'seconds', 'eligible_at', 'reason', 'actor', 'target_count', 'credited_count', 'skipped_count', 'failure', 'applied_at'];
+
     protected $table = 'licensekit_compensation_operations';
 
     /** @return BelongsTo<Outage, $this> */

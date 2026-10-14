@@ -3,8 +3,8 @@
 > **A Filament plugin for self-hosted software licensing and HWID node-locking.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![PHP](https://img.shields.io/badge/PHP-8.2%2B-777BB4.svg)](https://www.php.net/)
-[![Laravel](https://img.shields.io/badge/Laravel-11%20%7C%2012%20%7C%2013-FF2D20.svg)](https://laravel.com)
+[![PHP](https://img.shields.io/badge/PHP-8.3%2B-777BB4.svg)](https://www.php.net/)
+[![Laravel](https://img.shields.io/badge/Laravel-12%20%7C%2013-FF2D20.svg)](https://laravel.com)
 [![Filament](https://img.shields.io/badge/Filament-5-FDAE4B.svg)](https://filamentphp.com)
 
 **LicenseKit** is a Filament plugin and a self-hosted licensing engine for independent developers selling desktop applications, game enhancements, private clients, and automation tools.
@@ -65,23 +65,24 @@ public function login(Request $request, LicensedDevices $devices)
 
 | | |
 | :--- | :--- |
-| **PHP** | 8.2+ |
-| **Laravel** | 11.28+, 12, 13 |
+| **PHP** | 8.3+ |
+| **Laravel** | 12, 13 |
 | **Filament** | 5.10+ |
 | **Sanctum** | 4.3+ |
 | **[Filament Shield](https://github.com/bezhanSalleh/filament-shield)** | 4.x, optional |
-| **spatie/laravel-permission** | 8.x, only if you install Shield |
+| **spatie/laravel-permission** | Selected by Composer for your PHP and Shield versions, optional |
 
 LicenseKit checks ordinary Laravel policies. Install Shield in your app when you want roles. It is not a LicenseKit dependency. Custom actions such as reset HWID and create keys need the [Shield recipe](docs/installation.md#optional-filament-shield). A policy that says no is final.
 
 ### 📦 Installation
 
-PHP 8.2+, Laravel 11.28+, 12, or 13, Filament 5.10+, and Sanctum 4.3+. Accounts and login stay in your app.
+PHP 8.3+, Laravel 12 or 13, Filament 5.10+, and Sanctum 4.3+. Accounts and login stay in your app.
 
-Not on Packagist yet. Require `licensekit/licensekit` at `0.1.0` from a path or git repository, then:
+Not on Packagist yet. Install the pre-release from Git, then:
 
 ```sh
-composer require licensekit/licensekit
+composer config repositories.licensekit vcs https://github.com/Krixx1337/filament-licensekit.git
+composer require licensekit/licensekit:dev-main
 php artisan licensekit:install --no-interaction
 ```
 

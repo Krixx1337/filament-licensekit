@@ -70,3 +70,6 @@ yarn-error.log
 /repomix-output.xml
 /.repomixignore
 /repomix.config.json
+
+/composer.lock
+/workbench

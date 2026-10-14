@@ -2,7 +2,6 @@
 
 namespace LicenseKit\Core\Models;
 
-use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Validator;
@@ -19,9 +18,10 @@ use LicenseKit\Database\Factories\Core\ApiClientFactory;
  * @property list<string> $permissions
  * @property int $maximum_quantity
  */
-#[Fillable(['name', 'is_enabled', 'all_products', 'allowed_product_ids', 'permissions', 'maximum_quantity'])]
 class ApiClient extends Model
 {
+    protected $fillable = ['name', 'is_enabled', 'all_products', 'allowed_product_ids', 'permissions', 'maximum_quantity'];
+
     /** @use HasFactory<ApiClientFactory> */
     use HasApiTokens, HasFactory;
 

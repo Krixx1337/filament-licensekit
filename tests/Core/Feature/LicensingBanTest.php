@@ -284,7 +284,7 @@ test('configured UUID and ULID users retain ban scope and audit identities', fun
     expect(fn () => app(LicensingBans::class)->assertAllowed($user, $product))->toThrow(LicensingException::class);
     app(ManageLicensingBans::class)->lift($ban, 'Appeal', $actor);
     $this->assertDatabaseHas('licensekit_audit_events', ['event' => 'licensing_ban_lifted', 'actor' => 'user:'.$actor->getKey()]);
-})->with([UuidUser::class, UlidUser::class]);
+})->with([[UuidUser::class], [UlidUser::class]]);
 
 test('installation diagnostics require ban table even when disabled', function (bool $enabled) {
     config(['licensekit.features.licensing_bans' => $enabled]);

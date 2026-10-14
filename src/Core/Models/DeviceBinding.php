@@ -3,8 +3,6 @@
 namespace LicenseKit\Core\Models;
 
 use Carbon\CarbonImmutable;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
-use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use LicenseKit\Core\Casts\HwidPayload;
@@ -18,10 +16,12 @@ use LicenseKit\Database\Factories\Core\DeviceBindingFactory;
  * @property CarbonImmutable|null $bound_at
  * @property CarbonImmutable|null $last_hwid_reset_at
  */
-#[Fillable(['user_id', 'scope_key', 'hwid', 'bound_at', 'last_hwid_reset_at'])]
-#[Hidden(['hwid'])]
 class DeviceBinding extends Model
 {
+    protected $fillable = ['user_id', 'scope_key', 'hwid', 'bound_at', 'last_hwid_reset_at'];
+
+    protected $hidden = ['hwid'];
+
     protected $table = 'licensekit_device_bindings';
 
     protected static function newFactory(): DeviceBindingFactory

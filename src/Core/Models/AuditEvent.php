@@ -2,7 +2,6 @@
 
 namespace LicenseKit\Core\Models;
 
-use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use LicenseKit\Database\Factories\Core\AuditEventFactory;
@@ -17,9 +16,10 @@ use LicenseKit\Database\Factories\Core\AuditEventFactory;
  * @property array<string, mixed> $before
  * @property array<string, mixed> $after
  */
-#[Fillable(['actor', 'event', 'subject_type', 'subject_id', 'reason', 'before', 'after'])]
 class AuditEvent extends Model
 {
+    protected $fillable = ['actor', 'event', 'subject_type', 'subject_id', 'reason', 'before', 'after'];
+
     protected $table = 'licensekit_audit_events';
 
     protected static function newFactory(): AuditEventFactory

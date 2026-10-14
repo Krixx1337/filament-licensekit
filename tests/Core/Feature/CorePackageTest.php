@@ -166,7 +166,7 @@ test('UUID and ULID host user keys work for claims and desktop access', function
     $entitlement = app(ClaimLicense::class)->claim($user, $key->key);
     expect($entitlement->user_id)->toBe($user->getKey());
     expect(app(ClientSessions::class)->login($plan->product, $user->email, 'password', desktopRequest($user)['hwid'])['token'])->toBeString();
-})->with([UuidUser::class, UlidUser::class]);
+})->with([[UuidUser::class], [UlidUser::class]]);
 
 test('installation check is read only and reports missing Sanctum storage', function () {
     $this->artisan('licensekit:check')->assertSuccessful();
