@@ -1,0 +1,15 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+    - vendor/nesbot/carbon/extension.neon
+parameters:
+    level: 7
+    databaseMigrationsPath:
+        - database/migrations/core
+        - database/migrations/outages
+        - vendor/laravel/sanctum/database/migrations
+    paths:
+        - src
+        - database/factories
+        - database/migrations
+        - config
+        - routes

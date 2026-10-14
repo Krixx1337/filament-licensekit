@@ -1,0 +1,25 @@
+* text=auto eol=lf
+
+*.blade.php diff=html
+*.css diff=css
+*.html diff=html
+*.md diff=markdown
+*.php diff=php
+
+CHANGELOG.md export-ignore
+.github/workflows/browser-tests.yml export-ignore
+
+/apps export-ignore
+/docs export-ignore
+/tests export-ignore
+/vendor export-ignore
+/packages export-ignore
+/.agents export-ignore
+/.codex export-ignore
+/.github export-ignore
+/AGENTS.md export-ignore
+/.env export-ignore
+/storage export-ignore
+/database/*.sqlite* export-ignore
+/boost.json export-ignore
+/opencode.json export-ignore

@@ -1,0 +1,68 @@
+<?php
+
+namespace LicenseKit\Support;
+
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use LicenseKit\Core\Contracts\ReadinessCheck;
+use LicenseKit\Core\Exceptions\LicensingException;
+
+final class ModuleReadiness implements ReadinessCheck
+{
+    public function __construct(private SetupDiagnostics $diagnostics) {}
+
+    public function assertReady(): void
+    {
+        if ($this->diagnostics->configurationErrors() !== []) {
+            throw new LicensingException('licensing_unavailable', 503);
+        }
+    }
+
+    /** @return list<string> */
+    public function issues(): array
+    {
+        $errors = $this->diagnostics->configurationErrors();
+        if ($errors !== []) {
+            return $errors;
+        }
+        foreach (['outages' => ['licensekit_outages', 'licensekit_compensation_operations', 'licensekit_compensation_entries']] as $module => $tables) {
+            if (Modules::enabled($module)) {
+                foreach ($tables as $table) {
+                    if (! Schema::hasTable($table)) {
+                        $errors[] = 'Missing '.$module.' table: '.$table.'. Enable the module and run php artisan migrate.';
+                    }
+                }
+            }
+        }
+        foreach (['licensekit_device_reset_history' => ['before_hwid'], 'licensekit_license_keys' => ['note', 'batch_id'], 'licensekit_batches' => ['issuer', 'reference', 'quantity', 'duration_days', 'label']] as $table => $columns) {
+            if (! Schema::hasTable($table)) {
+                $errors[] = 'Missing core table: '.$table.'. This unreleased schema requires a fresh disposable database.';
+
+                continue;
+            }
+            foreach ($columns as $column) {
+                if (! Schema::hasColumn($table, $column)) {
+                    $errors[] = 'Missing '.$table.' column: '.$column.'. This unreleased schema requires a fresh disposable database.';
+                }
+            }
+        }
+        if (Schema::hasTable('licensekit_device_bindings')) {
+            foreach (['user_id', 'scope_key', 'hwid', 'bound_at', 'last_hwid_reset_at'] as $column) {
+                if (! Schema::hasColumn('licensekit_device_bindings', $column)) {
+                    $errors[] = 'Missing device binding column: '.$column.'. This unreleased schema requires a fresh disposable database.';
+                }
+            }
+            if ($errors === []) {
+                $bindings = DB::table('licensekit_device_bindings');
+                $wrongScope = config('licensekit.device_binding.scope') === 'global'
+                    ? $bindings->where('scope_key', '!=', 'global')->exists()
+                    : $bindings->where('scope_key', 'not like', 'product:%')->exists();
+                if ($wrongScope) {
+                    $errors[] = 'Device bindings use another scope. Restore licensekit.device_binding.scope; automatic conversion/reset is not supported.';
+                }
+            }
+        }
+
+        return $errors;
+    }
+}

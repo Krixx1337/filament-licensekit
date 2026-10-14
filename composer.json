@@ -1,0 +1,58 @@
+{
+    "name": "licensekit/licensekit",
+    "description": "Software licensing APIs and Filament administration for Laravel, with optional outage compensation.",
+    "type": "library",
+    "license": "MIT",
+    "require": {
+        "php": "^8.4",
+        "illuminate/auth": "^13.35",
+        "illuminate/database": "^13.35",
+        "illuminate/http": "^13.35",
+        "illuminate/routing": "^13.35",
+        "illuminate/support": "^13.35",
+        "laravel/sanctum": "^4.3",
+        "filament/filament": "^5.10"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^11.0",
+        "pestphp/pest": "^5.3",
+        "pestphp/pest-plugin-laravel": "^5.0",
+        "laravel/pint": "^1.32",
+        "larastan/larastan": "^3.13"
+    },
+    "autoload": {
+        "psr-4": {
+            "LicenseKit\\": "src/",
+            "LicenseKit\\Database\\Factories\\": "database/factories/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "LicenseKit\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "LicenseKit\\LicenseKitServiceProvider"
+            ]
+        }
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "scripts": {
+        "test": "pest",
+        "analyse": "phpstan analyse --memory-limit=768M",
+        "format": "pint",
+        "check": [
+            "@test",
+            "@analyse"
+        ]
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
