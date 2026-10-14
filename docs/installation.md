@@ -1,6 +1,6 @@
 # Installation
 
-PHP 8.3+, Laravel 12 or 13, Filament 5.8.3+, and Sanctum 4.3+. Your app already has users and login. LicenseKit does not.
+PHP 8.3+, Laravel 12 or 13, Filament 4.13.3+ or 5.8.3+, and Sanctum 4.x. Sanctum requires 4.1+ on Laravel 12 or 4.3.1+ on Laravel 13. Your app already has users and login. LicenseKit does not.
 
 The package is not on Packagist yet. Install the pre-release from Git:
 

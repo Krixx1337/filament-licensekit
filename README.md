@@ -7,7 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![PHP](https://img.shields.io/badge/PHP-8.3%2B-777BB4.svg)](https://www.php.net/)
 [![Laravel](https://img.shields.io/badge/Laravel-12%20%7C%2013-FF2D20.svg)](https://laravel.com)
-[![Filament](https://img.shields.io/badge/Filament-5-FDAE4B.svg)](https://filamentphp.com)
+[![Filament](https://img.shields.io/badge/Filament-4%20%7C%205-FDAE4B.svg)](https://filamentphp.com)
 
 **LicenseKit** is a Filament plugin and a self-hosted licensing engine for independent developers selling desktop applications, game enhancements, private clients, and automation tools.
 
@@ -69,8 +69,8 @@ public function login(Request $request, LicensedDevices $devices)
 | :--- | :--- |
 | **PHP** | 8.3+ |
 | **Laravel** | 12, 13 |
-| **Filament** | 5.8.3+ |
-| **Sanctum** | 4.3+ |
+| **Filament** | 4.13.3+ or 5.8.3+ |
+| **Sanctum** | 4.1+ on Laravel 12, 4.3.1+ on Laravel 13 |
 | **[Filament Shield](https://github.com/bezhanSalleh/filament-shield)** | 4.x, optional |
 | **spatie/laravel-permission** | Selected by Composer for your PHP and Shield versions, optional |
 
@@ -78,7 +78,7 @@ LicenseKit checks ordinary Laravel policies. Install Shield in your app when you
 
 ### 📦 Installation
 
-PHP 8.3+, Laravel 12 or 13, Filament 5.8.3+, and Sanctum 4.3+. Accounts and login stay in your app.
+PHP 8.3+, Laravel 12 or 13, Filament 4.13.3+ or 5.8.3+, and Sanctum 4.x. Sanctum requires 4.1+ on Laravel 12 or 4.3.1+ on Laravel 13. Accounts and login stay in your app.
 
 Not on Packagist yet. Install the pre-release from Git, then:
 
