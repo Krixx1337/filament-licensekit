@@ -15,9 +15,9 @@ Stop paying monthly SaaS fees to services that police your business or crash whe
 
 I have run licensing for private desktop software since 2019. This is the package I wish I had when I started.
 
-> **Pre-release.** LicenseKit is not on Packagist yet. It will be published as a Composer package once it is ready. Until then, install it from this repository.
+> **Pre-release.** LicenseKit is available on [Packagist](https://packagist.org/packages/licensekit/licensekit) as `0.1.0-alpha.1`. APIs and configuration may change before the first stable release.
 
-Maintainer instructions for the first alpha are in [publishing](docs/releasing.md). Changes are recorded in the [changelog](CHANGELOG.md).
+Maintainer instructions are in [publishing](docs/releasing.md). Changes are recorded in the [changelog](CHANGELOG.md).
 
 ### 🚀 Why LicenseKit?
 
@@ -82,11 +82,10 @@ LicenseKit checks ordinary Laravel policies. Install Shield in your app when you
 
 PHP 8.3+, Laravel 12 or 13, Filament 4.13.3+ or 5.8.3+, and Sanctum 4.x. Sanctum requires 4.1+ on Laravel 12 or 4.3.1+ on Laravel 13. Accounts and login stay in your app.
 
-Not on Packagist yet. Install the pre-release from Git, then:
+Install the alpha from Packagist, then:
 
 ```sh
-composer config repositories.licensekit vcs https://github.com/Krixx1337/filament-licensekit.git
-composer require licensekit/licensekit:dev-main
+composer require licensekit/licensekit:0.1.0-alpha.1
 php artisan licensekit:install --no-interaction
 ```
 

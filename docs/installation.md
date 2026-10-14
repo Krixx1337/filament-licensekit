@@ -2,11 +2,10 @@
 
 PHP 8.3+, Laravel 12 or 13, Filament 4.13.3+ or 5.8.3+, and Sanctum 4.x. Sanctum requires 4.1+ on Laravel 12 or 4.3.1+ on Laravel 13. Your app already has users and login. LicenseKit does not.
 
-The package is not on Packagist yet. Install the pre-release from Git:
+Install the pre-release from [Packagist](https://packagist.org/packages/licensekit/licensekit):
 
 ```sh
-composer config repositories.licensekit vcs https://github.com/Krixx1337/filament-licensekit.git
-composer require licensekit/licensekit:dev-main
+composer require licensekit/licensekit:0.1.0-alpha.1
 php artisan licensekit:install --no-interaction
 ```
 
