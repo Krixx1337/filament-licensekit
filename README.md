@@ -17,6 +17,8 @@ I have run licensing for private desktop software since 2019. This is the packag
 
 > **Pre-release.** LicenseKit is not on Packagist yet. It will be published as a Composer package once it is ready. Until then, install it from this repository.
 
+Maintainer instructions for the first alpha are in [publishing](docs/releasing.md). Changes are recorded in the [changelog](CHANGELOG.md).
+
 ### 🚀 Why LicenseKit?
 
 * **💳 100% Commerce Agnostic (Gateway Immunity)**: Run your own storefront, or sell keys through Shopify, Stripe, WooCommerce, or Telegram resellers. Use any of them at the same time. If a payment processor shuts down one store, your licensing database is untouched.

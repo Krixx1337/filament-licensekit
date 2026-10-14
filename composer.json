@@ -1,8 +1,21 @@
 {
     "name": "licensekit/licensekit",
     "description": "Software licensing APIs and Filament administration for Laravel, with optional outage compensation.",
+    "keywords": ["laravel", "filament", "filament-plugin", "licensing", "license-keys", "hwid"],
+    "homepage": "https://github.com/Krixx1337/filament-licensekit",
+    "support": {
+        "issues": "https://github.com/Krixx1337/filament-licensekit/issues",
+        "source": "https://github.com/Krixx1337/filament-licensekit"
+    },
     "type": "library",
     "license": "MIT",
+    "authors": [
+        {
+            "name": "Krixx",
+            "homepage": "https://github.com/Krixx1337",
+            "role": "Developer"
+        }
+    ],
     "require": {
         "php": "^8.3",
         "illuminate/auth": "^12.0 || ^13.0",

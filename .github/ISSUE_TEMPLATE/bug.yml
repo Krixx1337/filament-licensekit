@@ -1,0 +1,43 @@
+name: Bug report
+description: Report a reproducible LicenseKit problem.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        LicenseKit is pre-release software. Check whether the problem still occurs on the latest main commit.
+        Report security vulnerabilities [privately](https://github.com/Krixx1337/filament-licensekit/security/advisories/new).
+        Remove API tokens, license keys, customer data, and other secrets from examples and logs.
+  - type: input
+    id: commit
+    attributes:
+      label: LicenseKit commit or version
+      description: For dev-main installations, include the source reference from composer.lock.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include installed versions. Add your database and operating system if relevant.
+      value: |
+        PHP:
+        Laravel:
+        Filament:
+        Livewire:
+        Sanctum:
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected and actual behavior
+      description: Explain what you expected and what happened. Include the error message if available.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Provide steps or a minimal code example, including relevant LicenseKit configuration and enabled modules.
+    validations:
+      required: true
