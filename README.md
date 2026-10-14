@@ -22,8 +22,8 @@ I have run licensing for private desktop software since 2019. This is the packag
 * **💳 100% Commerce Agnostic (Gateway Immunity)**: Run your own storefront, or sell keys through Shopify, Stripe, WooCommerce, or Telegram resellers. Use any of them at the same time. If a payment processor shuts down one store, your licensing database is untouched.
 * **💻 Resilient HWID Node-Locking**: Supports both strict exact matching and multi-signal fuzzy matching. Legitimate GPU or SSD upgrades won't lock out paying customers.
 * **⚡ Operational Downtime Compensation**: Planned game updates or unexpected server crashes? Pause client access and automatically credit lost subscription time in queued batches.
-* **🤝 Built for Reseller Distribution**: Mint keys in batches, export clean `.txt` files in 1 click, and revoke unsold batches with one click if a reseller disputes payment.
-* **🎨 Beautiful Filament Admin UI**: Turnkey dashboard, [Filament Shield](https://github.com/bezhanSalleh/filament-shield) ready. Shield is optional and not bundled. Let support staff inspect hardware diffs and reset devices without giving them access to mint keys or API tokens.
+* **🤝 Built for Reseller Distribution**: Create license keys in batches, export clean `.txt` files in 1 click, and revoke unsold batches with one click if a reseller disputes payment.
+* **🎨 Beautiful Filament Admin UI**: Turnkey dashboard, [Filament Shield](https://github.com/bezhanSalleh/filament-shield) ready. Shield is optional and not bundled. Let support staff inspect hardware diffs and reset devices without giving them access to create license keys or API tokens.
 * **🔒 Host-Owned Security**: LicenseKit owns the entitlement math and hardware locks. You own customer authentication, desktop handshake protocols, and billing.
 
 ### 📊 Quick comparison
@@ -41,7 +41,7 @@ I have run licensing for private desktop software since 2019. This is the packag
 
 LicenseKit plugs into the Laravel app you already have.
 
-1. **Your storefront, or a webhook** from Stripe or Shopify, mints keys. The same order id returns the same keys. [Mint keys](docs/shops.md).
+1. **Your storefront, or a webhook** from Stripe or Shopify, creates license keys. The same order id returns the same keys. [Create license keys](docs/shops.md).
 2. **Customer** claims the key on your site through `ClaimLicense::claim($user, $serial)`.
 3. **Desktop client** logs in through your controller. `LicensedDevices::bind()` checks the license and locks the PC.
 
@@ -99,4 +99,4 @@ php artisan migrate
 php artisan licensekit:check
 ```
 
-Shield permissions, host user settings, and the rest of setup are in [installation](docs/installation.md). After that, [connect your app](docs/client.md) and [mint keys](docs/shops.md).
+Shield permissions, host user settings, and the rest of setup are in [installation](docs/installation.md). After that, [connect your app](docs/client.md) and [create license keys](docs/shops.md).

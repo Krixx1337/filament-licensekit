@@ -1,8 +1,8 @@
-# Mint keys
+# Create license keys
 
 LicenseKit does not take payment. Your store, or Shopify, Stripe, WooCommerce, or a Telegram reseller, asks for keys after the sale. The same order id returns the same keys.
 
-You can also mint from the admin with no API. On a license plan, use **Create keys**. Set a quantity, a reference, and an optional label. Export downloads `license-keys-{id}.txt`, one serial per line. **Revoke unclaimed keys** cancels the unsold keys in that batch. Claimed licenses stay.
+You can also create license keys from the admin with no API. On a license plan, use **Create keys**. Set a quantity, a reference, and an optional label. Export downloads `license-keys-{id}.txt`, one serial per line. **Revoke unclaimed keys** cancels the unsold keys in that batch. Claimed licenses stay.
 
 ## From your store
 
@@ -34,9 +34,9 @@ Plans are `$LICENSEKIT_API_ROOT/plans?product_id=1`. Listing products and plans 
 
 | Permission | What it allows |
 | --- | --- |
-| `licenses:create` | Mint a batch |
+| `licenses:create` | Create a batch |
 | `keys:read` | Include the serials in the response |
-| `batches:read-all` | See batches minted by someone else |
+| `batches:read-all` | See batches created by someone else |
 
 Without `keys:read`, creation still works and the response has no serials.
 
