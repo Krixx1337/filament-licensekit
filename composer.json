@@ -11,7 +11,7 @@
         "illuminate/routing": "^12.0 || ^13.0",
         "illuminate/support": "^12.0 || ^13.0",
         "laravel/sanctum": "^4.3",
-        "filament/filament": "^5.10"
+        "filament/filament": "^5.8.3"
     },
     "require-dev": {
         "orchestra/testbench": "^10.0 || ^11.0",
