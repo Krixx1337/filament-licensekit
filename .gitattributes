@@ -32,3 +32,4 @@ CHANGELOG.md export-ignore
 /phpunit.xml export-ignore
 /phpstan.neon export-ignore
 /pint.json export-ignore
+/art export-ignore

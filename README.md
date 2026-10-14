@@ -1,3 +1,5 @@
+![LicenseKit self-hosted software licensing](art/licensekit-banner.png)
+
 # 🛡️ LicenseKit
 
 > **A Filament plugin for self-hosted software licensing and HWID node-locking.**
