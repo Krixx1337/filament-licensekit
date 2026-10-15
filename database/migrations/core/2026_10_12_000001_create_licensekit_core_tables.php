@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use LicenseKit\Core\Users\ConfiguredUserModel;
 
@@ -83,7 +84,10 @@ return new class extends Migration
             $table->foreignId('license_plan_id')->constrained('licensekit_license_plans')->restrictOnDelete();
             $table->foreignId('batch_id')->constrained('licensekit_batches')->restrictOnDelete();
             $table->foreignId('entitlement_id')->nullable()->constrained('licensekit_entitlements')->restrictOnDelete();
-            $table->string('key', 29)->unique();
+            $key = $table->string('key', 255)->unique();
+            if (DB::connection()->getDriverName() === 'mysql') {
+                $key->charset('ascii')->collation('ascii_bin');
+            }
             $table->string('note')->nullable();
             $table->unsignedInteger('duration_days')->nullable();
             $table->timestamp('claimed_at')->nullable();
@@ -114,6 +118,18 @@ return new class extends Migration
             $table->index(['user_id', 'id']);
             $table->index(['product_id', 'id']);
         });
+        Schema::create('licensekit_import_records', function (Blueprint $table): void {
+            $table->id();
+            $table->string('identity', 64)->unique();
+            $table->string('source_namespace', 128);
+            $table->string('record_type', 32);
+            $table->string('source_reference', 128);
+            $table->string('payload_hash', 64);
+            $table->string('target_type');
+            $table->unsignedBigInteger('target_id');
+            $table->string('actor');
+            $table->timestamps();
+        });
         Schema::create('licensekit_audit_events', function (Blueprint $table): void {
             $table->id();
             $table->string('actor');
@@ -129,7 +145,7 @@ return new class extends Migration
 
     public function down(): void
     {
-        foreach (['licensekit_audit_events', 'licensekit_device_reset_history', 'licensekit_device_bindings', 'licensekit_license_keys', 'licensekit_entitlements', 'licensekit_batches', 'licensekit_api_clients', 'licensekit_license_plans', 'licensekit_licensing_bans', 'licensekit_products', 'licensekit_product_groups'] as $table) {
+        foreach (['licensekit_import_records', 'licensekit_audit_events', 'licensekit_device_reset_history', 'licensekit_device_bindings', 'licensekit_license_keys', 'licensekit_entitlements', 'licensekit_batches', 'licensekit_api_clients', 'licensekit_license_plans', 'licensekit_licensing_bans', 'licensekit_products', 'licensekit_product_groups'] as $table) {
             Schema::dropIfExists($table);
         }
     }

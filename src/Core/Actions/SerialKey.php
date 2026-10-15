@@ -2,8 +2,6 @@
 
 namespace LicenseKit\Core\Actions;
 
-use LicenseKit\Core\Exceptions\LicensingException;
-
 class SerialKey
 {
     public const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -18,13 +16,9 @@ class SerialKey
         return implode('-', str_split($value, 5));
     }
 
+    /** @deprecated Resolve KeyNormalizer for customer input. */
     public function normalize(#[\SensitiveParameter] string $value): string
     {
-        $value = strtoupper(str_replace('-', '', trim($value)));
-        if (strlen($value) !== 25 || strspn($value, self::ALPHABET) !== 25) {
-            throw new LicensingException('invalid_key', 422);
-        }
-
-        return implode('-', str_split($value, 5));
+        return app(CanonicalKeys::class)->normalize($value);
     }
 }

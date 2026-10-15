@@ -5,6 +5,7 @@ namespace LicenseKit\Core\Actions;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
+use LicenseKit\Core\Contracts\ReadinessCheck;
 use LicenseKit\Core\Exceptions\LicensingException;
 use LicenseKit\Core\Models\Batch;
 use LicenseKit\Core\Models\LicenseKey;
@@ -13,11 +14,15 @@ use LicenseKit\Core\Models\Product;
 
 class CreateBatch
 {
-    public function __construct(private SerialKey $serial, private Audit $audit) {}
+    public function __construct(private SerialKey $serial, private Audit $audit, private CanonicalKeys $canonical, private ReadinessCheck $readiness) {}
 
     /** @internal Use createFor for admin calls or ManagementOperations for machine calls. */
     public function create(LicensePlan $plan, int $quantity, string $reference, string $issuer, ?string $label = null): Batch
     {
+        $this->readiness->assertReady();
+        if (trim($issuer) === '' || strlen($issuer) > 255) {
+            throw new LicensingException('invalid_issuer', 422);
+        }
         $label = $label === null ? null : trim($label);
         if ($label !== null && mb_strlen($label) > 255) {
             throw new LicensingException('invalid_batch_label', 422);
@@ -78,6 +83,9 @@ class CreateBatch
                 $unique = [];
                 foreach ($chunk as $unused) {
                     $value = $this->serial->generate();
+                    if ($this->canonical->normalize($value) !== $value) {
+                        throw new LicensingException('invalid_key_normalizer', 503);
+                    }
                     $unique[$value] = true;
                     $rows[] = ['license_plan_id' => $plan->id, 'key' => $value, 'duration_days' => $plan->duration_days, 'batch_id' => $batchId, 'created_at' => now(), 'updated_at' => now()];
                 }

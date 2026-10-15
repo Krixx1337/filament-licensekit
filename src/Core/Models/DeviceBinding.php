@@ -6,6 +6,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use LicenseKit\Core\Casts\HwidPayload;
+use LicenseKit\Core\Casts\UtcDateTime;
 use LicenseKit\Database\Factories\Core\DeviceBindingFactory;
 
 /**
@@ -35,6 +36,6 @@ class DeviceBinding extends Model
     /** @return array<string, string> */
     protected function casts(): array
     {
-        return ['hwid' => HwidPayload::class, 'bound_at' => 'immutable_datetime', 'last_hwid_reset_at' => 'immutable_datetime'];
+        return ['hwid' => HwidPayload::class, 'bound_at' => UtcDateTime::class, 'last_hwid_reset_at' => UtcDateTime::class];
     }
 }

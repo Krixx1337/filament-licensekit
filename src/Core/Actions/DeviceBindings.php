@@ -89,7 +89,7 @@ class DeviceBindings
         if (config('licensekit.device_binding.customer_reset.enabled') !== true) {
             return ['allowed' => false, 'available_at' => null, 'reason' => 'customer_reset_disabled'];
         }
-        $availableAt = $binding?->last_hwid_reset_at?->addDays(config('licensekit.device_binding.customer_reset.cooldown_days'));
+        $availableAt = $binding?->last_hwid_reset_at?->setTimezone(config('app.timezone', 'UTC'))->addDays(config('licensekit.device_binding.customer_reset.cooldown_days'));
         $reason = $availableAt?->isFuture() ? 'reset_cooldown' : ($binding?->hwid === null ? 'device_not_bound' : null);
 
         return ['allowed' => $reason === null, 'available_at' => $availableAt?->toIso8601String(), 'reason' => $reason];

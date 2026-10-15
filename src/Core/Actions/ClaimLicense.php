@@ -6,7 +6,9 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use LicenseKit\Core\Data\ClaimProvenance;
 use LicenseKit\Core\Events\EntitlementGranted;
+use LicenseKit\Core\Events\LicenseClaimed;
 use LicenseKit\Core\Exceptions\LicensingException;
 use LicenseKit\Core\Models\Entitlement;
 use LicenseKit\Core\Models\LicenseKey;
@@ -16,7 +18,7 @@ use LicenseKit\Support\OutageState;
 
 class ClaimLicense
 {
-    public function __construct(private SerialKey $serial, private EntitlementClock $clock, private UserAccess $users, private Audit $audit, private LicensingBans $bans, private OutageState $outages, private AccessRestrictions $restrictions) {}
+    public function __construct(private CanonicalKeys $serial, private EntitlementClock $clock, private UserAccess $users, private Audit $audit, private LicensingBans $bans, private OutageState $outages, private AccessRestrictions $restrictions) {}
 
     public function claimFor(Model $actor, Model $user, LicenseKey $key): Entitlement
     {
@@ -83,9 +85,19 @@ class ClaimLicense
             throw new LicensingException('already_lifetime', 409);
         }
         $before = $entitlement->only(['expires_at', 'is_lifetime']);
+        $claimedAt = CarbonImmutable::now('UTC')->startOfSecond();
         $this->clock->grant($entitlement, LicenseDuration::seconds($key->getRawOriginal('duration_days')));
-        Event::dispatch(new EntitlementGranted($entitlement, LicenseDuration::seconds($key->getRawOriginal('duration_days')), CarbonImmutable::now('UTC')->startOfSecond()));
-        $key->update(['entitlement_id' => $entitlement->id, 'claimed_at' => now()]);
+        $snapshot = fn (array $state): array => array_map(fn ($value) => $value instanceof \DateTimeInterface ? CarbonImmutable::instance($value)->utc()->toIso8601String() : $value, $state);
+        $provenance = new ClaimProvenance($key->id, $key->batch_id, $key->batch->issuer,
+            $key->batch->reference, 'claim:'.$key->id, $entitlement->id, $user->getKey(), $entitlement->product_id,
+            $claimedAt, $snapshot($before), $snapshot($entitlement->only(['expires_at', 'is_lifetime'])));
+        Event::dispatch(new EntitlementGranted($entitlement, LicenseDuration::seconds($key->getRawOriginal('duration_days')), $claimedAt, $provenance));
+        $key->update(['entitlement_id' => $entitlement->id, 'claimed_at' => $claimedAt]);
+        $entitlement->refresh();
+        $completed = new ClaimProvenance($key->id, $key->batch_id, $key->batch->issuer,
+            $key->batch->reference, 'claim:'.$key->id, $entitlement->id, $user->getKey(), $entitlement->product_id,
+            $claimedAt, $snapshot($before), $snapshot($entitlement->only(['expires_at', 'is_lifetime'])));
+        Event::dispatch(new LicenseClaimed($completed));
         $this->audit->record($actor ?? 'user:'.$user->getKey(), 'key_claimed', $entitlement, $before,
             [...$entitlement->only(['expires_at', 'is_lifetime']), 'key_id' => $key->id]);
 

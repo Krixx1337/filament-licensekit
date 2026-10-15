@@ -134,7 +134,7 @@ test('reset history uses configured UUID and ULID host identities', function (st
 test('missing reset history schema fails diagnostics without blocking unrelated authorization', function () {
     Schema::drop('licensekit_device_reset_history');
     $this->artisan('licensekit:check')->expectsOutputToContain('Missing table: licensekit_device_reset_history')->assertFailed();
-    expect(app(ModuleReadiness::class)->issues())->toContain('Missing core table: licensekit_device_reset_history. This unreleased schema requires a fresh disposable database.');
+    expect(app(ModuleReadiness::class)->issues())->toContain('Missing core table: licensekit_device_reset_history. Run php artisan migrate with the installed LicenseKit version.');
     app(ModuleReadiness::class)->assertReady();
 });
 

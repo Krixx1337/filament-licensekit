@@ -34,22 +34,22 @@ final class ModuleReadiness implements ReadinessCheck
                 }
             }
         }
-        foreach (['licensekit_entitlements' => ['paused_at', 'remaining_seconds'], 'licensekit_device_reset_history' => ['before_hwid'], 'licensekit_license_keys' => ['note', 'batch_id'], 'licensekit_batches' => ['issuer', 'reference', 'quantity', 'duration_days', 'label']] as $table => $columns) {
+        foreach (['licensekit_import_records' => ['identity', 'payload_hash', 'target_id'], 'licensekit_entitlements' => ['paused_at', 'remaining_seconds'], 'licensekit_device_reset_history' => ['before_hwid'], 'licensekit_license_keys' => ['note', 'batch_id'], 'licensekit_batches' => ['issuer', 'reference', 'quantity', 'duration_days', 'label']] as $table => $columns) {
             if (! Schema::hasTable($table)) {
-                $errors[] = 'Missing core table: '.$table.'. This unreleased schema requires a fresh disposable database.';
+                $errors[] = 'Missing core table: '.$table.'. Run php artisan migrate with the installed LicenseKit version.';
 
                 continue;
             }
             foreach ($columns as $column) {
                 if (! Schema::hasColumn($table, $column)) {
-                    $errors[] = 'Missing '.$table.' column: '.$column.'. This unreleased schema requires a fresh disposable database.';
+                    $errors[] = 'Missing '.$table.' column: '.$column.'. Run php artisan migrate with the installed LicenseKit version.';
                 }
             }
         }
         if (Schema::hasTable('licensekit_device_bindings')) {
             foreach (['user_id', 'scope_key', 'hwid', 'bound_at', 'last_hwid_reset_at'] as $column) {
                 if (! Schema::hasColumn('licensekit_device_bindings', $column)) {
-                    $errors[] = 'Missing device binding column: '.$column.'. This unreleased schema requires a fresh disposable database.';
+                    $errors[] = 'Missing device binding column: '.$column.'. Run php artisan migrate with the installed LicenseKit version.';
                 }
             }
             if ($errors === []) {

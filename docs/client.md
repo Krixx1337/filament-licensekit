@@ -101,3 +101,14 @@ app(DeviceBindings::class)->adminReset($user, $product, $admin, 'Customer replac
 ```
 
 Successful resets stay on the HWID reset history page in the admin, including the device that was cleared.
+
+
+## Claim events and provenance
+
+`EntitlementGranted` remains synchronous inside the claim transaction. Its listeners can change licensing state, and a listener exception rolls back the claim. The outage module depends on this behavior. The optional `claim` property contains immutable `ClaimProvenance`: key/batch IDs, issuer/reference, stable `claim:{keyId}` operation identity, entitlement/user/product IDs, UTC claim time, and before/after expiry/lifetime values. No serial is included. At this hook, the key's entitlement link has not yet been written.
+
+`LicenseClaimed` carries completed `ClaimProvenance` in its `claim` property. It dispatches after the outermost transaction commits and after key linkage is saved. Its after-state includes synchronous grant-listener changes. Rollback discards it. Data consists of scalar values and immutable timestamps rather than mutable Eloquent models.
+
+Use after-commit listeners for delivery notifications and external calls. A listener failure after commit cannot undo the claim; delivery guarantees need a host outbox or reconciliation. Use synchronous listeners only for database work that must participate in the claim transaction.
+
+Host-provided grants remain host decisions. `AccessPolicy::assertAllowed()` checks universal restrictions but does not prove paid entitlement. Approve a host grant before using `DeviceBindings::bind()`, ideally within the same transaction. Keep account authentication, session cleanup, and desktop response/error protocols in the host.

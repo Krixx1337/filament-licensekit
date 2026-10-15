@@ -9,6 +9,7 @@ use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use LicenseKit\Core\Contracts\HwidHandler;
+use LicenseKit\Core\Contracts\KeyNormalizer;
 use LicenseKit\Core\Exceptions\LicensingException;
 use LicenseKit\Core\Http\LicensingExceptionResponse;
 use LicenseKit\Core\Http\Middleware\JsonResponse;
@@ -19,6 +20,14 @@ class CoreServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->app->bind(KeyNormalizer::class, function ($app): KeyNormalizer {
+            $normalizer = config('licensekit.key_normalizer');
+            if (! is_string($normalizer) || ! is_a($normalizer, KeyNormalizer::class, true)) {
+                throw new LicensingException('invalid_key_normalizer', 503);
+            }
+
+            return $app->make($normalizer);
+        });
         $this->app->bind(HwidHandler::class, function ($app): HwidHandler {
             $handler = config('licensekit.hwid_handler');
             if (! is_string($handler) || ! is_a($handler, HwidHandler::class, true)) {

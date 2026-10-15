@@ -197,5 +197,5 @@ test('generated lifetime batch remains lifetime after plan edits', function () {
 test('schema diagnostics detect old databases missing private key notes', function () {
     Schema::table('licensekit_license_keys', fn (Blueprint $table) => $table->dropColumn('note'));
 
-    expect(app(ModuleReadiness::class)->issues())->toContain('Missing licensekit_license_keys column: note. This unreleased schema requires a fresh disposable database.');
+    expect(app(ModuleReadiness::class)->issues())->toContain('Missing licensekit_license_keys column: note. Run php artisan migrate with the installed LicenseKit version.');
 });

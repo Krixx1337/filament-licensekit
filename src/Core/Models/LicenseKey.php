@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use LicenseKit\Core\Actions\LicenseDuration;
+use LicenseKit\Core\Casts\UtcDateTime;
 use LicenseKit\Database\Factories\Core\LicenseKeyFactory;
 
 /**
@@ -48,7 +49,7 @@ class LicenseKey extends Model
     /** @return array<string, string> */
     protected function casts(): array
     {
-        return ['license_plan_id' => 'integer', 'batch_id' => 'integer', 'entitlement_id' => 'integer', 'duration_days' => 'integer', 'claimed_at' => 'immutable_datetime', 'revoked_at' => 'immutable_datetime'];
+        return ['license_plan_id' => 'integer', 'batch_id' => 'integer', 'entitlement_id' => 'integer', 'duration_days' => 'integer', 'claimed_at' => UtcDateTime::class, 'revoked_at' => UtcDateTime::class];
     }
 
     /** @return BelongsTo<LicensePlan, $this> */

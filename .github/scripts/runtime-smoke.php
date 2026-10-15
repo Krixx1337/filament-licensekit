@@ -44,6 +44,7 @@ try {
             'cache.default' => 'array',
             'session.driver' => 'array',
             'licensekit.modules.outages' => true,
+            'licensekit.user.require_verified' => false,
         ]);
     });
 
@@ -86,6 +87,26 @@ try {
     LicensingBan::create(['user_id' => $user->id, 'product_id' => $product->id, 'reason' => 'Lifted', 'created_by' => 'console', 'lifted_at' => now()]);
     if (LicensingBan::query()->active()->pluck('id')->all() !== [$active->id]) {
         throw new RuntimeException('Active ban scope included expired or lifted bans.');
+    }
+
+
+    $plan = \LicenseKit\Core\Models\LicensePlan::create(['product_id' => $product->id, 'name' => '30 days', 'duration_days' => 30]);
+    config(['licensekit.local_integrations.store' => ['enabled' => true, 'all_products' => true, 'maximum_quantity' => 1, 'disclose_serials' => true]]);
+    $issuer = app(\LicenseKit\Core\Actions\IssueLicenses::class);
+    $first = $issuer->issue('store', $plan->id, 1, 'purchase:1', discloseSerials: true);
+    $retry = $issuer->issue('store', $plan->id, 1, 'purchase:1', discloseSerials: true);
+    if ($first->batchId !== $retry->batchId || ! $retry->replayed || $first->serials !== $retry->serials) {
+        throw new RuntimeException('Native issuance retry failed.');
+    }
+    $customer = CompatibilityUser::create(['email' => 'customer@example.test', 'password' => 'unused']);
+    app(\LicenseKit\Core\Actions\ClaimLicense::class)->claim($customer, $first->serials[0]);
+    config(['licensekit.imports.enabled' => true]);
+    $importer = app(\LicenseKit\Core\Actions\ImportLicensing::class);
+    $source = new \LicenseKit\Core\Data\ImportSource('example', 'key:1', 'migration');
+    $snapshot = new \LicenseKit\Core\Data\KeySnapshot('AAAAA-BBBBB-CCCCC-DDDDD-EEEEE', $plan->id, 30);
+    $import = $importer->key($source, $snapshot);
+    if ($importer->key($source, $snapshot)->targetId !== $import->targetId) {
+        throw new RuntimeException('Historical import retry failed.');
     }
 
     echo 'Runtime smoke passed on Laravel '.$app->version().' / PHP '.PHP_VERSION.".\n";

@@ -9,7 +9,7 @@ The package is published on [Packagist](https://packagist.org/packages/licenseki
 ## Prepare the release
 
 1. Commit the intended release changes and push them to GitHub.
-2. Wait for every job in the `tests` workflow to pass, including the compatibility matrix, distribution archive check, and MySQL tests.
+2. Wait for every job in the `tests` workflow to pass, including the compatibility matrix, distribution archive check, minimum-runtime issuance/import consumer, fresh-schema rollback/reinstall coverage, and MySQL claim/issuance/import tests.
 3. Add a changelog entry for `0.1.0-alpha.2` with the release date and changes since the previous alpha. Keep the pre-release warning.
 4. Commit and push that changelog update, then wait for CI to pass on that commit.
 5. Create and push the tag on that tested commit:

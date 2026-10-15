@@ -8,11 +8,15 @@ use LicenseKit\Core\Actions\Audit;
 use LicenseKit\Core\Actions\ClaimLicense;
 use LicenseKit\Core\Actions\CreateBatch;
 use LicenseKit\Core\Actions\DeviceBindings;
+use LicenseKit\Core\Actions\ImportLicensing;
+use LicenseKit\Core\Actions\IssueLicenses;
 use LicenseKit\Core\Actions\LicensedDevices;
 use LicenseKit\Core\Actions\ManageApiClients;
 use LicenseKit\Core\Actions\ManageEntitlements;
 use LicenseKit\Core\Actions\ManageLicensingBans;
 use LicenseKit\Core\Actions\ManagementOperations;
+use LicenseKit\Core\Data\ImportSource;
+use LicenseKit\Core\Data\KeySnapshot;
 use LicenseKit\Core\Exceptions\LicensingException;
 use LicenseKit\Core\Models\ApiClient;
 use LicenseKit\Core\Models\Batch;
@@ -35,6 +39,9 @@ $case->travelTo(CarbonImmutable::parse($payload['at']));
 config(['licensekit.device_binding.scope' => $payload['binding_scope'] ?? 'per_product', 'host_client.free_until' => $payload['free_until'] ?? null]);
 if ($payload['structured_hwid'] ?? false) {
     config(['licensekit.hwid_handler' => StructuredHwid::class]);
+}
+if ($payload['read_committed'] ?? false) {
+    DB::statement('SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED');
 }
 $worker = DB::table('licensekit_test_barrier')->insertGetId([]);
 $deadline = microtime(true) + 15;
@@ -66,6 +73,18 @@ $run = fn () => match ($operation) {
         app(DeviceBindings::class)->reset($user, Product::findOrFail($payload['reset_product_id']), $user);
 
         return 1;
+    })(),
+    'local-issue' => (function () use ($payload): int {
+        config(['licensekit.local_integrations.store' => ['enabled' => true, 'all_products' => true, 'maximum_quantity' => 2]]);
+
+        return app(IssueLicenses::class)->issue('store', $payload['plan_id'], 2, 'purchase')->batchId;
+    })(),
+    'import-key' => (function () use ($payload): int {
+        config(['licensekit.imports.enabled' => true]);
+
+        return app(ImportLicensing::class)->key(
+            new ImportSource('old', 'key:1', 'migration'),
+            new KeySnapshot('AAAAA-BBBBB-CCCCC-DDDDD-EEEEE', $payload['plan_id'], 30))->targetId;
     })(),
     'management-issue' => app(ManagementOperations::class)->create($payload['token'], $payload['plan_id'], 2, 'issue')->id,
     'management-revoke' => (function () use ($payload): int {
