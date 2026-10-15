@@ -58,7 +58,7 @@ class MySqlTestCase extends TestCase
 
     /** @param list<string> $operations
      * @param  array<string,mixed>  $payload
-     * @return list<int|string>
+     * @return list<mixed>
      */
     public function race(array $operations, array $payload, ?string $firstOperation = null): array
     {

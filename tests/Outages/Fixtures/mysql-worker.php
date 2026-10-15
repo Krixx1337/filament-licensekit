@@ -74,10 +74,12 @@ $run = fn () => match ($operation) {
 
         return 1;
     })(),
-    'local-issue' => (function () use ($payload): int {
-        config(['licensekit.local_integrations.store' => ['enabled' => true, 'all_products' => true, 'maximum_quantity' => 2]]);
+    'local-issue', 'local-issue-stale' => (function () use ($payload): array {
+        config(['licensekit.local_integrations.store' => ['enabled' => true, 'all_products' => true, 'maximum_quantity' => 2, 'disclose_serials' => true]]);
 
-        return app(IssueLicenses::class)->issue('store', $payload['plan_id'], 2, 'purchase')->batchId;
+        $result = app(IssueLicenses::class)->issue('store', $payload['plan_id'], 2, 'purchase', discloseSerials: true);
+
+        return ['batch_id' => $result->batchId, 'key_ids' => $result->keyIds, 'serials' => $result->serials, 'replayed' => $result->replayed];
     })(),
     'import-key' => (function () use ($payload): int {
         config(['licensekit.imports.enabled' => true]);
@@ -132,9 +134,9 @@ $run = fn () => match ($operation) {
     'create-plan' => app(CreateBatch::class)->create(LicensePlan::findOrFail($payload['plan_ids'][$worker - 1]), 1, 'plan-'.$worker, 'test')->id,
     'create-distinct' => app(CreateBatch::class)->create(LicensePlan::findOrFail($payload['plan_id']), 1, 'order-'.$worker, 'test')->id,
 };
-$waitFor = function (string $path): void {
+$waitFor = function (string $path, string $expected = 'ready'): void {
     $deadline = microtime(true) + 15;
-    while (file_get_contents($path) !== 'ready') {
+    while (file_get_contents($path) !== $expected) {
         if (microtime(true) > $deadline) {
             throw new RuntimeException('Ordered race worker did not reach licensing lock.');
         }
@@ -178,8 +180,18 @@ try {
         }
     } else {
         $waitFor($payload['ready_path']);
-        file_put_contents($payload['contender_path'], 'ready');
-        $result = $run();
+        if ($operation === 'local-issue-stale') {
+            $result = DB::transaction(function () use ($run, $payload, $waitFor) {
+                LicensePlan::findOrFail($payload['plan_id']);
+                file_put_contents($payload['contender_path'], 'ready');
+                $waitFor($payload['ready_path'], 'committed');
+
+                return $run();
+            });
+        } else {
+            file_put_contents($payload['contender_path'], 'ready');
+            $result = $run();
+        }
     }
 } catch (LicensingException $exception) {
     $result = $exception->error;

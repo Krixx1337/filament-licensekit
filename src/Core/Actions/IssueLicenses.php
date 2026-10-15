@@ -5,7 +5,6 @@ namespace LicenseKit\Core\Actions;
 use Illuminate\Support\Facades\DB;
 use LicenseKit\Core\Data\IssuanceResult;
 use LicenseKit\Core\Exceptions\LicensingException;
-use LicenseKit\Core\Models\Batch;
 use LicenseKit\Core\Models\LicensePlan;
 use LicenseKit\Core\Models\Product;
 
@@ -33,7 +32,6 @@ class IssueLicenses
                 throw new LicensingException('integration_forbidden');
             }
             $issuer = 'local:'.$integration;
-            $replayed = Batch::where('issuer', $issuer)->where('reference', $reference)->exists();
             $batch = $this->batches->create($plan, $quantity, $reference, $issuer, $label);
 
             $ids = [];
@@ -45,7 +43,7 @@ class IssueLicenses
                 }
             }
 
-            return new IssuanceResult($batch->id, $ids, $replayed, $discloseSerials ? $serials : null);
+            return new IssuanceResult($batch->id, $ids, ! $batch->wasRecentlyCreated, $discloseSerials ? $serials : null);
         }, 3);
     }
 }

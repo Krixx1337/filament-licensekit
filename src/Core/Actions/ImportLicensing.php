@@ -165,7 +165,7 @@ class ImportLicensing
 
             return DeviceResetHistory::create(['user_id' => (string) $snapshot->userId,
                 'scope' => $snapshot->productId === null ? 'global' : 'per_product', 'product_id' => $snapshot->productId,
-                'reset_at' => $this->date($snapshot->resetAt), 'performed_by' => $snapshot->performedBy,
+                'reset_at' => $snapshot->resetAt, 'performed_by' => $snapshot->performedBy,
                 'actor_id' => $snapshot->actorId, 'reason' => $snapshot->reason, 'before_hwid' => $snapshot->beforeHwid]);
         });
     }

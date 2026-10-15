@@ -41,7 +41,7 @@ class CreateBatch
                     throw new LicensingException('batch_conflict', 409);
                 }
 
-                return $batch->load(['keys' => fn ($query) => $query->orderBy('id')]);
+                return $batch->load(['keys' => fn ($query) => $query->orderBy('id')->lockForUpdate()]);
             }
             $this->validatePlan($plan, $quantity);
             $batch = Batch::create(['issuer' => $issuer, 'reference' => $reference, 'license_plan_id' => $plan->id,
@@ -50,7 +50,7 @@ class CreateBatch
             $this->audit->record($issuer, 'batch_created', $batch, [], ['quantity' => $quantity, 'plan_id' => $plan->id,
                 'duration_days' => $plan->duration_days]);
 
-            return $batch->load(['keys' => fn ($query) => $query->orderBy('id')]);
+            return $batch->load(['keys' => fn ($query) => $query->orderBy('id')->lockForUpdate()]);
         };
         try {
             return DB::transaction($operation, 3);

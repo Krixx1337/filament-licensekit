@@ -346,6 +346,38 @@ test('historical import dates stay UTC in a non-UTC host', function () {
     }
 });
 
+test('reset history imports preserve the same instant as binding cooldowns across timezones', function (string $timezone, string $instant) {
+    config(['licensekit.imports.enabled' => true, 'app.timezone' => $timezone]);
+    $originalTimezone = date_default_timezone_get();
+    date_default_timezone_set($timezone);
+    try {
+        $user = User::factory()->create();
+        $product = Product::factory()->create();
+        $at = CarbonImmutable::parse($instant);
+        $importer = app(ImportLicensing::class);
+        $source = new ImportSource('old', 'reset:timezone', 'migration');
+        $snapshot = new ResetSnapshot($user->id, $product->id, $at, 'customer', (string) $user->id);
+        $binding = $importer->device(new ImportSource('old', 'device:timezone', 'migration'),
+            new DeviceSnapshot($user->id, $product->id, null, null, $at));
+
+        $first = $importer->reset($source, $snapshot);
+        $retry = $importer->reset($source, $snapshot);
+
+        $reset = DeviceResetHistory::findOrFail($first->targetId);
+        expect($reset->reset_at->equalTo($at))->toBeTrue();
+        expect($reset->reset_at->equalTo(DeviceBinding::findOrFail($binding->targetId)->last_hwid_reset_at))->toBeTrue();
+        expect($retry->replayed)->toBeTrue();
+        expect($retry->targetId)->toBe($first->targetId);
+        $this->assertDatabaseCount('licensekit_device_reset_history', 1);
+    } finally {
+        date_default_timezone_set($originalTimezone);
+    }
+})->with([
+    ['UTC', '2025-01-01T00:00:00Z'],
+    ['America/New_York', '2025-01-01T00:00:00Z'],
+    ['America/New_York', '2025-07-01T03:00:00+03:00'],
+]);
+
 test('paused and deleted-owner entitlement history imports without clock advancement', function () {
     config(['licensekit.imports.enabled' => true]);
     $user = User::factory()->create();
