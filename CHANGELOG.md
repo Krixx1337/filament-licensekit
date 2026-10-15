@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.1.0-alpha.2 - 2026-10-15
+
+Pre-release APIs and configuration may change before the first stable release.
+
+**Schema compatibility:** the initial migration changed. Existing disposable alpha development databases must be rebuilt; ordinary `migrate` does not update an already-applied initial migration. No incremental alpha upgrade migration is provided. Preserve any data you need before rebuilding.
+
 - Trusted local application issuance with integration scope, explicit serial disclosure, and stable retry results.
 - Replaceable key normalization and initial-schema support for 255-byte canonical keys with exact equality.
 - Explicitly enabled historical entitlement, key, device, and reset imports with preflight reports and source fingerprints.

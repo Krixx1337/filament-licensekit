@@ -5,9 +5,11 @@ PHP 8.3+, Laravel 12 or 13, Filament 4.13.3+ or 5.8.3+, and Sanctum 4.x. Sanctum
 Install the pre-release from [Packagist](https://packagist.org/packages/licensekit/licensekit):
 
 ```sh
-composer require licensekit/licensekit:0.1.0-alpha.1
+composer require licensekit/licensekit:0.1.0-alpha.2
 php artisan licensekit:install --no-interaction
 ```
+
+When updating from alpha.1, preserve any data you need and rebuild disposable development databases. Alpha.2 changes the initial schema; ordinary `migrate` does not update an already-applied initial migration. No incremental alpha upgrade migration is provided.
 
 Add the plugin to your panel. The panel cannot be a Filament tenant panel, and it has to use your user model.
 

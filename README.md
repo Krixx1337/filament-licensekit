@@ -15,9 +15,9 @@ Stop paying monthly SaaS fees to services that police your business or crash whe
 
 I have run licensing for private desktop software since 2019. This is the package I wish I had when I started.
 
-> **Pre-release.** LicenseKit is available on [Packagist](https://packagist.org/packages/licensekit/licensekit) as `0.1.0-alpha.1`. APIs and configuration may change before the first stable release.
+> **Pre-release.** LicenseKit is available on [Packagist](https://packagist.org/packages/licensekit/licensekit) as `0.1.0-alpha.2`. APIs and configuration may change before the first stable release.
 
-Unreleased changes include [local application issuance](docs/shops.md#from-the-same-laravel-application), [historical imports and custom keys](docs/importing.md), and [claim events](docs/client.md#claim-events-and-provenance). These additions are not in the published alpha yet.
+Alpha.2 adds [local application issuance](docs/shops.md#from-the-same-laravel-application), [historical imports and custom keys](docs/importing.md), and [claim events](docs/client.md#claim-events-and-provenance). Existing disposable alpha development databases must be rebuilt because the initial schema changed. See the [changelog](CHANGELOG.md) before updating.
 
 Maintainer instructions are in [publishing](docs/releasing.md). Changes are recorded in the [changelog](CHANGELOG.md).
 
@@ -87,7 +87,7 @@ PHP 8.3+, Laravel 12 or 13, Filament 4.13.3+ or 5.8.3+, and Sanctum 4.x. Sanctum
 Install the alpha from Packagist, then:
 
 ```sh
-composer require licensekit/licensekit:0.1.0-alpha.1
+composer require licensekit/licensekit:0.1.0-alpha.2
 php artisan licensekit:install --no-interaction
 ```
 
