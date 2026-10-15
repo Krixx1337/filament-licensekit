@@ -34,7 +34,7 @@ final class ModuleReadiness implements ReadinessCheck
                 }
             }
         }
-        foreach (['licensekit_device_reset_history' => ['before_hwid'], 'licensekit_license_keys' => ['note', 'batch_id'], 'licensekit_batches' => ['issuer', 'reference', 'quantity', 'duration_days', 'label']] as $table => $columns) {
+        foreach (['licensekit_entitlements' => ['paused_at', 'remaining_seconds'], 'licensekit_device_reset_history' => ['before_hwid'], 'licensekit_license_keys' => ['note', 'batch_id'], 'licensekit_batches' => ['issuer', 'reference', 'quantity', 'duration_days', 'label']] as $table => $columns) {
             if (! Schema::hasTable($table)) {
                 $errors[] = 'Missing core table: '.$table.'. This unreleased schema requires a fresh disposable database.';
 

@@ -44,7 +44,9 @@ class EntitlementResource extends LicensingResource
         return $table->columns([TextColumn::make('user.'.config('licensekit.user.display_column'))->label('User')->placeholder('Deleted user')->searchable()->toggleable(),
             TextColumn::make('product.name')->label('Product')->searchable()->toggleable(),
             IconColumn::make('is_lifetime')->label('Lifetime')->boolean()->toggleable(isToggledHiddenByDefault: true),
-            TextColumn::make('expires_at')->label('Ends')->dateTime()->placeholder('Lifetime')->toggleable(),
+            TextColumn::make('expires_at')->label('Ends')->dateTime()->placeholder(fn (Entitlement $record): string => $record->is_lifetime ? 'Lifetime' : ($record->paused_at !== null ? 'Paused' : 'No expiry'))->toggleable(),
+            TextColumn::make('paused_at')->label('Paused at')->dateTime()->placeholder('Not paused')->toggleable(isToggledHiddenByDefault: true),
+            TextColumn::make('remaining_seconds')->label('Banked time')->formatStateUsing(fn (int $state): string => floor($state / 86400).'d '.floor(($state % 86400) / 3600).'h '.floor(($state % 3600) / 60).'m '.($state % 60).'s')->placeholder('None')->toggleable(),
             IconColumn::make('is_revoked')->label('Cancelled')->boolean()->toggleable(),
             IconColumn::make('is_blocked')->label('Blocked')->boolean()->toggleable(),
             IconColumn::make('device_bound')->label('Device linked')->boolean()->toggleable(isToggledHiddenByDefault: true)
@@ -52,6 +54,9 @@ class EntitlementResource extends LicensingResource
             TextColumn::make('bound_at')->label('Linked at')->dateTime()->placeholder('Not linked')->toggleable(isToggledHiddenByDefault: true)
                 ->state(fn (Entitlement $record): ?CarbonImmutable => $record->binding?->bound_at)])->recordActions([LicensingActions::status('is_revoked'),
                     LicensingActions::status('is_blocked'),
+                    LicensingActions::extendEntitlement(),
+                    LicensingActions::pauseEntitlement(),
+                    LicensingActions::resumeEntitlement(),
                     LicensingActions::reset(),
                     LicensingActions::inspectDevice(), ])->defaultSort('id', 'desc');
     }

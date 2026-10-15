@@ -199,7 +199,7 @@ class ManageOutages
     private function eligible(int $productId, CarbonImmutable $at): Builder
     {
         return DB::table('licensekit_entitlements')->where('product_id', $productId)->whereNotNull('user_id')
-            ->where('is_lifetime', false)->where('is_revoked', false)->where('created_at', '<=', $at)->where('expires_at', '>', $at);
+            ->whereNull('paused_at')->where('is_lifetime', false)->where('is_revoked', false)->where('created_at', '<=', $at)->where('expires_at', '>', $at);
     }
 
     private function validate(string $reference, string $reason): void

@@ -12,7 +12,7 @@ trait DisplaysLicensingErrors
     public function exception(Throwable $e, Closure $stopPropagation): void
     {
         if ($e instanceof LicensingException) {
-            Notification::make()->title(ucfirst($e->getMessage()))->danger()->send();
+            Notification::make()->title($e->error === 'operation_conflict' ? 'Finish the product outage or finish/cancel compensation before trying again.' : ucfirst($e->getMessage()))->danger()->send();
             $stopPropagation();
         }
     }

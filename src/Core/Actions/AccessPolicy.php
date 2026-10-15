@@ -57,6 +57,9 @@ class AccessPolicy
         }
         $entitlement = Entitlement::where('user_id', $user->getKey())->where('product_id', $product->id)->when(DB::transactionLevel() > 0, fn ($query) => $query->sharedLock())->first();
         $this->restrictions->assertAllowed($user, $product, $entitlement);
+        if ($entitlement?->paused_at !== null) {
+            throw new LicensingException('subscription_paused');
+        }
 
         return $entitlement;
     }

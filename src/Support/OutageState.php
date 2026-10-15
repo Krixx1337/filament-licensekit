@@ -9,6 +9,25 @@ use LicenseKit\Core\Exceptions\LicensingException;
 /** Stored incident safety remains active even when its optional module is disabled. */
 class OutageState
 {
+    /** Caller holds the product lock, including when the optional module is disabled. */
+    public function assertClockChange(int $productId): void
+    {
+        foreach (['licensekit_outages', 'licensekit_compensation_operations'] as $table) {
+            if (! Schema::hasTable($table)) {
+                if (Modules::enabled('outages')) {
+                    throw new LicensingException('licensing_unavailable', 503);
+                }
+
+                continue;
+            }
+            $query = DB::table($table)->where('product_id', $productId);
+            $query = $table === 'licensekit_outages' ? $query->whereNull('ended_at') : $query->whereIn('status', ['pending', 'processing', 'failed']);
+            if ($query->lockForUpdate()->first() !== null) {
+                throw new LicensingException('operation_conflict', 409);
+            }
+        }
+    }
+
     public function assertAccess(int $productId): void
     {
         if (Modules::enabled('outages') && ! Schema::hasTable('licensekit_outages')) {

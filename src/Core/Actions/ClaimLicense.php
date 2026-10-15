@@ -73,6 +73,9 @@ class ClaimLicense
         $entitlement = Entitlement::where($ownership)->lockForUpdate()->first();
         $this->restrictions->assertAllowed($user, $key->plan->product, $entitlement);
         $entitlement ??= Entitlement::create($ownership);
+        if ($entitlement->paused_at !== null) {
+            throw new LicensingException('subscription_paused');
+        }
         if ($entitlement->is_revoked) {
             throw new LicensingException('entitlement_revoked');
         }

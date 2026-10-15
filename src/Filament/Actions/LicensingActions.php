@@ -134,6 +134,43 @@ class LicensingActions
             ->action(fn (Entitlement $record, array $data) => app(ManageEntitlements::class)->status($record, $field, ! $record->{$field}, self::actor(), $data['reason']));
     }
 
+    public static function extendEntitlement(): Action
+    {
+        return Action::make('extend')->label('Extend time')
+            ->authorize(fn (Entitlement $record): bool => AdminAccess::can('extend', $record))
+            ->visible(fn (Entitlement $record): bool => $record->user_id !== null && ! $record->is_lifetime && ! $record->is_revoked)
+            ->modalDescription('Adds time from the current expiry, or from now if expired. Paused licenses keep the added time banked.')
+            ->schema([
+                TextInput::make('duration')->integer()->minValue(1)->maxValue(fn (Get $get): int => $get('unit') === 'days' ? 3650 : 87600)->default(1)->required(),
+                Select::make('unit')->options(['hours' => 'Hours', 'days' => 'Days'])->default('days')->live()->required(),
+                Textarea::make('reason')->required()->maxLength(2000),
+            ])
+            ->action(function (Entitlement $record, array $data): void {
+                $seconds = (int) $data['duration'] * ($data['unit'] === 'days' ? 86400 : 3600);
+                app(ManageEntitlements::class)->extend($record, $seconds, self::actor(), $data['reason']);
+            });
+    }
+
+    public static function pauseEntitlement(): Action
+    {
+        return Action::make('pause')->label('Pause')
+            ->authorize(fn (Entitlement $record): bool => AdminAccess::can('pause', $record))
+            ->visible(fn (Entitlement $record): bool => $record->user_id !== null && ! $record->is_lifetime && ! $record->is_revoked && $record->paused_at === null && (bool) $record->expires_at?->isFuture())
+            ->modalDescription('Preserves remaining time and stops access until staff resume this license.')
+            ->schema([Textarea::make('reason')->required()->maxLength(2000)])
+            ->action(fn (Entitlement $record, array $data) => app(ManageEntitlements::class)->pause($record, self::actor(), $data['reason']));
+    }
+
+    public static function resumeEntitlement(): Action
+    {
+        return Action::make('resume')->label('Resume')
+            ->authorize(fn (Entitlement $record): bool => AdminAccess::can('resume', $record))
+            ->visible(fn (Entitlement $record): bool => $record->user_id !== null && ! $record->is_lifetime && ! $record->is_revoked && $record->paused_at !== null)
+            ->modalDescription('Starts the banked time from now. Other access restrictions still apply.')
+            ->schema([Textarea::make('reason')->required()->maxLength(2000)])
+            ->action(fn (Entitlement $record, array $data) => app(ManageEntitlements::class)->resume($record, self::actor(), $data['reason']));
+    }
+
     public static function reset(): Action
     {
         return Action::make('reset_hwid')->authorize(fn (Entitlement $record): bool => $record->user !== null && AdminAccess::can('resetHwid', $record->product, context: [$record->user]))->label('Reset HWID')->modalDescription(fn (): string => config('licensekit.device_binding.scope') === 'global' ? 'Resets the account-wide device and invalidates device access for every product.' : 'Resets this product device and invalidates its device access.')->schema([Textarea::make('reason')->required()->maxLength(2000)])

@@ -15,6 +15,47 @@ use LicenseKit\Modules\Outages\Jobs\ApplyCompensation;
 use LicenseKit\Tests\Core\Fixtures\ClientSessions;
 use LicenseKit\Tests\Outages\Fixtures\User;
 
+test('MySQL individual extension and pause preserve every granted second', function (string $first) {
+    $actor = outageAdmin();
+    $entitlement = Entitlement::factory()->create(['user_id' => User::factory()->create()->id]);
+    $expiry = $entitlement->expires_at;
+
+    $results = $this->race(['individual-extend', 'individual-pause'], ['entitlement_id' => $entitlement->id, 'product_id' => $entitlement->product_id, 'user_id' => $entitlement->user_id, 'actor_id' => $actor->id], $first);
+
+    expect($results)->toBe([$entitlement->id, $entitlement->id]);
+    $entitlement->refresh();
+    expect($entitlement->expires_at)->toBeNull();
+    expect($entitlement->remaining_seconds)->toBe((int) $entitlement->paused_at->diffInSeconds($expiry, false) + 3600);
+})->with(['individual-extend', 'individual-pause']);
+
+test('MySQL claim and pause serialize without consuming a key while paused', function (string $first) {
+    $actor = outageAdmin();
+    $user = User::factory()->create();
+    $plan = LicensePlan::factory()->create(['duration_days' => 1]);
+    $key = app(CreateBatch::class)->create($plan, 1, 'sale', 'test')->keys->first();
+    $entitlement = Entitlement::factory()->create(['user_id' => $user->id, 'product_id' => $plan->product_id]);
+    $expiry = $entitlement->expires_at;
+
+    $results = $this->race(['claim', 'individual-pause'], ['entitlement_id' => $entitlement->id, 'product_id' => $entitlement->product_id, 'user_id' => $user->id, 'actor_id' => $actor->id, 'key' => $key->key], $first);
+
+    expect($results)->toBe([$first === 'claim' ? $entitlement->id : 'subscription_paused', $entitlement->id]);
+    $entitlement->refresh();
+    expect($key->fresh()->claimed_at !== null)->toBe($first === 'claim');
+    expect($entitlement->remaining_seconds)->toBe((int) $entitlement->paused_at->diffInSeconds($expiry, false) + ($first === 'claim' ? 86400 : 0));
+})->with(['claim', 'individual-pause']);
+
+test('MySQL outage start and individual pause cannot overlap clocks', function (string $first) {
+    $actor = outageAdmin();
+    $entitlement = Entitlement::factory()->create(['user_id' => User::factory()->create()->id]);
+
+    $results = $this->race(['start', 'individual-pause'], ['entitlement_id' => $entitlement->id, 'product_id' => $entitlement->product_id, 'actor_id' => $actor->id], $first);
+
+    expect($results[0])->toBeInt();
+    expect($results[1])->toBe($first === 'start' ? 'operation_conflict' : $entitlement->id);
+    expect($entitlement->fresh()->paused_at !== null)->toBe($first === 'individual-pause');
+    $this->assertDatabaseCount('licensekit_compensation_entries', $first === 'start' ? 1 : 0);
+})->with(['start', 'individual-pause']);
+
 test('MySQL competing users cannot claim the same key', function () {
     $users = User::factory()->count(2)->create();
     $plan = LicensePlan::factory()->create();

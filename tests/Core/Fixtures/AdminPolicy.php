@@ -6,6 +6,21 @@ use Illuminate\Database\Eloquent\Model;
 
 class AdminPolicy
 {
+    public function extend(Model $actor, Model $record): bool
+    {
+        return $this->allowed(__FUNCTION__, $record);
+    }
+
+    public function pause(Model $actor, Model $record): bool
+    {
+        return $this->allowed(__FUNCTION__, $record);
+    }
+
+    public function resume(Model $actor, Model $record): bool
+    {
+        return $this->allowed(__FUNCTION__, $record);
+    }
+
     private function allowed(string $ability, ?Model $record = null, ?Model $target = null): bool
     {
         return in_array($ability, config('testing.admin_abilities', []), true)

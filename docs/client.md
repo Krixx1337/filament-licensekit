@@ -61,6 +61,29 @@ One paid license exists per user and product. A second claim on a timed plan ext
 
 Staff can claim for someone from the admin. That uses `ClaimLicense::claimFor($actor, $user, $serial)`.
 
+## Individual license support
+
+Staff can extend, pause, and resume one user's license from the Licenses table, or through PHP:
+
+```php
+use LicenseKit\Core\Actions\ManageEntitlements;
+
+$licenses = app(ManageEntitlements::class);
+$licenses->extend($entitlement, 3 * 86400, $admin, 'Support credit');
+$licenses->pause($entitlement, $admin, 'Customer requested a vacation pause');
+$licenses->resume($entitlement, $admin, 'Customer returned');
+```
+
+Each call checks its own policy ability, `extend`, `pause`, or `resume`, and requires a reason of 1–2000 characters after trimming. Extensions accept 1–315360000 seconds. They add to a future expiry or start from now if expired. A paused license banks the added seconds.
+
+Pause saves remaining seconds and clears expiry. Resume starts that balance from now. Lifetime, revoked, and deleted-user licenses cannot use these actions. Blocked licenses can, but the block stays. Pausing an expired license or repeating a pause/resume returns HTTP 409 with `cannot_pause_entitlement` or `cannot_resume_entitlement`.
+
+While paused, paid access, host-provided free access, and key claims fail with `subscription_paused`, HTTP 403. Keys stay unclaimed, including lifetime keys. Resume first before claiming. Customer summaries report `paused`, unless revoked or blocked, and expose `paused_at` and `remaining_seconds`. A null `expires_at` alone does not mean lifetime.
+
+Pause dispatches `EntitlementAccessInvalidated` inside the transaction. Your host app must listen to that event to invalidate its sessions. Bind and verify also reject paused licenses. Keep listener database writes in the same transaction; defer external side effects until commit.
+
+An unfinished product outage or pending, processing, or failed compensation prevents individual clock changes with `operation_conflict`, HTTP 409. Finish the outage and finish or cancel compensation first. Stored operations still prevent changes when the outage module is disabled. Paused licenses are excluded from product-wide credits, including historical manual credits.
+
 ## Reset
 
 The owner can clear their PC. The default wait is 7 days.

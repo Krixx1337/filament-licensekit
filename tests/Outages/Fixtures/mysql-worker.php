@@ -16,6 +16,7 @@ use LicenseKit\Core\Actions\ManagementOperations;
 use LicenseKit\Core\Exceptions\LicensingException;
 use LicenseKit\Core\Models\ApiClient;
 use LicenseKit\Core\Models\Batch;
+use LicenseKit\Core\Models\Entitlement;
 use LicenseKit\Core\Models\LicensePlan;
 use LicenseKit\Core\Models\Product;
 use LicenseKit\Modules\Outages\Actions\ManageOutages;
@@ -47,6 +48,17 @@ $operation = $argv[1];
 $hwid = ['value' => 'pc'];
 Gate::define('licensekit.manage', fn ($actor): bool => $actor->getKey() === ($payload['actor_id'] ?? null) || in_array($actor->getKey(), $payload['actor_ids'] ?? [], true));
 $run = fn () => match ($operation) {
+    'individual-pause', 'individual-extend' => (function () use ($operation, $payload): int {
+        $entitlement = Entitlement::findOrFail($payload['entitlement_id']);
+        $actor = User::findOrFail($payload['actor_id']);
+        if ($operation === 'individual-pause') {
+            app(ManageEntitlements::class)->pause($entitlement, $actor, 'Vacation');
+        } else {
+            app(ManageEntitlements::class)->extend($entitlement, 3600, $actor, 'Support');
+        }
+
+        return $entitlement->id;
+    })(),
     'batch-revoke' => app(ManageEntitlements::class)->revokeUnclaimedBatch(Batch::findOrFail($payload['batch_id']), User::findOrFail($payload['actor_id']), 'Chargeback'),
     'global-login' => app(ClientSessions::class)->login(Product::findOrFail($payload['product_ids'][$worker - 1]), User::findOrFail($payload['user_id'])->email, 'password', ['value' => 'pc-'.$worker])['token'],
     'device-reset' => (function () use ($payload): int {
@@ -116,7 +128,11 @@ try {
         $result = $run();
     } elseif ($operation === $payload['first_operation']) {
         $result = DB::transaction(function () use ($run, $payload, $waitFor) {
-            if ($payload['first_operation'] === 'batch-revoke') {
+            if (isset($payload['entitlement_id'])) {
+                $entitlement = Entitlement::findOrFail($payload['entitlement_id']);
+                User::whereKey([$payload['actor_id'], $entitlement->user_id])->orderBy('id')->lockForUpdate()->get();
+                Product::whereKey($entitlement->product_id)->lockForUpdate()->firstOrFail();
+            } elseif ($payload['first_operation'] === 'batch-revoke') {
                 User::whereKey($payload['actor_id'])->sharedLock()->firstOrFail();
                 Product::whereKey($payload['product_id'])->lockForUpdate()->firstOrFail();
             } elseif ($payload['first_operation'] === 'claim' && isset($payload['batch_id'])) {

@@ -11,10 +11,71 @@ use LicenseKit\Core\Models\Batch;
 use LicenseKit\Core\Models\Entitlement;
 use LicenseKit\Core\Models\LicenseKey;
 use LicenseKit\Core\Models\Product;
+use LicenseKit\Support\OutageState;
 
 class ManageEntitlements
 {
     public function __construct(private Audit $audit) {}
+
+    public function extend(Entitlement $entitlement, int $seconds, Model $actor, string $reason): void
+    {
+        if ($seconds < 1 || $seconds > 315360000) {
+            throw new LicensingException('invalid_duration', 422);
+        }
+        $this->changeClock($entitlement, 'extend', $actor, $reason, $seconds);
+    }
+
+    public function pause(Entitlement $entitlement, Model $actor, string $reason): void
+    {
+        $this->changeClock($entitlement, 'pause', $actor, $reason);
+    }
+
+    public function resume(Entitlement $entitlement, Model $actor, string $reason): void
+    {
+        $this->changeClock($entitlement, 'resume', $actor, $reason);
+    }
+
+    /** @param 'extend'|'pause'|'resume' $ability */
+    private function changeClock(Entitlement $entitlement, string $ability, Model $actor, string $reason, ?int $seconds = null): void
+    {
+        $reason = trim($reason);
+        if ($reason === '' || mb_strlen($reason) > 2000) {
+            throw new LicensingException('invalid_reason', 422);
+        }
+
+        DB::transaction(function () use ($entitlement, $ability, $actor, $reason, $seconds): void {
+            $users = $actor->newQuery()->whereKey(array_filter([$actor->getKey(), $entitlement->user_id], fn ($id): bool => $id !== null))
+                ->orderBy($actor->getKeyName())->lockForUpdate()->get();
+            $actor = $users->first(fn (Model $user): bool => (string) $user->getKey() === (string) $actor->getKey()) ?? throw new LicensingException('admin_forbidden');
+            Product::whereKey($entitlement->product_id)->lockForUpdate()->firstOrFail();
+            $entitlement = Entitlement::whereKey($entitlement->id)->lockForUpdate()->first() ?? throw new LicensingException('license_unavailable');
+            $this->authorize($actor, $ability, $entitlement);
+            if ($entitlement->user_id === null || $entitlement->is_lifetime || $entitlement->is_revoked) {
+                throw new LicensingException('cannot_'.$ability.'_entitlement', 409);
+            }
+            app(OutageState::class)->assertClockChange($entitlement->product_id);
+            $before = $entitlement->only(['expires_at', 'paused_at', 'remaining_seconds']);
+            $clock = app(EntitlementClock::class);
+            match ($ability) {
+                'extend' => $clock->extend($entitlement, $seconds ?? throw new LicensingException('invalid_duration', 422)),
+                'pause' => $clock->pause($entitlement),
+                'resume' => $clock->resume($entitlement),
+            };
+            if ($ability === 'pause') {
+                Event::dispatch(new EntitlementAccessInvalidated($entitlement));
+            }
+            $after = $entitlement->only(['expires_at', 'paused_at', 'remaining_seconds']);
+            if ($seconds !== null) {
+                $after['added_seconds'] = $seconds;
+            }
+            $event = match ($ability) {
+                'extend' => 'entitlement_extended',
+                'pause' => 'entitlement_paused',
+                'resume' => 'entitlement_resumed',
+            };
+            $this->audit->record('user:'.$actor->getKey(), $event, $entitlement, $before, $after, $reason);
+        }, 3);
+    }
 
     public function status(Entitlement $entitlement, string $field, bool $value, Model $actor, string $reason): void
     {

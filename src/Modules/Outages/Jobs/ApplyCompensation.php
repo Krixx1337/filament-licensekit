@@ -47,7 +47,7 @@ class ApplyCompensation implements ShouldQueue
                     $results = [];
                     foreach ($entries as $entry) {
                         $entitlement = $entitlements->get($entry->entitlement_id);
-                        $eligible = $entitlement !== null && $entitlement->product_id === $operation->product_id && $entitlement->user_id !== null && ! $entitlement->is_lifetime && ! $entitlement->is_revoked && $entitlement->expires_at !== null;
+                        $eligible = $entitlement !== null && $entitlement->product_id === $operation->product_id && $entitlement->user_id !== null && ! $entitlement->is_lifetime && ! $entitlement->is_revoked && $entitlement->paused_at === null && $entitlement->expires_at !== null;
                         $seconds = 0;
                         if ($eligible) {
                             $old = CarbonImmutable::parse($entitlement->expires_at, 'UTC');

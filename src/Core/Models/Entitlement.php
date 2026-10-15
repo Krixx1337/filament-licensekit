@@ -15,19 +15,21 @@ use LicenseKit\Database\Factories\Core\EntitlementFactory;
 
 /**
  * @property int $id
- * @property int|string $user_id
+ * @property int|string|null $user_id
  * @property int $product_id
  * @property bool $is_lifetime
  * @property bool $is_revoked
  * @property bool $is_blocked
  * @property CarbonImmutable|null $expires_at
+ * @property CarbonImmutable|null $paused_at
+ * @property int|null $remaining_seconds
  * @property Product $product
  * @property Model|null $user
  * @property DeviceBinding|null $binding
  */
 class Entitlement extends Model
 {
-    protected $fillable = ['user_id', 'product_id', 'is_lifetime', 'is_revoked', 'is_blocked', 'expires_at'];
+    protected $fillable = ['user_id', 'product_id', 'is_lifetime', 'is_revoked', 'is_blocked', 'expires_at', 'paused_at', 'remaining_seconds'];
 
     protected $table = 'licensekit_entitlements';
 
@@ -44,7 +46,7 @@ class Entitlement extends Model
     /** @return array<string, string> */
     protected function casts(): array
     {
-        return ['created_at' => UtcDateTime::class, 'updated_at' => UtcDateTime::class, 'product_id' => 'integer', 'is_lifetime' => 'boolean', 'is_revoked' => 'boolean', 'is_blocked' => 'boolean', 'expires_at' => UtcDateTime::class];
+        return ['created_at' => UtcDateTime::class, 'updated_at' => UtcDateTime::class, 'product_id' => 'integer', 'is_lifetime' => 'boolean', 'is_revoked' => 'boolean', 'is_blocked' => 'boolean', 'expires_at' => UtcDateTime::class, 'paused_at' => UtcDateTime::class, 'remaining_seconds' => 'integer'];
     }
 
     /** @return BelongsTo<Product, $this> */

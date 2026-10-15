@@ -26,4 +26,9 @@ class EntitlementFactory extends Factory
     {
         return $this->state(fn (): array => ['expires_at' => now()->subDay()]);
     }
+
+    public function paused(int $seconds = 86400): static
+    {
+        return $this->state(fn (): array => ['is_lifetime' => false, 'expires_at' => null, 'paused_at' => now('UTC')->startOfSecond(), 'remaining_seconds' => $seconds]);
+    }
 }

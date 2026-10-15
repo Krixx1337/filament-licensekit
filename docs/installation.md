@@ -69,7 +69,7 @@ In `config/filament-shield.php`, merge this into `resources.manage`:
 \LicenseKit\Filament\Resources\LicensePlans\LicensePlanResource::class => ['viewAny', 'view', 'create', 'update', 'createKeys'],
 \LicenseKit\Filament\Resources\LicenseKeys\LicenseKeyResource::class => ['viewAny', 'view', 'claim', 'revoke', 'updateNote'],
 \LicenseKit\Filament\Resources\Batches\BatchResource::class => ['viewAny', 'view', 'exportUnclaimed', 'revokeUnclaimed'],
-\LicenseKit\Filament\Resources\Entitlements\EntitlementResource::class => ['viewAny', 'view', 'revoke', 'restoreAccess', 'block', 'unblock'],
+\LicenseKit\Filament\Resources\Entitlements\EntitlementResource::class => ['viewAny', 'view', 'revoke', 'restoreAccess', 'block', 'unblock', 'extend', 'pause', 'resume'],
 \LicenseKit\Filament\Resources\LicensingBans\LicensingBanResource::class => ['viewAny', 'view', 'create', 'lift'],
 \LicenseKit\Filament\Resources\ApiClients\ApiClientResource::class => ['viewAny', 'view', 'create', 'update', 'rotateToken', 'revokeTokens'],
 \LicenseKit\Filament\Resources\AuditEvents\AuditEventResource::class => ['viewAny', 'view'],
@@ -108,5 +108,7 @@ foreach ([
 ```
 
 For a helper role, grant Entitlement `viewAny` / `view`, Product `resetHwid` / `inspectDevice`, and LicensingBan `viewAny` / `view` / `create` / `lift`. Add reset-history `viewAny` / `view` only if they should see past resets. Leave out key creation, plans, API clients, and outages.
+
+Grant Entitlement `extend`, `pause`, and `resume` separately when staff should manage individual license time. These actions work with outages disabled and require a reason. See [individual license support](client.md#individual-license-support) for behavior and outage conflicts.
 
 A missing policy method denies the action. `licensekit.manage` cannot override that. Clear caches after you change this.

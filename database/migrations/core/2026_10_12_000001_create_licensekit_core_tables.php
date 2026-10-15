@@ -73,6 +73,8 @@ return new class extends Migration
             $table->boolean('is_revoked')->default(false);
             $table->boolean('is_blocked')->default(false);
             $table->dateTime('expires_at')->nullable();
+            $table->dateTime('paused_at')->nullable();
+            $table->unsignedBigInteger('remaining_seconds')->nullable();
             $table->timestamps();
             $table->unique(['user_id', 'product_id']);
         });
