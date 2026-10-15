@@ -1,6 +1,6 @@
 # Existing keys and historical imports
 
-These APIs are available on the development branch and are not part of published `0.1.0-alpha.1`. LicenseKit remains one MIT package requiring Filament 4/5. Jobs and commands can call licensing APIs without a panel session. Host applications own their source database readers and commerce integration.
+These APIs are unreleased changes and are not part of published `0.1.0-alpha.1`. LicenseKit remains one MIT package requiring Filament 4/5. Jobs and commands can call licensing APIs without a panel session. Host applications own their source database readers and commerce integration.
 
 ## Custom key formats
 

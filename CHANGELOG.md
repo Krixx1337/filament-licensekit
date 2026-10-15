@@ -8,6 +8,8 @@
 - Immutable claim provenance and after-commit `LicenseClaimed` events; synchronous outage hooks remain intact.
 - Core catalog operations accept explicit actors independently of a Filament panel.
 - UTC key/device timestamps. The initial schema includes all alpha changes; no incremental upgrade path is maintained for disposable development databases.
+- Fixed concurrent local issuance returning incomplete key lists or incorrect replay status when a host transaction has an older MySQL snapshot.
+- Fixed historical reset imports shifting timestamps in applications configured with a non-UTC timezone.
 
 ## 0.1.0-alpha.1 - 2026-10-15
 

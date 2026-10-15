@@ -17,7 +17,7 @@ I have run licensing for private desktop software since 2019. This is the packag
 
 > **Pre-release.** LicenseKit is available on [Packagist](https://packagist.org/packages/licensekit/licensekit) as `0.1.0-alpha.1`. APIs and configuration may change before the first stable release.
 
-Development branch additions include [local application issuance](docs/shops.md#from-the-same-laravel-application), [historical imports and custom keys](docs/importing.md), and [claim events](docs/client.md#claim-events-and-provenance). These additions are not in the published alpha yet.
+Unreleased changes include [local application issuance](docs/shops.md#from-the-same-laravel-application), [historical imports and custom keys](docs/importing.md), and [claim events](docs/client.md#claim-events-and-provenance). These additions are not in the published alpha yet.
 
 Maintainer instructions are in [publishing](docs/releasing.md). Changes are recorded in the [changelog](CHANGELOG.md).
 
