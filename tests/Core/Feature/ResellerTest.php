@@ -196,13 +196,14 @@ test('client creation validates owners and ignores privileged retirement input',
 test('retirement requires its own policy ability even when management gate allows access', function () {
     $actor = User::factory()->create();
     [$client] = resellerCredential($actor);
-    Gate::policy(ApiClient::class, new class
+    $policy = new class
     {
         public function retire(User $actor, ApiClient $client): bool
         {
             return false;
         }
-    }::class);
+    };
+    Gate::policy(ApiClient::class, $policy::class);
     expect(fn () => app(ManageApiClients::class)->retire($client, $actor, 'Denied'))->toThrow(LicensingException::class);
     expect($client->fresh()->retired_at)->toBeNull()->and($client->tokens()->count())->toBe(1);
 });
