@@ -24,6 +24,10 @@ class ManagementBatchResource extends JsonResource
     {
         return ['id' => $this->id, 'issuer' => $this->issuer, 'reference' => $this->reference, 'plan_id' => $this->license_plan_id,
             'quantity' => $this->quantity, 'duration_days' => $this->duration_days, 'label' => $this->label,
+            'total_count' => $this->whenHas('total_count'),
+            'claimed_count' => $this->whenHas('claimed_count'),
+            'unclaimed_count' => $this->whenHas('unclaimed_count'),
+            'revoked_count' => $this->whenHas('revoked_count'),
             'keys' => $this->when($this->includeKeys, fn () => $this->keys->map(fn (LicenseKey $key): array => ['id' => $key->id, 'key' => $key->key])->all())];
     }
 }

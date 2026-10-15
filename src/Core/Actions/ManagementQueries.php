@@ -7,13 +7,12 @@ use Illuminate\Pagination\LengthAwarePaginator;
 use LicenseKit\Core\Data\ManagementAuthorization;
 use LicenseKit\Core\Exceptions\LicensingException;
 use LicenseKit\Core\Models\Batch;
-use LicenseKit\Core\Models\LicenseKey;
 use LicenseKit\Core\Models\LicensePlan;
 use LicenseKit\Core\Models\Product;
 
 class ManagementQueries
 {
-    public function __construct(private ManagementAccess $access) {}
+    public function __construct(private ManagementAccess $access, private BatchInventoryQueries $inventory) {}
 
     /** @return LengthAwarePaginator<int, Product> */
     public function products(#[\SensitiveParameter] string $bearer, int $perPage = 25, int $page = 1, ?string $search = null): LengthAwarePaginator
@@ -74,13 +73,13 @@ class ManagementQueries
         return $this->access->run($bearer, null, fn (ManagementAuthorization $context): Batch => $this->batchesFor($context)->whereKey($batchId)->firstOrFail());
     }
 
-    /** @return list<array{id: int, key: string}> */
-    public function keys(#[\SensitiveParameter] string $bearer, int $batchId): array
+    /** @return LengthAwarePaginator<int, array{id: int, key: string, duration_days: int|null, claimed_at: string|null, revoked_at: string|null}> */
+    public function keys(#[\SensitiveParameter] string $bearer, int $batchId, int $perPage = 25, int $page = 1, string $status = 'all'): LengthAwarePaginator
     {
-        return $this->access->run($bearer, 'keys:read', function (ManagementAuthorization $context) use ($batchId): array {
+        return $this->access->run($bearer, 'keys:read', function (ManagementAuthorization $context) use ($batchId, $perPage, $page, $status): LengthAwarePaginator {
             $batch = $this->batchesFor($context)->whereKey($batchId)->firstOrFail();
 
-            return array_values($batch->keys()->orderBy('id')->get()->map(fn (LicenseKey $key): array => ['id' => $key->id, 'key' => $key->key])->all());
+            return $this->inventory->keys($batch, $perPage, $page, $status);
         });
     }
 
@@ -100,16 +99,19 @@ class ManagementQueries
     {
         $query = Batch::query()->whereIn('license_plan_id', $this->plansFor($context)->select('id'));
         if (! $context->allows('batches:read-all')) {
-            $query->where('issuer', $context->issuer());
+            $query->where(function (Builder $visible) use ($context): void {
+                $visible->where('issuer', $context->issuer());
+                if ($context->client->owner_user_id !== null) {
+                    $visible->orWhere('reseller_user_id', $context->client->owner_user_id);
+                }
+            });
         }
 
-        return $query;
+        return $this->inventory->counts($query);
     }
 
     private function pagination(int $perPage, int $page): void
     {
-        if ($perPage < 1 || $perPage > 100 || $page < 1) {
-            throw new LicensingException('invalid_page_size', 422);
-        }
+        $this->inventory->pagination($perPage, $page);
     }
 }

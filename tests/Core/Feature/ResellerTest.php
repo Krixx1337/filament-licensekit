@@ -13,6 +13,7 @@ use LicenseKit\Core\Actions\ManageApiClients;
 use LicenseKit\Core\Actions\ManagementAccess;
 use LicenseKit\Core\Actions\ManagementOperations;
 use LicenseKit\Core\Actions\ManagementQueries;
+use LicenseKit\Core\Actions\ResellerInventory;
 use LicenseKit\Core\Data\ManagementAuthorization;
 use LicenseKit\Core\Exceptions\LicensingException;
 use LicenseKit\Core\Models\ApiClient;
@@ -40,7 +41,7 @@ beforeEach(function () {
         'maximum_quantity' => 10, 'disclose_serials' => true]]);
 });
 
-test('API ownership attributes batches without sharing another clients references or serials', function () {
+test('API ownership shares reseller batches while preserving client retry identities', function () {
     $owner = User::factory()->create();
     [$first, $token] = resellerCredential($owner);
     [$second, $otherToken] = resellerCredential($owner);
@@ -49,8 +50,8 @@ test('API ownership attributes batches without sharing another clients reference
     $other = app(ManagementOperations::class)->create($otherToken, $plan->id, 1, 'same');
     expect($batch->apiClient->is($first))->toBeTrue()->and($batch->reseller->is($owner))->toBeTrue()
         ->and($batch->created_by_user_id)->toBeNull()->and($other->id)->not->toBe($batch->id);
-    expect(app(ManagementQueries::class)->batches($token)->pluck('id')->all())->toBe([$batch->id]);
-    expect(fn () => app(ManagementQueries::class)->keys($token, $other->id))->toThrow(ModelNotFoundException::class);
+    expect(app(ManagementQueries::class)->batches($token)->pluck('id')->all())->toBe([$batch->id, $other->id]);
+    expect(app(ManagementQueries::class)->keys($token, $other->id)->total())->toBe(1);
     $first->update(['name' => 'Renamed']);
     $token = app(ManageApiClients::class)->rotate($first, now()->toImmutable()->addDay(), $owner);
     expect(app(ManagementOperations::class)->create($token, $plan->id, 1, 'same')->id)->toBe($batch->id);
@@ -110,8 +111,10 @@ test('soft deleted and missing owners fail closed while restoration restores eli
     $owner = SoftDeletedUser::create(User::factory()->raw());
     [$client, $token] = resellerCredential($owner);
     $owner->delete();
+    expect(fn () => app(ResellerInventory::class)->batches($owner))->toThrow(LicensingException::class, 'user unavailable');
     expect(fn () => app(ManagementAccess::class)->authenticate($token))->toThrow(LicensingException::class, 'invalid token');
     $owner->restore();
+    expect(app(ResellerInventory::class)->batches($owner)->total())->toBe(0);
     expect(app(ManagementAccess::class)->authenticate($token)->client->id)->toBe($client->id);
     DB::statement('PRAGMA defer_foreign_keys = ON');
     // Simulate an orphan from host maintenance with constraints disabled.
@@ -132,6 +135,7 @@ test('manual and local issuance distinguish creator from reseller and retries fr
     expect($manual->creator->is($actor))->toBeTrue()->and($manual->reseller->is($reseller))->toBeTrue()
         ->and($manual->api_client_id)->toBeNull()->and($batch->reseller_user_id)->toBe($reseller->id)
         ->and($batch->created_by_user_id)->toBeNull()->and($batch->issuer)->toBe('local:store');
+    expect(app(ResellerInventory::class)->batches($reseller)->pluck('id')->all())->toBe([$manual->id, $batch->id]);
     $reseller->update(['is_suspended' => true]);
     expect(app(CreateBatch::class)->createFor($actor, $plan, 1, 'manual', reseller: $other)->reseller_user_id)->toBe($reseller->id);
     expect(app(IssueLicenses::class)->issue('store', $plan->id, 1, 'local', reseller: $reseller)->replayed)->toBeTrue();
@@ -268,8 +272,61 @@ test('ownership and attribution support configured user tables and key types', f
     expect((string) $client->owner->getKey())->toBe((string) $owner->getKey())
         ->and((string) $batch->reseller->getKey())->toBe((string) $owner->getKey())
         ->and((string) $batch->creator->getKey())->toBe((string) $actor->getKey());
+    expect(app(ResellerInventory::class)->keys($owner, $batch->id)->total())->toBe(1);
     app(ManageApiClients::class)->retire($client, $actor, 'End');
     $owner->delete();
     expect($batch->fresh()->reseller_user_id)->toBeNull();
     $this->artisan('licensekit:check')->assertSuccessful();
 })->with([UuidUser::class, UlidUser::class, CustomUser::class]);
+
+test('reseller PHP reads owned batches with licensing counts and explicit paginated key data', function () {
+    $owner = User::factory()->create();
+    $actor = User::factory()->create();
+    $plan = LicensePlan::factory()->create(['duration_days' => 7]);
+    $batch = app(CreateBatch::class)->createFor($actor, $plan, 3, 'owned', reseller: $owner);
+    $batch->keys[0]->update(['claimed_at' => now(), 'note' => 'private']);
+    $batch->keys[1]->update(['revoked_at' => now()]);
+    $other = app(CreateBatch::class)->createFor($actor, $plan, 1, 'other', reseller: $actor);
+    $plan->update(['duration_days' => 30, 'is_enabled' => false]);
+    $inventory = app(ResellerInventory::class);
+    $listed = $inventory->batches($owner);
+    expect($listed->pluck('id')->all())->toBe([$batch->id]);
+    $found = $inventory->batch($owner, $batch->id);
+    expect($found->total_count)->toBe(3)->and($found->claimed_count)->toBe(1)
+        ->and($found->unclaimed_count)->toBe(1)->and($found->revoked_count)->toBe(1);
+    expect($inventory->keys($owner, $batch->id, 1, 2)->items()[0]['id'])->toBe($batch->keys[1]->id);
+    foreach (['claimed' => 0, 'revoked' => 1, 'unclaimed' => 2] as $status => $index) {
+        $keys = $inventory->keys($owner, $batch->id, status: $status);
+        expect($keys->total())->toBe(1)->and($keys->items()[0]['id'])->toBe($batch->keys[$index]->id)
+            ->and($keys->items()[0]['duration_days'])->toBe(7)
+            ->and(array_keys($keys->items()[0]))->toBe(['id', 'key', 'duration_days', 'claimed_at', 'revoked_at']);
+    }
+    expect(fn () => $inventory->batch($owner, $other->id))->toThrow(ModelNotFoundException::class);
+    expect(fn () => $inventory->keys($owner, $other->id))->toThrow(ModelNotFoundException::class);
+    expect($inventory->batches($owner, planId: $plan->id + 1)->total())->toBe(0);
+});
+
+test('reseller PHP checks fresh eligibility and configured identity before reads', function (string $state) {
+    $owner = User::factory()->create();
+    $candidate = $owner;
+    match ($state) {
+        'suspended' => $owner->update(['is_suspended' => true]),
+        'unverified' => $owner->update(['email_verified_at' => null]),
+        'deleted' => $owner->delete(),
+        'wrong table' => $candidate = new CustomUser(['id' => $owner->id]),
+        'wrong connection' => $candidate = (clone $owner)->setConnection('other'),
+        'missing id' => $candidate = new User,
+    };
+    foreach (['batches', 'batch', 'keys'] as $method) {
+        expect(fn () => $method === 'batches'
+            ? app(ResellerInventory::class)->batches($candidate)
+            : app(ResellerInventory::class)->$method($candidate, 1))->toThrow(LicensingException::class, 'user unavailable');
+    }
+})->with(['suspended', 'unverified', 'deleted', 'wrong table', 'wrong connection', 'missing id']);
+
+test('reseller PHP rejects invalid pagination and key filters', function (int $perPage, int $page, string $status, string $error) {
+    $owner = User::factory()->create();
+    $batch = app(CreateBatch::class)->createFor($owner, LicensePlan::factory()->create(), 1, 'validation', reseller: $owner);
+    expect(fn () => app(ResellerInventory::class)->keys($owner, $batch->id, $perPage, $page, $status))
+        ->toThrow(LicensingException::class, $error);
+})->with([[0, 1, 'all', 'invalid page size'], [101, 1, 'all', 'invalid page size'], [25, 0, 'all', 'invalid page size'], [25, 1, 'sold', 'invalid key status']]);

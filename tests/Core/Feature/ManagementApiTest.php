@@ -180,7 +180,8 @@ test('issue fifty keys workflow retries same batch after plan edits and retrieve
     $this->postJson('/api/licensekit/v1/manage/batches', [...$body, 'label' => 'Changed'])->assertOk()->assertJsonPath('data.id', $created->json('data.id'))->assertJsonPath('data.duration_days', 30)->assertJsonPath('data.label', 'October giveaway');
     $id = $created->json('data.id');
     $this->getJson('/api/licensekit/v1/manage/batches/'.$id)->assertOk()->assertJsonMissingPath('data.keys');
-    $this->getJson('/api/licensekit/v1/manage/batches/'.$id.'/keys')->assertOk()->assertJsonCount(50, 'data')->assertJsonPath('data.0.key', $created->json('data.keys.0.key'));
+    $this->getJson('/api/licensekit/v1/manage/batches/'.$id.'/keys')->assertOk()->assertJsonCount(25, 'data')->assertJsonPath('meta.total', 50);
+    $this->getJson('/api/licensekit/v1/manage/batches/'.$id.'/keys?per_page=100')->assertOk()->assertJsonCount(50, 'data')->assertJsonPath('data.0.key', $created->json('data.keys.0.key'));
     $this->getJson('/api/licensekit/v1/manage/batches?reference=giveaway-october')->assertOk()->assertJsonCount(1, 'data')->assertJsonMissingPath('data.0.keys');
     $this->assertDatabaseCount('licensekit_license_keys', 50);
     $this->assertDatabaseCount('licensekit_entitlements', 0);
@@ -368,3 +369,40 @@ test('missing management storage returns sanitized no-store failure and log', fu
         ->assertExactJson(['error' => 'licensing_unavailable', 'message' => 'licensing unavailable'])
         ->assertHeader('Cache-Control', 'no-store, private');
 });
+
+test('read only reseller HTTP clients share owned stock with product isolation', function () {
+    Gate::define('licensekit.manage', fn () => true);
+    $owner = User::factory()->create();
+    $actor = User::factory()->create();
+    $allowed = LicensePlan::factory()->create();
+    $excluded = LicensePlan::factory()->create();
+    [$client, $token] = managementCredential(['owner_user_id' => $owner->id, 'permissions' => ['keys:read'],
+        'all_products' => false, 'allowed_product_ids' => [$allowed->product_id]]);
+    $staffBatch = app(CreateBatch::class)->createFor($actor, $allowed, 2, 'staff', reseller: $owner);
+    $outside = app(CreateBatch::class)->createFor($actor, $excluded, 1, 'outside', reseller: $owner);
+    $unrelated = app(CreateBatch::class)->createFor($actor, $allowed, 1, 'unrelated', reseller: $actor);
+    $ownOutside = app(CreateBatch::class)->create($excluded, 1, 'own-outside', 'api:'.$client->id);
+    $staffBatch->keys[0]->update(['revoked_at' => now()]);
+    $this->withToken($token)->getJson('/api/licensekit/v1/manage/batches')->assertOk()
+        ->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $staffBatch->id)
+        ->assertJsonPath('data.0.total_count', 2)->assertJsonPath('data.0.unclaimed_count', 1)
+        ->assertJsonPath('data.0.revoked_count', 1)->assertJsonMissingPath('data.0.keys');
+    $this->getJson('/api/licensekit/v1/manage/batches/'.$staffBatch->id)->assertOk()->assertJsonPath('data.claimed_count', 0);
+    $this->getJson('/api/licensekit/v1/manage/batches/'.$staffBatch->id.'/keys?status=unclaimed&per_page=1')
+        ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('meta.total', 1)
+        ->assertJsonPath('data.0.id', $staffBatch->keys[1]->id)->assertJsonPath('data.0.claimed_at', null)
+        ->assertHeader('Cache-Control', 'no-store, private')->assertJsonMissingPath('data.0.entitlement_id');
+    foreach ([$outside, $unrelated, $ownOutside] as $hidden) {
+        $this->getJson('/api/licensekit/v1/manage/batches/'.$hidden->id)->assertNotFound();
+        $this->getJson('/api/licensekit/v1/manage/batches/'.$hidden->id.'/keys')->assertNotFound();
+    }
+    $this->postJson('/api/licensekit/v1/manage/batches', ['plan_id' => $allowed->id, 'quantity' => 1, 'reference' => 'denied'])->assertForbidden();
+    $client->update(['permissions' => []]);
+    $this->getJson('/api/licensekit/v1/manage/batches/'.$staffBatch->id.'/keys')->assertForbidden();
+});
+
+test('management key HTTP reads validate pagination and status', function (string $query) {
+    [$client, $token] = managementCredential();
+    $batch = app(ManagementOperations::class)->create($token, LicensePlan::factory()->create()->id, 1, 'validation');
+    $this->withToken($token)->getJson('/api/licensekit/v1/manage/batches/'.$batch->id.'/keys?'.$query)->assertUnprocessable();
+})->with(['per_page=101', 'per_page=0', 'page=0', 'status=sold']);

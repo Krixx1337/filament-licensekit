@@ -4,6 +4,7 @@ namespace LicenseKit\Core\Http\Controllers\Management;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Routing\Controller;
 use LicenseKit\Core\Actions\ManagementAccess;
 use LicenseKit\Core\Actions\ManagementOperations;
@@ -39,6 +40,10 @@ class BatchController extends Controller
 
     public function keys(Request $request, int $batch, ManagementQueries $queries): JsonResponse
     {
-        return response()->json(['data' => $queries->keys($request->bearerToken() ?? '', $batch)]);
+        $request->validate(['per_page' => ['sometimes', 'integer', 'min:1', 'max:100'], 'page' => ['sometimes', 'integer', 'min:1'],
+            'status' => ['sometimes', 'string', 'in:all,unclaimed,claimed,revoked']]);
+
+        return JsonResource::collection($queries->keys($request->bearerToken() ?? '', $batch, $request->integer('per_page', 25),
+            $request->integer('page', 1), $request->string('status', 'all')->toString())->withQueryString())->response();
     }
 }

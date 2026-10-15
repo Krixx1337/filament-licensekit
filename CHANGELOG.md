@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Reseller-owned batch access across clients and host PHP through `ResellerInventory`, with licensing counts and paginated key status reads. Existing key-list responses now use resource pagination, default 25 keys per page. Sales and delivery remain host-owned.
+
 - Optional registered-user ownership of API clients, immutable batch attribution across API/admin/local issuance, and client/reseller administration filters.
 - Owner eligibility checks for management operations and permanent audited client retirement before owner deletion. Initial migration changed; disposable development databases need rebuilding.
 - Optional per-product HWID binding and explicit `bypassHwid` Gate/policy immunity, with payload validation and host device checks retained.

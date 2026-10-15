@@ -31,8 +31,8 @@ class BatchResource extends LicensingResource
             TextColumn::make('issuer')->searchable()->toggleable(isToggledHiddenByDefault: true),
             TextColumn::make('reference')->searchable()->toggleable(isToggledHiddenByDefault: true),
             TextColumn::make('quantity')->label('Original quantity')->toggleable(isToggledHiddenByDefault: true),
-            TextColumn::make('claimed_count')->label('Given')->toggleable(),
-            TextColumn::make('unclaimed_count')->label('Keys left')->toggleable(),
+            TextColumn::make('claimed_count')->label('Claimed')->toggleable(),
+            TextColumn::make('unclaimed_count')->label('Unclaimed')->toggleable(),
             TextColumn::make('revoked_count')->label('Revoked')->toggleable(),
             TextColumn::make('created_at')->dateTime()->toggleable(isToggledHiddenByDefault: true),
         ])->filters([
