@@ -16,7 +16,8 @@ class ManagementOperations
         return $this->access->run($bearer, 'licenses:create', function (ManagementAuthorization $context) use ($planId, $quantity, $reference, $label): Batch {
             $plan = $this->plan($context, $planId, $quantity);
 
-            return $this->batches->create($plan, $quantity, $reference, $context->issuer(), label: $label);
+            return $this->batches->create($plan, $quantity, $reference, $context->issuer(), label: $label,
+                apiClientId: $context->client->id, reseller: $context->client->owner);
         });
     }
 

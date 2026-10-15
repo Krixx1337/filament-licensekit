@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Optional registered-user ownership of API clients, immutable batch attribution across API/admin/local issuance, and client/reseller administration filters.
+- Owner eligibility checks for management operations and permanent audited client retirement before owner deletion. Initial migration changed; disposable development databases need rebuilding.
 - Optional per-product HWID binding and explicit `bypassHwid` Gate/policy immunity, with payload validation and host device checks retained.
 - Product administration toggle and management catalog `requires_hwid` field. The initial alpha migration includes the new default-enabled column; disposable development databases need rebuilding.
 

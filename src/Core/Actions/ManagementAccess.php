@@ -8,6 +8,7 @@ use Laravel\Sanctum\Sanctum;
 use LicenseKit\Core\Data\ManagementAuthorization;
 use LicenseKit\Core\Exceptions\LicensingException;
 use LicenseKit\Core\Models\ApiClient;
+use LicenseKit\Core\Users\UserAccess;
 
 class ManagementAccess
 {
@@ -20,9 +21,7 @@ class ManagementAccess
             throw new LicensingException('invalid_token', 401);
         }
         $client = $token->tokenable;
-        if (! $client->is_enabled) {
-            throw new LicensingException('invalid_token', 401);
-        }
+        $this->assertClientAvailable($client);
 
         return new ManagementAuthorization($client, $token);
     }
@@ -44,6 +43,7 @@ class ManagementAccess
                 $query->sharedLock();
             }
             $client = $query->firstOrFail();
+            $this->assertClientAvailable($client, lockOwner: true);
             $token = Sanctum::personalAccessTokenModel()::whereKey($initial->token->id)->sharedLock()->first();
             if ($token === null || ! $client->is_enabled || $token->expires_at === null || $token->expires_at->lessThanOrEqualTo(now()) || $token->name !== 'licensekit:api' || ! in_array('licensekit:api', $token->abilities, true)) {
                 throw new LicensingException('invalid_token', 401);
@@ -55,5 +55,22 @@ class ManagementAccess
 
             return $operation($context);
         }, 3);
+    }
+
+    private function assertClientAvailable(ApiClient $client, bool $lockOwner = false): void
+    {
+        if (! $client->is_enabled || $client->retired_at !== null) {
+            throw new LicensingException('invalid_token', 401);
+        }
+        if ($client->owner_user_id !== null) {
+            $query = $client->owner();
+            if ($lockOwner) {
+                $query->sharedLock();
+            }
+            $owner = $query->first();
+            if ($owner === null || ! app(UserAccess::class)->available($owner)) {
+                throw new LicensingException('invalid_token', 401);
+            }
+        }
     }
 }

@@ -89,6 +89,16 @@ $run = fn () => match ($operation) {
             new KeySnapshot('AAAAA-BBBBB-CCCCC-DDDDD-EEEEE', $payload['plan_id'], 30))->targetId;
     })(),
     'management-issue' => app(ManagementOperations::class)->create($payload['token'], $payload['plan_id'], 2, 'issue')->id,
+    'management-retire' => (function () use ($payload): int {
+        app(ManageApiClients::class)->retire(ApiClient::findOrFail($payload['client_id']), User::findOrFail($payload['actor_id']), 'Partnership ended');
+
+        return $payload['client_id'];
+    })(),
+    'reseller-suspend' => (function () use ($payload): int {
+        User::whereKey($payload['user_id'])->update(['is_suspended' => true]);
+
+        return $payload['user_id'];
+    })(),
     'management-revoke' => (function () use ($payload): int {
         app(ManageApiClients::class)->revoke(ApiClient::findOrFail($payload['client_id']), User::findOrFail($payload['actor_id']));
 
@@ -162,6 +172,9 @@ try {
             } elseif (str_starts_with($payload['first_operation'], 'management-')) {
                 $id = $payload['client_id'];
                 ApiClient::whereKey($id)->lockForUpdate()->firstOrFail();
+                if ($payload['first_operation'] === 'management-issue' && isset($payload['user_id'])) {
+                    User::whereKey($payload['user_id'])->sharedLock()->firstOrFail();
+                }
             } elseif (in_array($payload['first_operation'], ['apply', 'cancel'], true) && isset($payload['product_id'])) {
                 Product::whereKey($payload['product_id'])->lockForUpdate()->firstOrFail();
             } elseif (isset($payload['user_id'])) {

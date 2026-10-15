@@ -42,6 +42,19 @@ beforeEach(function () {
     bootManagementApi();
 });
 
+test('owned management HTTP credentials reject ineligible owners before returning data or issuing keys', function (string $path, string $method) {
+    $owner = User::factory()->create();
+    [$client, $token] = managementCredential(['owner_user_id' => $owner->id]);
+    $plan = LicensePlan::factory()->create();
+    $batch = app(ManagementOperations::class)->create($token, $plan->id, 1, 'sale');
+    $owner->update(['is_suspended' => true]);
+    $path = str_replace('{batch}', (string) $batch->id, $path);
+    $this->withToken($token)->json($method, '/api/licensekit/v1/manage/'.$path,
+        ['plan_id' => $plan->id, 'quantity' => 1, 'reference' => 'sale'])
+        ->assertUnauthorized()->assertJsonPath('error', 'invalid_token');
+    $this->assertDatabaseCount('licensekit_batches', 1);
+})->with([['products', 'GET'], ['plans', 'GET'], ['batches', 'GET'], ['batches/{batch}', 'GET'], ['batches/{batch}/keys', 'GET'], ['batches', 'POST']]);
+
 test('management catalog reports product HWID requirement as boolean', function (bool $required) {
     [$client, $token] = managementCredential();
     Product::factory()->create(['requires_hwid' => $required]);

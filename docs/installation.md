@@ -73,7 +73,7 @@ In `config/filament-shield.php`, merge this into `resources.manage`:
 \LicenseKit\Filament\Resources\Batches\BatchResource::class => ['viewAny', 'view', 'exportUnclaimed', 'revokeUnclaimed'],
 \LicenseKit\Filament\Resources\Entitlements\EntitlementResource::class => ['viewAny', 'view', 'revoke', 'restoreAccess', 'block', 'unblock', 'extend', 'pause', 'resume'],
 \LicenseKit\Filament\Resources\LicensingBans\LicensingBanResource::class => ['viewAny', 'view', 'create', 'lift'],
-\LicenseKit\Filament\Resources\ApiClients\ApiClientResource::class => ['viewAny', 'view', 'create', 'update', 'rotateToken', 'revokeTokens'],
+\LicenseKit\Filament\Resources\ApiClients\ApiClientResource::class => ['viewAny', 'view', 'create', 'update', 'rotateToken', 'revokeTokens', 'retire'],
 \LicenseKit\Filament\Resources\AuditEvents\AuditEventResource::class => ['viewAny', 'view'],
 \LicenseKit\Filament\Resources\DeviceResetHistory\DeviceResetHistoryResource::class => ['viewAny', 'view'],
 \LicenseKit\Filament\Resources\Outages\OutageResource::class => ['viewAny', 'view', 'stop'],
@@ -114,3 +114,15 @@ For a helper role, grant Entitlement `viewAny` / `view`, Product `resetHwid` / `
 Grant Entitlement `extend`, `pause`, and `resume` separately when staff should manage individual license time. These actions work with outages disabled and require a reason. See [individual license support](client.md#individual-license-support) for behavior and outage conflicts.
 
 A missing policy method denies the action. `licensekit.manage` cannot override that. Clear caches after you change this.
+
+## Reseller account ownership
+
+API clients can optionally belong to a registered host user. Configure `licensekit.user.suspended_column` to your account suspension column if suspension should also block reseller API access. The existing `require_verified` setting applies to client owners. Product licensing bans do not independently disable reseller credentials.
+
+Owner selection is available when creating an API client. Ownership cannot change afterward, including for initially ownerless clients. Use a new client for a different owner. Token rotation preserves the existing client identity, references, and batch visibility.
+
+Hard deletion of an owner is restricted while clients remain attached, even when disabled. Use **Retire client** on each attached client first. This requires the `retire` policy ability and a reason. Retirement permanently disables the client, revokes its tokens, clears ownership, and audits the former owner. It cannot be undone. Issued keys and claimed access remain unchanged.
+
+Soft-deleted owners cannot use their API clients. Restoring an account restores eligibility when its client is still enabled and its token is otherwise valid. A retired client stays retired.
+
+The initial core migration includes ownership, retirement, and batch attribution columns. Rebuild disposable development databases that ran an earlier schema; ordinary `migrate` does not add these columns. No incremental migration is supplied.

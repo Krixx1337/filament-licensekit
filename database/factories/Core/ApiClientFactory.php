@@ -14,6 +14,6 @@ class ApiClientFactory extends Factory
     public function definition(): array
     {
         return ['name' => fake()->company(), 'is_enabled' => true, 'all_products' => false, 'allowed_product_ids' => [],
-            'permissions' => [], 'maximum_quantity' => 100];
+            'permissions' => [], 'maximum_quantity' => 100, 'owner_user_id' => null, 'retired_at' => null];
     }
 }

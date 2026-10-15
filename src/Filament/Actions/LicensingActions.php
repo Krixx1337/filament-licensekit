@@ -85,9 +85,11 @@ class LicensingActions
             TextInput::make('quantity')->integer()->minValue(1)->maxValue(config('licensekit.maximum_batch_size'))->default(1)->required(),
             TextInput::make('reference')->default(fn (): string => (string) Str::uuid())->maxLength(128)->required(),
             TextInput::make('label')->label('Batch label')->maxLength(255),
+            self::userSelect('reseller_user_id')->label('Reseller')->required(false)->helperText('Optional recipient of these keys. Does not claim them.'),
             Toggle::make('download')->label('Download keys')->default(true),
         ])->action(function (LicensePlan $record, array $data): ?StreamedResponse {
-            $batch = app(CreateBatch::class)->createFor(self::actor(), $record, (int) $data['quantity'], $data['reference'], label: $data['label'] ?? null);
+            $reseller = isset($data['reseller_user_id']) ? ConfiguredUserModel::className()::findOrFail($data['reseller_user_id']) : null;
+            $batch = app(CreateBatch::class)->createFor(self::actor(), $record, (int) $data['quantity'], $data['reference'], label: $data['label'] ?? null, reseller: $reseller);
             if (! ($data['download'] ?? true)) {
                 Notification::make()->title('Batch #'.$batch->id.' created')->success()->send();
 
@@ -101,9 +103,9 @@ class LicensingActions
         });
     }
 
-    public static function userSelect(): Select
+    public static function userSelect(string $name = 'user_id'): Select
     {
-        return Select::make('user_id')->options(fn (): array => ConfiguredUserModel::className()::query()->limit(50)->pluck(config('licensekit.user.display_column'), (new (ConfiguredUserModel::className()))->getKeyName())->all())->searchable()->getSearchResultsUsing(fn (string $search): array => ConfiguredUserModel::className()::query()->where(config('licensekit.user.display_column'), 'like', '%'.$search.'%')->limit(50)->pluck(config('licensekit.user.display_column'), (new (ConfiguredUserModel::className()))->getKeyName())->all())->getOptionLabelUsing(fn ($value) => ConfiguredUserModel::className()::query()->whereKey($value)->first()?->getAttribute(config('licensekit.user.display_column')))->required();
+        return Select::make($name)->options(fn (): array => ConfiguredUserModel::className()::query()->limit(50)->pluck(config('licensekit.user.display_column'), (new (ConfiguredUserModel::className()))->getKeyName())->all())->searchable()->getSearchResultsUsing(fn (string $search): array => ConfiguredUserModel::className()::query()->where(config('licensekit.user.display_column'), 'like', '%'.$search.'%')->limit(50)->pluck(config('licensekit.user.display_column'), (new (ConfiguredUserModel::className()))->getKeyName())->all())->getOptionLabelUsing(fn ($value) => ConfiguredUserModel::className()::query()->whereKey($value)->first()?->getAttribute(config('licensekit.user.display_column')))->required();
     }
 
     public static function claim(): Action
