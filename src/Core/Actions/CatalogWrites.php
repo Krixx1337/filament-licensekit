@@ -84,6 +84,7 @@ class CatalogWrites
                 'name' => ['required', 'string', 'max:255'],
                 'slug' => ['required', 'string', 'max:255', Rule::unique('licensekit_products', 'slug')->ignore($record->getKey())],
                 'is_enabled' => ['required', 'boolean'], 'is_blocked' => ['required', 'boolean'],
+                'requires_hwid' => ['required', 'boolean'],
                 'product_group_id' => ['nullable', 'integer', 'exists:licensekit_product_groups,id'],
             ])->validate();
         } elseif ($record instanceof LicensePlan) {

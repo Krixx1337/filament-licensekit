@@ -14,6 +14,16 @@ class AdminAuthorization
      * @param  class-string<Model>|Model  $subject
      * @param  list<mixed>  $context
      */
+    public function allowsExplicit(Model $actor, string $ability, string|Model $subject, array $context = []): bool
+    {
+        return $this->users->available($actor)
+            && Gate::forUser($actor)->allows($ability, [$subject, ...$context]);
+    }
+
+    /**
+     * @param  class-string<Model>|Model  $subject
+     * @param  list<mixed>  $context
+     */
     public function allows(Model $actor, string $ability, string|Model $subject, array $context = []): bool
     {
         if (! $this->users->available($actor)) {

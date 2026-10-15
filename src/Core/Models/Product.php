@@ -19,12 +19,13 @@ use LicenseKit\Database\Factories\Core\ProductFactory;
  * @property ProductGroup|null $group
  * @property bool $is_enabled
  * @property bool $is_blocked
+ * @property bool $requires_hwid
  * @property Collection<int, LicensePlan> $plans
  */
 #[ObservedBy([LicensingConfigurationObserver::class])]
 class Product extends Model
 {
-    protected $fillable = ['name', 'slug', 'product_group_id', 'is_enabled', 'is_blocked'];
+    protected $fillable = ['name', 'slug', 'product_group_id', 'is_enabled', 'is_blocked', 'requires_hwid'];
 
     /** @internal Actor supplied by supported catalog operations for synchronous auditing. */
     public ?string $auditActor = null;
@@ -39,12 +40,12 @@ class Product extends Model
     /** @use HasFactory<ProductFactory> */
     use HasFactory;
 
-    protected $attributes = ['is_enabled' => true, 'is_blocked' => false];
+    protected $attributes = ['is_enabled' => true, 'is_blocked' => false, 'requires_hwid' => true];
 
     /** @return array<string, string> */
     protected function casts(): array
     {
-        return ['product_group_id' => 'integer', 'is_enabled' => 'boolean', 'is_blocked' => 'boolean'];
+        return ['product_group_id' => 'integer', 'is_enabled' => 'boolean', 'is_blocked' => 'boolean', 'requires_hwid' => 'boolean'];
     }
 
     /** @return BelongsTo<ProductGroup, $this> */

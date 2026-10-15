@@ -22,6 +22,38 @@ $auth = app(LicensedDevices::class)->verify($user, $product, $hwid);
 
 Your app creates the session token. LicenseKit does not.
 
+## Optional device binding
+
+Products require device binding by default. Turn off "Require device binding (HWID)" in the product form, or set `$product->requires_hwid = false` and save, to allow that product on different PCs. Management product responses include the boolean `requires_hwid` setting.
+
+To exempt selected users while keeping protection for other customers, define `bypassHwid` in your host service provider:
+
+```php
+use Illuminate\Support\Facades\Gate;
+use LicenseKit\Core\Models\Product;
+
+Gate::define('bypassHwid', fn ($user, Product $product): bool => (bool) $user->is_admin);
+```
+
+Alternatively, add this method to your registered Product policy:
+
+```php
+public function bypassHwid($user, Product $product): bool
+{
+    return (bool) $user->is_admin;
+}
+```
+
+Use your host application's role or permission check in place of `is_admin`. With Shield/Spatie permissions, you can check `$user->hasPermissionTo('bypass_hwid')`. Create and assign that permission in the host application; LicenseKit does not generate a Shield checkbox. `licensekit.manage` alone does not grant immunity. Laravel Gate hooks, including host super-admin hooks, still apply.
+
+Both exemptions affect direct `DeviceBindings::bind()`/`verify()` and `LicensedDevices::bind()`/`verify()`/`upgrade()`. These calls still require a valid HWID array and run your handler's `assertAllowed()` with the saved baseline when present. Account checks, licensing bans, product restrictions, outages, and license requirements still apply. Staff immunity grants no entitlement.
+
+Exempt calls accept different PCs without creating or changing a device binding. `verify()` succeeds without a saved PC, and `upgrade()` returns the normalized presented HWID without changing a baseline or emitting an upgrade audit/event. Existing bindings and reset cooldowns remain stored. Customer and admin reset tools keep their existing behavior.
+
+Re-enabling protection or removing immunity restores the saved device lock. With no saved binding, call `bind()` before `verify()` as usual. In global scope, disabling binding for one product leaves the shared lock intact for protected products.
+
+## Device errors
+
 | Error | Meaning |
 | --- | --- |
 | `invalid_hwid` | The payload is not a JSON object the handler accepts. HTTP 422. |

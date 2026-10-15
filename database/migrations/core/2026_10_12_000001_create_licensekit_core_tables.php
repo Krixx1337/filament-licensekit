@@ -22,6 +22,7 @@ return new class extends Migration
             $table->string('slug')->unique();
             $table->boolean('is_enabled')->default(true);
             $table->boolean('is_blocked')->default(false);
+            $table->boolean('requires_hwid')->default(true);
             $table->timestamps();
         });
         Schema::create('licensekit_licensing_bans', function (Blueprint $table): void {

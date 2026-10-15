@@ -40,10 +40,17 @@ class LicensedDevices
             $user = $user->newQuery()->whereKey($user->getKey())->lockForUpdate()->first() ?? throw new LicensingException('user_unavailable');
             $product = Product::whereKey($product->id)->lockForUpdate()->first() ?? throw new LicensingException('service_unavailable');
             $access = $this->access->authorize($user, $product, $freeUntil);
-            $binding = $this->bindings->find($access->user, $access->product) ?? throw new LicensingException('device_not_bound', 409);
-            $bound = $binding->hwid ?? throw new LicensingException('device_not_bound', 409);
+            $requiresBinding = $this->bindings->requiresBinding($access->user, $access->product);
+            $binding = $this->bindings->find($access->user, $access->product);
+            $bound = $binding?->hwid;
+            if ($requiresBinding && ($binding === null || $bound === null)) {
+                throw new LicensingException('device_not_bound', 409);
+            }
             $normalized = $this->hwids->normalize($access->product, $hwid);
             $this->hwids->handler->assertAllowed($access->user, $access->product, $bound, $normalized);
+            if (! $requiresBinding) {
+                return new DeviceAuthorization($access->user, $access, $normalized);
+            }
             if ($bound !== $normalized) {
                 $this->hwids->verify($access->product, $bound, $normalized);
                 if (! $this->hwids->handler->canUpgrade($access->product, $bound, $normalized)) {

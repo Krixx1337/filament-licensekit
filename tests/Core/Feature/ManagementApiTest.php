@@ -42,6 +42,13 @@ beforeEach(function () {
     bootManagementApi();
 });
 
+test('management catalog reports product HWID requirement as boolean', function (bool $required) {
+    [$client, $token] = managementCredential();
+    Product::factory()->create(['requires_hwid' => $required]);
+
+    $this->withToken($token)->getJson('/api/licensekit/v1/manage/products')->assertOk()->assertJsonPath('data.0.requires_hwid', $required);
+})->with([true, false]);
+
 test('management HTTP is opt in while core operations and fulfillment remain available', function (bool $enabled) {
     bootManagementApi($enabled);
     expect(Route::has('licensekit.management.products.index'))->toBeFalse();

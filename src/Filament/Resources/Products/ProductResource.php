@@ -35,6 +35,8 @@ class ProductResource extends LicensingResource
             TextInput::make('slug')->required()->maxLength(100)->regex('/^[a-z0-9-]+$/')->unique(ignoreRecord: true),
             Toggle::make('is_enabled')->default(true),
             Toggle::make('is_blocked')->label('Manual maintenance block'),
+            Toggle::make('requires_hwid')->label('Require device binding (HWID)')->default(true)
+                ->helperText('Disable to allow different devices. Valid HWID payloads and host device checks still apply.'),
         ]);
     }
 

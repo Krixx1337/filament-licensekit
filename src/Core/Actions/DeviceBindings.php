@@ -25,6 +25,12 @@ class DeviceBindings
         return config('licensekit.device_binding.scope') === 'global' ? 'global' : 'product:'.$product->id;
     }
 
+    /** @internal Evaluate with current user and product records after access authorization. */
+    public function requiresBinding(Model $user, Product $product): bool
+    {
+        return $product->requires_hwid && ! app(AdminAuthorization::class)->allowsExplicit($user, 'bypassHwid', $product);
+    }
+
     public function find(Model $user, Product $product): ?DeviceBinding
     {
         return DeviceBinding::where('user_id', $user->getKey())->where('scope_key', $this->scopeKey($product))->when(DB::transactionLevel() > 0, fn ($query) => $query->sharedLock())->first();
@@ -51,6 +57,9 @@ class DeviceBindings
         $binding = $this->find($user, $product);
         $bound = $binding?->hwid;
         $this->hwids->handler->assertAllowed($user, $product, $bound, $normalized);
+        if (! $this->requiresBinding($user, $product)) {
+            return;
+        }
         if ($bound !== null) {
             $this->hwids->verify($product, $bound, $normalized);
         } elseif ($bind) {
@@ -64,6 +73,8 @@ class DeviceBindings
     /** @param array<string, mixed> $hwid */
     public function verify(Model $user, Product $product, #[\SensitiveParameter] array $hwid): void
     {
+        $user = $user->fresh() ?? throw new LicensingException('user_unavailable');
+        $product = $product->fresh() ?? throw new LicensingException('service_unavailable');
         $this->access->assertAllowed($user, $product);
         $this->verifyOrBind($user, $product, $this->hwids->normalize($product, $hwid), false);
     }

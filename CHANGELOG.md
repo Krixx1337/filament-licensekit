@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Optional per-product HWID binding and explicit `bypassHwid` Gate/policy immunity, with payload validation and host device checks retained.
+- Product administration toggle and management catalog `requires_hwid` field. The initial alpha migration includes the new default-enabled column; disposable development databases need rebuilding.
+
 ## 0.1.0-alpha.2 - 2026-10-15
 
 Pre-release APIs and configuration may change before the first stable release.
