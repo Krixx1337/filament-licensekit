@@ -15,6 +15,6 @@ class ClientLoginRequest extends FormRequest
     public function rules(): array
     {
         return ['login' => ['required', 'string', 'max:255'], 'password' => ['required', 'string', 'max:1024'],
-            'hwid' => ['required', 'array']];
+            'hwid' => ['required', 'string']];
     }
 }

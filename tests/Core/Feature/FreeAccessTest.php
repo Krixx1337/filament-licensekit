@@ -6,7 +6,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
 use LicenseKit\Core\Actions\AccessPolicy;
-use LicenseKit\Core\Actions\DeviceBindings;
 use LicenseKit\Core\Actions\LicensedDevices;
 use LicenseKit\Core\Actions\ManageEntitlements;
 use LicenseKit\Core\Contracts\AccessRestriction;
@@ -37,10 +36,10 @@ test('host free authorization works without module schema HTTP routes or panel',
     expect($result->access->source)->toBe('host_free')->and($result->access->entitlement)->toBeNull()
         ->and($result->access->validUntil->equalTo($deadline))->toBeTrue();
     app(LicensedDevices::class)->verify($user, $product, desktopRequest($user)['hwid'], $deadline);
-    $this->assertDatabaseCount('licensekit_entitlements', 0);
+    expect(Entitlement::sole()->expires_at)->toBeNull()->and(Entitlement::sole()->is_lifetime)->toBeFalse();
     expect(Schema::hasTable('licensekit_free_access_windows'))->toBeFalse();
     expect(fn () => app(LicensedDevices::class)->verify($user, $product, desktopRequest($user, 'other')['hwid'], $deadline))->toThrow(LicensingException::class, 'hwid mismatch');
-    $this->assertDatabaseCount('licensekit_device_bindings', 1);
+    expect(lockedDeviceCount())->toBe(1);
 });
 
 test('null expired and exact-boundary host deadlines grant nothing', function (?int $offset) {
@@ -49,7 +48,7 @@ test('null expired and exact-boundary host deadlines grant nothing', function (?
     $product = Product::factory()->create();
     $deadline = $offset === null ? null : CarbonImmutable::now()->addSeconds($offset);
     expect(fn () => app(LicensedDevices::class)->bind($user, $product, desktopRequest($user)['hwid'], $deadline))->toThrow(LicensingException::class, 'license unavailable');
-    $this->assertDatabaseCount('licensekit_device_bindings', 0);
+    expect(lockedDeviceCount())->toBe(0);
 })->with([null, -1, 0]);
 
 test('paid grant takes precedence and paid-only denial never uses free access implicitly', function () {
@@ -81,7 +80,7 @@ test('universal restrictions deny host-approved free access without binding writ
         'custom' => config(['licensekit.access_restrictions' => [HostFreeRestriction::class]]),
     };
     expect(fn () => app(LicensedDevices::class)->bind($user, $product, desktopRequest($user)['hwid'], CarbonImmutable::now()->addHour()))->toThrow(LicensingException::class, str_replace('_', ' ', $error));
-    $this->assertDatabaseCount('licensekit_device_bindings', 0);
+    expect(lockedDeviceCount())->toBe(0);
 })->with([['maintenance', 'service_unavailable'], ['suspended', 'user_unavailable'], ['unverified', 'user_unavailable'], ['custom', 'service_unavailable']]);
 
 test('suspension denies free access before any purchase and invalidates host sessions', function () {
@@ -109,13 +108,11 @@ test('host session is deadline capped and heartbeat rechecks withdrawn free elig
     expect(fn () => app(ClientSessions::class)->heartbeat($product, $login['token'], desktopRequest($user)['hwid']))->toThrow(LicensingException::class, 'license unavailable');
 });
 
-test('restriction-only and standalone device operations do not create a paid or free grant', function () {
+test('restriction-only checks do not create a paid or free grant', function () {
     $user = User::factory()->create();
     $product = Product::factory()->create();
     expect(app(AccessPolicy::class)->assertAllowed($user, $product))->toBeNull();
-    expect(fn () => app(DeviceBindings::class)->verify($user, $product, desktopRequest($user)['hwid']))->toThrow(LicensingException::class, 'device not bound');
-    app(DeviceBindings::class)->bind($user, $product, desktopRequest($user)['hwid']);
-    app(DeviceBindings::class)->verify($user, $product, desktopRequest($user)['hwid']);
+    expect(fn () => app(LicensedDevices::class)->bind($user, $product, desktopRequest($user)['hwid']))->toThrow(LicensingException::class, 'license unavailable');
     expect(fn () => app(AccessPolicy::class)->authorize($user, $product))->toThrow(LicensingException::class);
     $this->assertDatabaseCount('licensekit_entitlements', 0);
 });
@@ -129,5 +126,5 @@ test('host credential write failure rolls back first free binding in outer trans
         app(LicensedDevices::class)->bind($user, $product, desktopRequest($user)['hwid'], CarbonImmutable::now()->addDay());
         throw new RuntimeException('host credential failed');
     }))->toThrow(RuntimeException::class, 'host credential failed');
-    $this->assertDatabaseCount('licensekit_device_bindings', 0);
+    expect(lockedDeviceCount())->toBe(0);
 });

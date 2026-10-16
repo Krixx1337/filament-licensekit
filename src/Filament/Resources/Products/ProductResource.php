@@ -6,6 +6,7 @@ use Filament\Actions\EditAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
@@ -31,8 +32,11 @@ class ProductResource extends LicensingResource
             TextInput::make('slug')->required()->maxLength(100)->regex('/^[a-z0-9-]+$/')->unique(ignoreRecord: true),
             Select::make('status')->options(['active' => 'Active', 'maintenance' => 'Maintenance', 'discontinued' => 'Discontinued'])->default('active')->required()->selectablePlaceholder(false)
                 ->helperText('Maintenance: the software stops working for everyone and licenses keep their time. Discontinued: no new keys, existing licenses keep working.'),
-            Toggle::make('requires_hwid')->label('Require device binding (HWID)')->default(true)
-                ->helperText('Disable to allow different devices. Valid HWID payloads and host device checks still apply.'),
+            Toggle::make('requires_hwid')->label('Lock each license to one device')->default(true)->live()
+                ->helperText('The first PC a customer logs in from is locked to their license. Turn off to allow any PC.'),
+            Select::make('device_move_cooldown_days')->label('Customers can move their license to a new PC')
+                ->options([0 => 'Any time', 1 => 'Once a day', 7 => 'Once a week', 14 => 'Every 2 weeks', 30 => 'Once a month'])
+                ->placeholder('Never (support only)')->default(7)->visible(fn (Get $get): bool => (bool) $get('requires_hwid')),
         ]);
     }
 

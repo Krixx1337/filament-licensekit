@@ -7,7 +7,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Laravel\Sanctum\HasApiTokens;
-use LicenseKit\Core\Casts\HwidPayload;
 use LicenseKit\Core\Models\Product;
 use LicenseKit\Core\Users\ConfiguredUserModel;
 
@@ -19,7 +18,7 @@ use LicenseKit\Core\Users\ConfiguredUserModel;
  * @property Model $user
  * @property Product $product
  * @property string $user_fingerprint
- * @property array<string, mixed> $hwid
+ * @property string $hwid
  */
 class ClientSession extends Model
 {
@@ -52,6 +51,6 @@ class ClientSession extends Model
     /** @return array<string, string> */
     protected function casts(): array
     {
-        return ['product_id' => 'integer', 'personal_access_token_id' => 'integer', 'hwid' => HwidPayload::class];
+        return ['product_id' => 'integer', 'personal_access_token_id' => 'integer'];
     }
 }

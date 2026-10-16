@@ -24,7 +24,7 @@ Maintainer instructions are in [publishing](docs/releasing.md). Changes are reco
 ### 🚀 Why LicenseKit?
 
 * **💳 100% Commerce Agnostic (Gateway Immunity)**: Run your own storefront, or sell keys through Shopify, Stripe, WooCommerce, or Telegram resellers. Connect your store through your own webhook or API integration. Use any of them at the same time. If a payment processor shuts down one store, your licensing database is untouched.
-* **💻 Resilient HWID Node-Locking**: Strict exact matching out of the box, with a custom handler interface for multi-signal fuzzy matching. Define your own hardware-change rules so legitimate GPU or SSD upgrades can stay allowed.
+* **💻 Resilient HWID Node-Locking**: Strict exact matching out of the box, with a one-method matcher interface for fuzzy matching. Define your own hardware-change rules so legitimate GPU or SSD upgrades can stay allowed.
 * **⚡ Downtime Compensation**: Planned game update or unexpected crash? Put the product in maintenance mode, then give every running license the lost time back in one click.
 * **🤝 Built for Reseller Distribution**: Create license keys in batches, export clean `.txt` files in 1 click, and revoke unsold batches with one click if a reseller disputes payment.
 * **🎨 Filament Admin UI**: Two simple roles. Support staff look up customers, reset devices and suspend licenses without access to creating keys or API tokens.
@@ -37,7 +37,7 @@ Maintainer instructions are in [publishing](docs/releasing.md). Changes are reco
 | **Self-Hosted / Sovereign** | ❌ | ❌ | ✅ | **✅ (100% Free MIT)** |
 | **No Risk of Account Bans** | ❌ (ToS) | ❌ (ToS) | ✅ | **✅ (You own the DB)** |
 | **Turnkey Admin Dashboard** | ⚠️ (Outdated) | ⚠️ (Basic) | ❌ | **✅ (Modern Filament)** |
-| **HWID Fuzzy Matching** | ❌ (Exact only) | ⚠️ (Custom) | ❌ | **✅ Custom handler interface** |
+| **HWID Fuzzy Matching** | ❌ (Exact only) | ⚠️ (Custom) | ❌ | **✅ Custom matcher** |
 | **Downtime Time Compensation** | ❌ | ❌ | ❌ | **✅ One-click add time** |
 | **Multi-Storefront Support** | ⚠️ (Clunky) | ✅ | ⚠️ | **✅ Native idempotency** |
 
@@ -65,7 +65,7 @@ public function login(Request $request, LicensedDevices $devices)
 }
 ```
 
-`$hwid` is an array. Heartbeats call `verify()`, which checks the saved PC and does not move the lock. [Connect your app](docs/client.md).
+The device is a string your app sends. Heartbeats call `verify()`, which checks the saved PC and does not move the lock. [Connect your app](docs/client.md).
 
 ### ✅ Compatibility
 

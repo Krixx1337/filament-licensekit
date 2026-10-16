@@ -38,12 +38,7 @@ Email verification is required. Set `licensekit.user.require_verified` to `false
 
 `licensekit.user.display_column` defaults to `email`. Set it to `username` to show usernames in the admin. It must be a real database column. Clear the config cache after you change it.
 
-Choose these before the first device is saved. There is no conversion later.
-
-- `licensekit.device_binding.storage` is `plain` (default) or `encrypted`. Encrypted uses the Laravel app key.
-- `licensekit.device_binding.scope` is `per_product` (default) or `global` (one PC for every product on the account).
-
-Buyers can reset their own PC. The wait is `licensekit.device_binding.customer_reset.cooldown_days`, default 7. `0` means no wait. Set `customer_reset.enabled` to `false` to leave resets to an admin.
+Each product locks a license to one PC by default. On the product you choose how often customers may move to a new PC, or leave it to support. See [device lock settings](client.md#device-lock-settings).
 
 To ban someone from a product, **Suspend** their license, or use **Suspend a customer** on the Licenses page if they have not bought it yet. A suspension can end on a date you choose.
 
@@ -62,7 +57,7 @@ LicenseKit has two roles, defined as Laravel gates:
 | Role | Can do |
 | --- | --- |
 | `licensekit.admin` | Everything. |
-| `licensekit.support` | Browse licenses, keys and HWID reset history; suspend and unsuspend; add time to, pause and resume a license; reset and inspect a device; suspend a customer. |
+| `licensekit.support` | Browse licenses, keys and the activity log; suspend and unsuspend; add time to, pause and resume a license; reset and inspect a device; suspend a customer. |
 
 By default every user who can open your panel is an admin. To restrict staff, define the gates in your `AppServiceProvider::boot()`:
 

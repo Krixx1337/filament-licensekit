@@ -6,9 +6,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use LicenseKit\Core\Actions\ClaimLicense;
 use LicenseKit\Core\Actions\CreateBatch;
-use LicenseKit\Core\Actions\DeviceBindings;
 use LicenseKit\Core\Actions\IssueLicenses;
-use LicenseKit\Core\Actions\LicensedDevices;
 use LicenseKit\Core\Actions\ManageApiClients;
 use LicenseKit\Core\Actions\ManageEntitlements;
 use LicenseKit\Core\Actions\ManagementOperations;
@@ -19,7 +17,6 @@ use LicenseKit\Core\Models\Entitlement;
 use LicenseKit\Core\Models\LicensePlan;
 use LicenseKit\Core\Models\Product;
 use LicenseKit\Tests\Core\Fixtures\ClientSessions;
-use LicenseKit\Tests\Core\Fixtures\StructuredHwid;
 use LicenseKit\Tests\Integration\Fixtures\User;
 use LicenseKit\Tests\Integration\MySqlTestCase;
 
@@ -27,10 +24,7 @@ $case = new MySqlTestCase('worker');
 $case->createApplication();
 $payload = json_decode($argv[2], true, 512, JSON_THROW_ON_ERROR);
 $case->travelTo(CarbonImmutable::parse($payload['at']));
-config(['licensekit.device_binding.scope' => $payload['binding_scope'] ?? 'per_product', 'host_client.free_until' => $payload['free_until'] ?? null]);
-if ($payload['structured_hwid'] ?? false) {
-    config(['licensekit.hwid_handler' => StructuredHwid::class]);
-}
+config(['host_client.free_until' => $payload['free_until'] ?? null]);
 if ($payload['read_committed'] ?? false) {
     DB::statement('SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED');
 }
@@ -43,7 +37,7 @@ while (DB::table('licensekit_test_barrier')->count() < 2) {
     usleep(10000);
 }
 $operation = $argv[1];
-$hwid = ['value' => 'pc'];
+$hwid = 'pc';
 Gate::define('licensekit.admin', fn ($actor): bool => $actor->getKey() === ($payload['actor_id'] ?? null) || in_array($actor->getKey(), $payload['actor_ids'] ?? [], true));
 $run = fn () => match ($operation) {
     'individual-pause', 'individual-extend' => (function () use ($operation, $payload): int {
@@ -58,13 +52,6 @@ $run = fn () => match ($operation) {
         return $entitlement->id;
     })(),
     'batch-revoke' => app(ManageEntitlements::class)->revokeUnclaimedBatch(Batch::findOrFail($payload['batch_id']), User::findOrFail($payload['actor_id']), 'Chargeback'),
-    'global-login' => app(ClientSessions::class)->login(Product::findOrFail($payload['product_ids'][$worker - 1]), User::findOrFail($payload['user_id'])->email, 'password', ['value' => 'pc-'.$worker])['token'],
-    'device-reset' => (function () use ($payload): int {
-        $user = User::findOrFail($payload['user_id']);
-        app(DeviceBindings::class)->reset($user, Product::findOrFail($payload['reset_product_id']), $user);
-
-        return 1;
-    })(),
     'local-issue', 'local-issue-stale' => (function () use ($payload): array {
         config(['licensekit.local_integrations.store' => ['enabled' => true, 'all_products' => true, 'maximum_quantity' => 2, 'disclose_serials' => true]]);
 
@@ -77,16 +64,6 @@ $run = fn () => match ($operation) {
         app(ManageApiClients::class)->revoke(ApiClient::findOrFail($payload['client_id']), User::findOrFail($payload['actor_id']));
 
         return $payload['client_id'];
-    })(),
-    'hwid-upgrade' => (function () use ($payload, $worker): int {
-        app(LicensedDevices::class)->upgrade(User::findOrFail($payload['user_id']), Product::findOrFail($payload['product_id']), ['v' => $payload['upgrade_version'] ?? $worker + 1, 'id' => 'pc']);
-
-        return 1;
-    })(),
-    'hwid-rebind' => (function () use ($payload, $worker): int {
-        app(DeviceBindings::class)->bind(User::findOrFail($payload['user_id']), Product::findOrFail($payload['product_id']), ['value' => 'pc-'.$worker]);
-
-        return 1;
     })(),
     'login' => app(ClientSessions::class)->login(Product::findOrFail($payload['product_id']), User::findOrFail($payload['user_id'])->email, 'password', $hwid)['token'],
     'heartbeat' => app(ClientSessions::class)->heartbeat(Product::findOrFail($payload['product_id']), $payload['token'], $hwid)['expires_at'],

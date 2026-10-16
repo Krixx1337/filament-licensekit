@@ -38,20 +38,20 @@ test('every panel user is a LicenseKit admin unless the host redefines the gate'
     }
 });
 
-test('support staff browse licenses keys and reset history but not admin pages', function () {
+test('support staff browse licenses keys and the activity log but not admin pages', function () {
     supportUser();
 
-    foreach (['entitlements', 'license-keys', 'device-reset-history'] as $slug) {
+    foreach (['entitlements', 'license-keys', 'audit-events'] as $slug) {
         $this->get('/admin/licensekit/'.$slug)->assertOk();
     }
-    foreach (['products', 'license-plans', 'batches', 'api-clients', 'audit-events'] as $slug) {
+    foreach (['products', 'license-plans', 'batches', 'api-clients'] as $slug) {
         $this->get('/admin/licensekit/'.$slug)->assertForbidden();
     }
 });
 
 test('support staff fix licenses but cannot cancel them or hand out keys', function () {
     supportUser();
-    $license = Entitlement::factory()->create(['user_id' => User::factory()->create()->id]);
+    $license = Entitlement::factory()->create(['user_id' => User::factory()->create()->id, 'device' => 'pc']);
     $key = LicenseKey::factory()->create();
 
     Livewire::test(ManageEntitlements::class)

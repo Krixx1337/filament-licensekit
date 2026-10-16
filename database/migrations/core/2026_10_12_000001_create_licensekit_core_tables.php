@@ -15,6 +15,7 @@ return new class extends Migration
             $table->string('slug')->unique();
             $table->string('status', 16)->default('active');
             $table->boolean('requires_hwid')->default(true);
+            $table->unsignedSmallInteger('device_move_cooldown_days')->nullable()->default(7);
             $table->timestamps();
         });
         Schema::create('licensekit_license_plans', function (Blueprint $table): void {
@@ -59,6 +60,9 @@ return new class extends Migration
             $table->dateTime('expires_at')->nullable();
             $table->dateTime('paused_at')->nullable();
             $table->unsignedBigInteger('remaining_seconds')->nullable();
+            $table->text('device')->nullable();
+            $table->timestamp('device_bound_at')->nullable();
+            $table->timestamp('device_reset_at')->nullable();
             $table->timestamps();
             $table->unique(['user_id', 'product_id']);
         });
@@ -75,29 +79,6 @@ return new class extends Migration
             $table->timestamps();
             $table->index(['license_plan_id', 'claimed_at', 'revoked_at'], 'unclaimed_keys');
         });
-        Schema::create('licensekit_device_bindings', function (Blueprint $table): void {
-            $table->id();
-            $table->foreignIdFor(ConfiguredUserModel::className(), 'user_id')->constrained()->cascadeOnDelete();
-            $table->string('scope_key', 64);
-            $table->text('hwid')->nullable();
-            $table->timestamp('bound_at')->nullable();
-            $table->timestamp('last_hwid_reset_at')->nullable();
-            $table->unique(['user_id', 'scope_key']);
-            $table->timestamps();
-        });
-        Schema::create('licensekit_device_reset_history', function (Blueprint $table): void {
-            $table->id();
-            $table->string('user_id', 64);
-            $table->string('scope', 16);
-            $table->unsignedBigInteger('product_id')->nullable();
-            $table->timestamp('reset_at');
-            $table->string('performed_by', 16);
-            $table->string('actor_id', 64);
-            $table->text('reason')->nullable();
-            $table->text('before_hwid')->nullable();
-            $table->index(['user_id', 'id']);
-            $table->index(['product_id', 'id']);
-        });
         Schema::create('licensekit_audit_events', function (Blueprint $table): void {
             $table->id();
             $table->string('actor');
@@ -113,7 +94,7 @@ return new class extends Migration
 
     public function down(): void
     {
-        foreach (['licensekit_audit_events', 'licensekit_device_reset_history', 'licensekit_device_bindings', 'licensekit_license_keys', 'licensekit_entitlements', 'licensekit_batches', 'licensekit_api_clients', 'licensekit_license_plans', 'licensekit_products'] as $table) {
+        foreach (['licensekit_audit_events', 'licensekit_license_keys', 'licensekit_entitlements', 'licensekit_batches', 'licensekit_api_clients', 'licensekit_license_plans', 'licensekit_products'] as $table) {
             Schema::dropIfExists($table);
         }
     }

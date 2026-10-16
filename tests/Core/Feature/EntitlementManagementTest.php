@@ -155,17 +155,17 @@ test('pause denies bind verify free access and shared access checks until resume
     $user = User::factory()->create();
     $entitlement = Entitlement::factory()->create(['user_id' => $user->id]);
     $devices = app(LicensedDevices::class);
-    $devices->bind($user, $entitlement->product, ['value' => 'pc']);
+    $devices->bind($user, $entitlement->product, 'pc');
     app(ManageEntitlements::class)->pause($entitlement, $actor, 'Vacation');
 
-    expect(fn () => $devices->bind($user, $entitlement->product, ['value' => 'pc']))->toThrow(LicensingException::class, 'subscription paused');
-    expect(fn () => $devices->verify($user, $entitlement->product, ['value' => 'pc']))->toThrow(LicensingException::class, 'subscription paused');
+    expect(fn () => $devices->bind($user, $entitlement->product, 'pc'))->toThrow(LicensingException::class, 'subscription paused');
+    expect(fn () => $devices->verify($user, $entitlement->product, 'pc'))->toThrow(LicensingException::class, 'subscription paused');
     expect(fn () => app(AccessPolicy::class)->authorize($user, $entitlement->product, CarbonImmutable::now()->addDay()))->toThrow(LicensingException::class, 'subscription paused');
     expect(fn () => app(AccessPolicy::class)->assertAllowed($user, $entitlement->product))->toThrow(LicensingException::class, 'subscription paused');
     $this->postJson('/host/products/'.$entitlement->product->slug.'/login', desktopRequest($user))->assertForbidden()->assertJsonPath('error', 'subscription_paused');
 
     app(ManageEntitlements::class)->resume($entitlement, $actor, 'Returned');
-    expect($devices->verify($user, $entitlement->product, ['value' => 'pc'])->access->source)->toBe('paid');
+    expect($devices->verify($user, $entitlement->product, 'pc')->access->source)->toBe('paid');
 });
 
 test('paused summaries expose balance and preserve restriction precedence', function (array $state, string $status) {

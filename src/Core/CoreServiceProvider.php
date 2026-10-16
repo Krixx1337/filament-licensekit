@@ -8,7 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
-use LicenseKit\Core\Contracts\HwidHandler;
+use LicenseKit\Core\Contracts\DeviceMatcher;
 use LicenseKit\Core\Exceptions\LicensingException;
 use LicenseKit\Core\Http\LicensingExceptionResponse;
 use LicenseKit\Core\Http\Middleware\JsonResponse;
@@ -19,9 +19,9 @@ class CoreServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->app->bind(HwidHandler::class, function ($app): HwidHandler {
-            $handler = config('licensekit.hwid_handler');
-            if (! is_string($handler) || ! is_a($handler, HwidHandler::class, true)) {
+        $this->app->bind(DeviceMatcher::class, function ($app): DeviceMatcher {
+            $handler = config('licensekit.device_matcher');
+            if (! is_string($handler) || ! is_a($handler, DeviceMatcher::class, true)) {
                 throw new LicensingException('licensing_unavailable', 503);
             }
 

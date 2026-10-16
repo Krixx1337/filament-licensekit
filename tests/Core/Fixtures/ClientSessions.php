@@ -6,8 +6,8 @@ use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\Sanctum;
 use LicenseKit\Core\Actions\Audit;
-use LicenseKit\Core\Actions\Hwids;
 use LicenseKit\Core\Actions\LicensedDevices;
+use LicenseKit\Core\Contracts\DeviceMatcher;
 use LicenseKit\Core\Data\AccessAuthorization;
 use LicenseKit\Core\Exceptions\LicensingException;
 use LicenseKit\Core\Models\Entitlement;
@@ -16,13 +16,12 @@ use LicenseKit\Core\Users\ConfiguredUserModel;
 
 class ClientSessions
 {
-    public function __construct(private HostAuthenticateUser $credentials, private ClientSecurity $security, private LicensedDevices $devices, private Hwids $hwids, private Audit $audit) {}
+    public function __construct(private HostAuthenticateUser $credentials, private ClientSecurity $security, private LicensedDevices $devices, private DeviceMatcher $matcher, private Audit $audit) {}
 
     /**
-     * @param  array<string, mixed>  $hwid
      * @return array{token: string, expires_at: string, entitlement: Entitlement|null, access: array{source: string, valid_until: string|null}, heartbeat_seconds: int}
      */
-    public function login(Product $product, string $identity, #[\SensitiveParameter] string $password, #[\SensitiveParameter] array $hwid): array
+    public function login(Product $product, string $identity, #[\SensitiveParameter] string $password, #[\SensitiveParameter] string $hwid): array
     {
         $this->requireConfigured();
         $authenticated = $this->credentials->authenticate($identity, $password, rehashPassword: false) ?? throw new LicensingException('invalid_credentials', 401);
@@ -35,7 +34,7 @@ class ClientSessions
             }
             $context = $this->devices->bind($user, $product, $hwid, $this->freeUntil());
             $expiry = $this->expiry($context->access);
-            $session = ClientSession::create(['user_id' => $user->getKey(), 'product_id' => $context->access->product->id, 'hwid' => $context->hwid, 'user_fingerprint' => $fingerprint]);
+            $session = ClientSession::create(['user_id' => $user->getKey(), 'product_id' => $context->access->product->id, 'hwid' => $context->device, 'user_fingerprint' => $fingerprint]);
             $token = $session->createToken('desktop:'.$product->id, ['desktop:heartbeat:'.$product->id], $expiry);
             $session->update(['personal_access_token_id' => $token->accessToken->id]);
             $this->audit->record('user:'.$user->getKey(), 'client_login', $context->access->product);
@@ -45,10 +44,9 @@ class ClientSessions
     }
 
     /**
-     * @param  array<string, mixed>  $hwid
      * @return array{expires_at: string, entitlement: Entitlement|null, access: array{source: string, valid_until: string|null}, heartbeat_seconds: int}
      */
-    public function heartbeat(Product $product, #[\SensitiveParameter] string $bearer, #[\SensitiveParameter] array $hwid): array
+    public function heartbeat(Product $product, #[\SensitiveParameter] string $bearer, #[\SensitiveParameter] string $hwid): array
     {
         $this->requireConfigured();
 
@@ -70,7 +68,9 @@ class ClientSessions
                 throw new LicensingException('invalid_token', 401);
             }
             $context = $this->devices->verify($user, $product, $hwid, $this->freeUntil());
-            $this->hwids->verify($context->access->product, $session->hwid, $context->hwid);
+            if (! $this->matcher->matches($context->access->product, $session->hwid, $context->device)) {
+                throw new LicensingException('hwid_mismatch');
+            }
             $expiry = $this->expiry($context->access);
             $token->update(['expires_at' => $expiry, 'last_used_at' => now()]);
 

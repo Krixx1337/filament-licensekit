@@ -7,7 +7,6 @@ use Illuminate\Foundation\Auth\User;
 use Illuminate\Foundation\Bootstrap\LoadConfiguration;
 use Illuminate\Support\Facades\Schema;
 use LicenseKit\Core\Models\AuditEvent;
-use LicenseKit\Core\Models\DeviceBinding;
 use LicenseKit\Core\Models\Entitlement;
 use LicenseKit\Core\Models\Product;
 use LicenseKit\LicenseKitServiceProvider;
@@ -64,7 +63,7 @@ try {
     }
     $migrator->run($migrator->paths());
 
-    foreach (['licensekit_products', 'licensekit_device_bindings'] as $table) {
+    foreach (['licensekit_products', 'licensekit_entitlements'] as $table) {
         if (! Schema::hasTable($table)) {
             throw new RuntimeException('Missing migrated table: '.$table);
         }
@@ -76,11 +75,12 @@ try {
         throw new RuntimeException('Product creation or observer audit failed.');
     }
 
-    $binding = DeviceBinding::create(['user_id' => $user->id, 'scope_key' => 'product:'.$product->id, 'hwid' => ['value' => 'private-hwid']])->fresh();
-    if ($binding->hwid !== ['value' => 'private-hwid'] || array_key_exists('hwid', $binding->toArray())) {
+    $binding = Entitlement::create(['user_id' => $user->id, 'product_id' => $product->id, 'device' => 'private-hwid'])->fresh();
+    if ($binding->device !== 'private-hwid' || array_key_exists('device', $binding->toArray())) {
         throw new RuntimeException('Device binding storage or serialization privacy failed.');
     }
 
+    $binding->delete();
     $suspended = Entitlement::create(['user_id' => $user->id, 'product_id' => $product->id, 'status' => Entitlement::SUSPENDED, 'suspended_until' => now()->addDay()]);
     if (! $suspended->fresh()->isSuspended() || $suspended->fresh()->restingStatus() !== Entitlement::ACTIVE) {
         throw new RuntimeException('License suspension state failed.');

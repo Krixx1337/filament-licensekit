@@ -4,29 +4,32 @@ LicenseKit does not ship a desktop login URL. Your Laravel app authenticates the
 
 ## Login
 
-Authenticate first. Then bind the PC. `$hwid` is an array, not a bare string. The default shape is `['value' => $fingerprint]`.
+Authenticate first. Then lock the PC. The device is a string your app sends, such as a hardware fingerprint, up to 1024 bytes.
 
 ```php
 use LicenseKit\Core\Actions\LicensedDevices;
 
-$auth = app(LicensedDevices::class)->bind($user, $product, $hwid);
+$auth = app(LicensedDevices::class)->bind($user, $product, $device);
 ```
 
-`bind()` saves the PC the first time. Later logins on the same PC pass. A different PC is rejected with `hwid_mismatch`. `valid_until` is `$auth->access->validUntil`, and it is null for a lifetime license.
+`bind()` saves the device on the customer's license the first time. Later logins from the same device pass. A different device is rejected with `hwid_mismatch`. `valid_until` is `$auth->access->validUntil`, and it is null for a lifetime license.
 
-Heartbeats call `verify()`. That checks the saved PC and does not move the lock.
+Heartbeats call `verify()`. It checks the saved device and never changes it.
 
 ```php
-$auth = app(LicensedDevices::class)->verify($user, $product, $hwid);
+$auth = app(LicensedDevices::class)->verify($user, $product, $device);
 ```
 
 Your app creates the session token. LicenseKit does not.
 
-## Optional device binding
+## Device lock settings
 
-Products require device binding by default. Turn off "Require device binding (HWID)" in the product form, or set `$product->requires_hwid = false` and save, to allow that product on different PCs. Management product responses include the boolean `requires_hwid` setting.
+Each product has two settings in the admin:
 
-To exempt selected users while keeping protection for other customers, define `bypassHwid` in your host service provider:
+- **Lock each license to one device** (`requires_hwid`, on by default). Turn it off to allow any PC.
+- **Customers can move their license to a new PC** (`device_move_cooldown_days`): any time, once a day, once a week (default), every 2 weeks, once a month, or never (support only).
+
+To exempt selected users, such as your own staff, define `bypassHwid`:
 
 ```php
 use Illuminate\Support\Facades\Gate;
@@ -35,49 +38,25 @@ use LicenseKit\Core\Models\Product;
 Gate::define('bypassHwid', fn ($user, Product $product): bool => (bool) $user->is_admin);
 ```
 
-Alternatively, add this method to your registered Product policy:
-
-```php
-public function bypassHwid($user, Product $product): bool
-{
-    return (bool) $user->is_admin;
-}
-```
-
-Use your host application's role or permission check in place of `is_admin`. With Shield/Spatie permissions, you can check `$user->hasPermissionTo('bypass_hwid')`. Create and assign that permission in the host application; LicenseKit does not generate a Shield checkbox. Being a LicenseKit admin does not grant immunity by itself. Laravel Gate hooks, including host super-admin hooks, still apply.
-
-Both exemptions affect direct `DeviceBindings::bind()`/`verify()` and `LicensedDevices::bind()`/`verify()`/`upgrade()`. These calls still require a valid HWID array and run your handler's `assertAllowed()` with the saved baseline when present. Account checks, license suspensions, product restrictions, maintenance mode, and license requirements still apply. Staff immunity grants no entitlement.
-
-Exempt calls accept different PCs without creating or changing a device binding. `verify()` succeeds without a saved PC, and `upgrade()` returns the normalized presented HWID without changing a baseline or emitting an upgrade audit/event. Existing bindings and reset cooldowns remain stored. Customer and admin reset tools keep their existing behavior.
-
-Re-enabling protection or removing immunity restores the saved device lock. With no saved binding, call `bind()` before `verify()` as usual. In global scope, disabling binding for one product leaves the shared lock intact for protected products.
+Exempt users can log in from any PC and nothing is saved. They still need a valid license.
 
 ## Device errors
 
 | Error | Meaning |
 | --- | --- |
-| `invalid_hwid` | The payload is not a JSON object the handler accepts. HTTP 422. |
-| `hwid_mismatch` | This is not the saved PC. HTTP 403. |
-| `device_not_bound` | `verify()` ran before any PC was saved. HTTP 409. |
+| `invalid_hwid` | The device string is empty or longer than 1024 bytes. HTTP 422. |
+| `hwid_mismatch` | This is not the saved device. HTTP 403. |
+| `device_not_bound` | `verify()` ran before any device was saved. HTTP 409. |
 
-## Hardware match
+## Hardware changes
 
-The default handler stores one string in `value` and compares it exactly. The string can be up to 1024 bytes.
-
-For a GPU or disk swap to stay allowed, replace the handler. Set `hwid_handler` in `config/licensekit.php` to your class. It implements `LicenseKit\Core\Contracts\HwidHandler`.
-
-- `normalize()` checks the payload and returns the array you store.
-- `matches()` returns true when the presented PC is still the saved one. Exact or fuzzy both belong here. The package has no Windows score and no threshold.
-- `canUpgrade()` returns true only when you mean to replace the saved PC.
-- `assertAllowed()` rejects a device you want banned. The saved PC is null on the first bind.
-
-A fuzzy accept does not rewrite the saved PC. Call `upgrade()` only when you intend a new payload, such as a new hardware schema. Do not call it on every fuzzy match. That would let the baseline drift.
+The default matcher compares the device string exactly. To let a GPU or disk swap stay allowed, set `device_matcher` in `config/licensekit.php` to your own class implementing `LicenseKit\Core\Contracts\DeviceMatcher`:
 
 ```php
-app(LicensedDevices::class)->upgrade($user, $product, $newHwid);
+public function matches(Product $product, string $bound, string $presented): bool
 ```
 
-Choose storage and scope before the first bind. See [installation](installation.md#settings-to-choose-first).
+A match never rewrites the saved device, so it cannot drift over time.
 
 ## Claim a key
 
@@ -138,24 +117,26 @@ $licenses->suspendCustomer($user, $product, $admin, 'Cheating'); // works before
 
 Products have one `status` too: `active`, `maintenance` (the software stops working for everyone, `service_unavailable`) or `discontinued` (no new keys, existing licenses keep working).
 
-## Reset
+## Moving to a new PC
 
-The owner can clear their PC. The default wait is 7 days.
-
-```php
-use LicenseKit\Core\Actions\DeviceBindings;
-
-app(DeviceBindings::class)->reset($user, $product, $user);
-```
-
-`customer_reset_disabled` means you turned self-service off. `reset_cooldown` means the wait has not finished. An admin override ignores the wait and needs a reason:
+Customers can fix their own device lock, limited by the product's waiting period:
 
 ```php
-app(DeviceBindings::class)->adminReset($user, $product, $admin, 'Customer replaced their PC');
+use LicenseKit\Core\Actions\LicensedDevices;
+
+$devices = app(LicensedDevices::class);
+$devices->moveDevice($user, $product, $newDevice); // from your app on the new PC: one step
+$devices->reset($user, $product);                  // from your website: clears it, the next login locks the new PC
+$devices->eligibility($license);                   // ['allowed' => ..., 'available_at' => ..., 'reason' => ...]
 ```
 
-Successful resets stay on the HWID reset history page in the admin, including the device that was cleared.
+`customer_reset_disabled` means the product is set to support only. `reset_cooldown` (HTTP 429) means the wait has not finished. Staff can always reset from the Licenses page, or with:
 
+```php
+$devices->adminReset($user, $product, $admin, 'Customer replaced their PC');
+```
+
+Every move and reset is written to the activity log with the old device, so support can spot accounts that keep switching PCs.
 
 ## Claim events and provenance
 
@@ -165,4 +146,4 @@ Successful resets stay on the HWID reset history page in the admin, including th
 
 Use after-commit listeners for delivery notifications and external calls. A listener failure after commit cannot undo the claim; delivery guarantees need a host outbox or reconciliation. Use synchronous listeners only for database work that must participate in the claim transaction.
 
-Host-provided grants remain host decisions. `AccessPolicy::assertAllowed()` checks universal restrictions but does not prove paid entitlement. Approve a host grant before using `DeviceBindings::bind()`, ideally within the same transaction. Keep account authentication, session cleanup, and desktop response/error protocols in the host.
+Host-provided grants remain host decisions. `AccessPolicy::assertAllowed()` checks universal restrictions but does not prove paid entitlement. Approve a host grant before calling `LicensedDevices::bind()`, ideally within the same transaction. Keep account authentication, session cleanup, and desktop response/error protocols in the host.

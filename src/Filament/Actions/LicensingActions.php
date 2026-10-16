@@ -220,20 +220,26 @@ class LicensingActions
 
     public static function reset(): Action
     {
-        return Action::make('reset_hwid')->authorize(fn (Entitlement $record): bool => $record->user !== null && AdminAccess::isSupport())->label('Reset HWID')->modalDescription(fn (): string => config('licensekit.device_binding.scope') === 'global' ? 'Resets the account-wide device and invalidates device access for every product.' : 'Resets this product device and invalidates its device access.')->schema([Textarea::make('reason')->required()->maxLength(2000)])
-            ->action(fn (Entitlement $record, array $data) => app(LicensedDevices::class)->adminReset($record, self::actor(), $data['reason']));
+        return Action::make('reset_hwid')->label('Reset device')
+            ->authorize(fn (Entitlement $record): bool => $record->user !== null && AdminAccess::isSupport())
+            ->visible(fn (Entitlement $record): bool => $record->device !== null)
+            ->modalDescription('Clears the locked device now, ignoring the waiting period. The customer\'s next login locks their new PC.')
+            ->schema([Textarea::make('reason')->label('Note')->required()->maxLength(2000)])
+            ->action(fn (Entitlement $record, array $data) => app(LicensedDevices::class)->adminReset($record->user, $record->product, self::actor(), $data['reason']));
     }
 
     public static function inspectDevice(): Action
     {
-        return Action::make('inspect_device')->authorize(fn (Entitlement $record): bool => $record->user !== null && AdminAccess::isSupport())->label('Inspect device')->schema([
-            Textarea::make('descriptor')->default(function (Entitlement $record): string {
-                abort_unless(AdminAccess::isSupport(), 403);
+        return Action::make('inspect_device')->label('Show device')
+            ->authorize(fn (Entitlement $record): bool => $record->user !== null && AdminAccess::isSupport())
+            ->visible(fn (Entitlement $record): bool => $record->device !== null)
+            ->schema([
+                Textarea::make('device')->label('Locked device fingerprint')->default(function (Entitlement $record): ?string {
+                    abort_unless(AdminAccess::isSupport(), 403);
 
-                return json_encode(['hwid' => $record->binding?->hwid, 'scope' => config('licensekit.device_binding.scope')], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR);
-            })
-                ->rows(12)->disabled()->dehydrated(false),
-        ])->before(fn (Entitlement $record) => abort_unless(AdminAccess::isSupport(), 403))->modalSubmitAction(false)->modalCancelActionLabel('Close');
+                    return $record->device;
+                })->rows(6)->disabled()->dehydrated(false),
+            ])->modalSubmitAction(false)->modalCancelActionLabel('Close');
     }
 
     public static function addTime(): Action

@@ -2,11 +2,9 @@
 
 use Illuminate\Support\Facades\Schema;
 use LicenseKit\Core\Actions\CreateBatch;
-use LicenseKit\Core\Models\DeviceResetHistory;
 use LicenseKit\Core\Models\Entitlement;
 use LicenseKit\Core\Models\LicensePlan;
 use LicenseKit\Core\Models\Product;
-use LicenseKit\Filament\Resources\DeviceResetHistory\Pages\ManageDeviceResetHistory;
 use LicenseKit\Filament\Resources\Entitlements\Pages\ManageEntitlements;
 use LicenseKit\Filament\Resources\LicenseKeys\Pages\ManageLicenseKeys;
 use LicenseKit\Tests\Filament\Fixtures\User;
@@ -58,14 +56,10 @@ test('configured usernames display and search across licensing administration', 
     config(['licensekit.user.display_column' => 'username']);
     adminUser();
     $owner = User::factory()->create(['username' => 'player-owner']);
-    $actor = User::factory()->create(['username' => 'player-actor']);
     $entitlement = Entitlement::factory()->create(['user_id' => $owner->id]);
-    $history = DeviceResetHistory::factory()->create(['user_id' => $owner->id, 'actor_id' => $actor->id]);
 
     Livewire::test(ManageEntitlements::class)
         ->assertSee('player-owner')->searchTable('player-owner')->assertCanSeeTableRecords([$entitlement]);
-    Livewire::test(ManageDeviceResetHistory::class)->filterTable('user_id', (string) $owner->id)
-        ->assertSee('player-owner')->assertSee('player-actor')->assertCanSeeTableRecords([$history]);
 });
 
 test('configured user selector limits results and resolves selected users outside initial options', function () {

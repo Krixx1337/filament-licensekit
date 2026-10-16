@@ -14,6 +14,6 @@ class ClientHeartbeatRequest extends FormRequest
     /** @return array<string, list<string>> */
     public function rules(): array
     {
-        return ['hwid' => ['required', 'array']];
+        return ['hwid' => ['required', 'string']];
     }
 }

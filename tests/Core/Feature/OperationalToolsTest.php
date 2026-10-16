@@ -5,17 +5,11 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Schema;
 use LicenseKit\Core\Actions\ClaimLicense;
 use LicenseKit\Core\Actions\CreateBatch;
-use LicenseKit\Core\Actions\DeviceBindings;
-use LicenseKit\Core\Actions\LicensedDevices;
 use LicenseKit\Core\Actions\ManageEntitlements;
 use LicenseKit\Core\Exceptions\LicensingException;
 use LicenseKit\Core\Models\AuditEvent;
-use LicenseKit\Core\Models\DeviceBinding;
-use LicenseKit\Core\Models\DeviceResetHistory;
-use LicenseKit\Core\Models\Entitlement;
 use LicenseKit\Core\Models\LicenseKey;
 use LicenseKit\Core\Models\LicensePlan;
-use LicenseKit\Core\Models\Product;
 use LicenseKit\Support\ModuleReadiness;
 use LicenseKit\Tests\Core\Fixtures\User;
 
@@ -75,48 +69,6 @@ test('new writes roll back on audit failure', function (string $operation) {
     expect($batch->keys->first()->fresh()->note)->toBeNull();
     $this->assertDatabaseCount('licensekit_license_keys', 1);
 })->with(['revoke', 'note']);
-
-test('customer reasons remain customer resets in either binding scope', function (string $scope) {
-    $this->freezeTime();
-    config(['licensekit.device_binding.scope' => $scope, 'licensekit.device_binding.customer_reset.require_reason' => true]);
-    $user = testAdminActor();
-    $product = Product::factory()->create();
-    $entitlement = Entitlement::factory()->create(['user_id' => $user->id, 'product_id' => $product->id]);
-    $binding = DeviceBinding::factory()->create(['user_id' => $user->id, 'scope_key' => app(DeviceBindings::class)->scopeKey($product)]);
-
-    app(LicensedDevices::class)->reset($entitlement, $user, '  PC replaced  ');
-
-    $history = DeviceResetHistory::firstOrFail();
-    expect($history->performed_by)->toBe('customer')->and($history->reason)->toBe('PC replaced');
-    $binding->update(['hwid' => ['value' => 'new']]);
-    expect(fn () => app(LicensedDevices::class)->reset($entitlement, $user, 'Another reason'))->toThrow(LicensingException::class, 'reset cooldown');
-    app(LicensedDevices::class)->adminReset($entitlement, $user, 'Staff override');
-    expect(DeviceResetHistory::latest('id')->first()->performed_by)->toBe('admin');
-})->with(['global', 'per_product']);
-
-test('invalid customer reasons preserve binding and history', function (?string $reason, string $error) {
-    config(['licensekit.device_binding.customer_reset.require_reason' => true]);
-    $user = User::factory()->create();
-    $product = Product::factory()->create();
-    $binding = DeviceBinding::factory()->create(['user_id' => $user->id, 'scope_key' => 'product:'.$product->id]);
-
-    expect(fn () => app(DeviceBindings::class)->reset($user, $product, $user, $reason))->toThrow(LicensingException::class, $error);
-
-    expect($binding->fresh()->hwid)->not->toBeNull();
-    $this->assertDatabaseCount('licensekit_device_reset_history', 0);
-})->with([[null, 'reason required'], [' ', 'reason required'], [str_repeat('x', 2001), 'invalid reset reason']]);
-
-test('optional blank reset reason stores null and reasons do not allow resetting another owner', function () {
-    $user = User::factory()->create();
-    $other = testAdminActor();
-    $product = Product::factory()->create();
-    DeviceBinding::factory()->create(['user_id' => $user->id, 'scope_key' => 'product:'.$product->id]);
-
-    expect(fn () => app(DeviceBindings::class)->reset($user, $product, $other, 'Support'))->toThrow(LicensingException::class, 'reset forbidden');
-    app(DeviceBindings::class)->reset($user, $product, $user, ' ');
-
-    expect(DeviceResetHistory::firstOrFail()->reason)->toBeNull();
-});
 
 test('invalid batch reasons do not revoke keys or create audit', function (string $reason) {
     $actor = testAdminActor();

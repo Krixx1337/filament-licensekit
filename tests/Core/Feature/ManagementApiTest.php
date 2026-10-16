@@ -78,7 +78,7 @@ test('management token cannot authenticate customer fulfillment or desktop reque
     $plan = LicensePlan::factory()->create();
     $this->withToken($token)->getJson('/api/licensekit/v1/entitlements')->assertNotFound();
     $this->postJson('/api/licensekit/v1/licenses/issue', ['plan_id' => $plan->id, 'quantity' => 1, 'reference' => 'wrong'])->assertNotFound();
-    $this->postJson('/api/licensekit/v1/products/'.$plan->product->slug.'/heartbeat', ['hwid' => ['value' => 'pc']])->assertUnauthorized();
+    $this->postJson('/api/licensekit/v1/products/'.$plan->product->slug.'/heartbeat', ['hwid' => 'pc'])->assertUnauthorized();
     $this->assertDatabaseCount('licensekit_license_keys', 0);
 });
 

@@ -2,7 +2,6 @@
 
 namespace LicenseKit\Filament\Resources\Entitlements;
 
-use Carbon\CarbonImmutable;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
@@ -57,18 +56,17 @@ class EntitlementResource extends LicensingResource
                     $record->is_lifetime || (bool) $record->expires_at?->isFuture() => 'success',
                     default => 'gray',
                 })->toggleable(),
-            IconColumn::make('device_bound')->label('Device linked')->boolean()->toggleable(isToggledHiddenByDefault: true)
-                ->state(fn (Entitlement $record): bool => $record->binding?->hwid !== null),
-            TextColumn::make('bound_at')->label('Linked at')->dateTime()->placeholder('Not linked')->toggleable(isToggledHiddenByDefault: true)
-                ->state(fn (Entitlement $record): ?CarbonImmutable => $record->binding?->bound_at)])->recordActions([LicensingActions::suspend(),
-                    LicensingActions::unsuspend(),
-                    LicensingActions::cancelLicense(),
-                    LicensingActions::restoreLicense(),
-                    LicensingActions::extendEntitlement(),
-                    LicensingActions::pauseEntitlement(),
-                    LicensingActions::resumeEntitlement(),
-                    LicensingActions::reset(),
-                    LicensingActions::inspectDevice(), ])->defaultSort('id', 'desc');
+            IconColumn::make('device_bound')->label('Device locked')->boolean()->toggleable()
+                ->state(fn (Entitlement $record): bool => $record->device !== null),
+            TextColumn::make('device_bound_at')->label('Linked at')->dateTime()->placeholder('Not linked')->toggleable(isToggledHiddenByDefault: true)])->recordActions([LicensingActions::suspend(),
+                LicensingActions::unsuspend(),
+                LicensingActions::cancelLicense(),
+                LicensingActions::restoreLicense(),
+                LicensingActions::extendEntitlement(),
+                LicensingActions::pauseEntitlement(),
+                LicensingActions::resumeEntitlement(),
+                LicensingActions::reset(),
+                LicensingActions::inspectDevice(), ])->defaultSort('id', 'desc');
     }
 
     public static function statusLabel(Entitlement $record): string

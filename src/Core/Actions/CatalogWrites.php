@@ -63,6 +63,7 @@ class CatalogWrites
                 'slug' => ['required', 'string', 'max:255', Rule::unique('licensekit_products', 'slug')->ignore($record->getKey())],
                 'status' => ['required', Rule::in(Product::STATUSES)],
                 'requires_hwid' => ['required', 'boolean'],
+                'device_move_cooldown_days' => ['nullable', 'integer', 'min:0', 'max:365'],
             ])->validate();
         } elseif ($record instanceof LicensePlan) {
             Validator::make($record->getAttributes(), ['name' => ['required', 'string', 'max:255'], 'product_id' => ['required', 'integer', 'exists:licensekit_products,id'], 'is_enabled' => ['required', 'boolean']])->validate();

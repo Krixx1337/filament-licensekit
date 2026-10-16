@@ -5,7 +5,7 @@ namespace LicenseKit\Support;
 use Filament\Panel;
 use Illuminate\Auth\AuthManager;
 use InvalidArgumentException;
-use LicenseKit\Core\Contracts\HwidHandler;
+use LicenseKit\Core\Contracts\DeviceMatcher;
 use LicenseKit\Core\Exceptions\LicensingException;
 use LicenseKit\Core\Users\ConfiguredUserModel;
 
@@ -25,32 +25,9 @@ final class SetupDiagnostics
         } catch (InvalidArgumentException $exception) {
             $errors[] = $exception->getMessage().' Check licensekit.user.guard and auth.guards/auth.providers.';
         }
-        $handler = config('licensekit.hwid_handler');
-        if (! is_string($handler) || ! is_a($handler, HwidHandler::class, true)) {
-            $errors[] = 'licensekit.hwid_handler must implement HwidHandler.';
-        }
-        if (! in_array(config('licensekit.device_binding.scope'), ['per_product', 'global'], true)) {
-            $errors[] = 'licensekit.device_binding.scope must be per_product or global.';
-        }
-        if (! in_array(config('licensekit.device_binding.storage'), ['plain', 'encrypted'], true)) {
-            $errors[] = 'licensekit.device_binding.storage must be plain or encrypted.';
-        }
-        if (config('licensekit.device_binding.storage') === 'encrypted') {
-            try {
-                app('encrypter');
-            } catch (\Throwable) {
-                $errors[] = 'Encrypted HWID storage requires a valid Laravel encryption key.';
-            }
-        }
-        if (! is_bool(config('licensekit.device_binding.customer_reset.enabled'))) {
-            $errors[] = 'licensekit.device_binding.customer_reset.enabled must be true or false.';
-        }
-        if (! is_bool(config('licensekit.device_binding.customer_reset.require_reason'))) {
-            $errors[] = 'licensekit.device_binding.customer_reset.require_reason must be true or false.';
-        }
-        $cooldown = config('licensekit.device_binding.customer_reset.cooldown_days');
-        if (! is_int($cooldown) || $cooldown < 0) {
-            $errors[] = 'licensekit.device_binding.customer_reset.cooldown_days must be a nonnegative integer.';
+        $matcher = config('licensekit.device_matcher');
+        if (! is_string($matcher) || ! is_a($matcher, DeviceMatcher::class, true)) {
+            $errors[] = 'licensekit.device_matcher must implement DeviceMatcher.';
         }
         if (! is_bool(config('licensekit.user.require_verified'))) {
             $errors[] = 'licensekit.user.require_verified must be true or false.';

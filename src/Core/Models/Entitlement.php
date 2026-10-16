@@ -4,11 +4,9 @@ namespace LicenseKit\Core\Models;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
-use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use LicenseKit\Core\Actions\DeviceBindings;
 use LicenseKit\Core\Casts\UtcDateTime;
 use LicenseKit\Core\Users\ConfiguredUserModel;
 use LicenseKit\Database\Factories\Core\EntitlementFactory;
@@ -25,7 +23,9 @@ use LicenseKit\Database\Factories\Core\EntitlementFactory;
  * @property int|null $remaining_seconds
  * @property Product $product
  * @property Model|null $user
- * @property DeviceBinding|null $binding
+ * @property string|null $device
+ * @property CarbonImmutable|null $device_bound_at
+ * @property CarbonImmutable|null $device_reset_at
  */
 class Entitlement extends Model
 {
@@ -37,7 +37,9 @@ class Entitlement extends Model
 
     public const REVOKED = 'revoked';
 
-    protected $fillable = ['user_id', 'product_id', 'is_lifetime', 'status', 'suspended_until', 'expires_at', 'paused_at', 'remaining_seconds'];
+    protected $fillable = ['user_id', 'product_id', 'is_lifetime', 'status', 'suspended_until', 'expires_at', 'paused_at', 'remaining_seconds', 'device', 'device_bound_at', 'device_reset_at'];
+
+    protected $hidden = ['device'];
 
     protected $table = 'licensekit_entitlements';
 
@@ -54,7 +56,7 @@ class Entitlement extends Model
     /** @return array<string, string> */
     protected function casts(): array
     {
-        return ['created_at' => UtcDateTime::class, 'updated_at' => UtcDateTime::class, 'product_id' => 'integer', 'is_lifetime' => 'boolean', 'suspended_until' => UtcDateTime::class, 'expires_at' => UtcDateTime::class, 'paused_at' => UtcDateTime::class, 'remaining_seconds' => 'integer'];
+        return ['created_at' => UtcDateTime::class, 'updated_at' => UtcDateTime::class, 'product_id' => 'integer', 'is_lifetime' => 'boolean', 'suspended_until' => UtcDateTime::class, 'expires_at' => UtcDateTime::class, 'paused_at' => UtcDateTime::class, 'remaining_seconds' => 'integer', 'device_bound_at' => UtcDateTime::class, 'device_reset_at' => UtcDateTime::class];
     }
 
     /** Suspension ends by itself once suspended_until has passed. */
@@ -84,11 +86,5 @@ class Entitlement extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(ConfiguredUserModel::className(), 'user_id');
-    }
-
-    /** @return Attribute<DeviceBinding|null, never> */
-    protected function binding(): Attribute
-    {
-        return Attribute::get(fn (): ?DeviceBinding => $this->user === null ? null : ($this->relationLoaded('binding') ? $this->getRelation('binding') : app(DeviceBindings::class)->find($this->user, $this->product)));
     }
 }

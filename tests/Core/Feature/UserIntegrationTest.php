@@ -39,7 +39,7 @@ test('missing desktop users return invalid credentials under host argon hasher',
     $product = Product::factory()->create();
     $this->postJson(route('licensekit.desktop.login', $product->slug), [
         'login' => 'missing@example.com', 'password' => 'password',
-        'hwid' => ['value' => 'pc'],
+        'hwid' => 'pc',
     ])->assertUnauthorized()->assertJsonPath('error', 'invalid_credentials');
     $this->assertDatabaseCount('client_sessions', 0);
 });
@@ -107,7 +107,7 @@ test('display configuration does not control host credentials or security invali
     $product = Product::factory()->create();
     $entitlement = Entitlement::factory()->create(['user_id' => $user->id, 'product_id' => $product->id]);
     $sessions = app(ClientSessions::class);
-    $token = $sessions->login($product, $user->email, 'password', ['value' => 'pc'])['token'];
+    $token = $sessions->login($product, $user->email, 'password', 'pc')['token'];
     $fingerprint = app(ClientSecurity::class)->fingerprint($user);
     config(['licensekit.user.display_column' => 'username']);
 
@@ -122,7 +122,7 @@ test('display configuration does not control host credentials or security invali
     $this->withToken($token)->postJson(route('licensekit.desktop.heartbeat', $product->slug), desktopRequest($user, 'pc'))->assertUnauthorized();
     $this->assertDatabaseCount('client_sessions', $bulk ? 1 : 0);
     expect($entitlement->fresh()->user_id)->toBe($user->id);
-    $this->assertDatabaseHas('licensekit_device_bindings', ['user_id' => $user->id, 'scope_key' => 'product:'.$product->id]);
+    $this->assertDatabaseHas('licensekit_entitlements', ['user_id' => $user->id, 'product_id' => $product->id, 'device' => 'pc']);
 })->with([
     'email observer' => ['email', 'changed@example.com', false],
     'username observer' => ['username', 'renamed-player', false],

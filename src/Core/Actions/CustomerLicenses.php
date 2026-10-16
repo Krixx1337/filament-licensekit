@@ -12,7 +12,7 @@ use LicenseKit\Core\Users\UserAccess;
 
 class CustomerLicenses
 {
-    public function __construct(private UserAccess $users, private ReadinessCheck $readiness, private CustomerLicenseSummary $summary, private DeviceBindings $bindings) {}
+    public function __construct(private UserAccess $users, private ReadinessCheck $readiness, private CustomerLicenseSummary $summary) {}
 
     /** @return LengthAwarePaginator<int, array<string, mixed>> */
     public function paginate(Model $user, int $perPage = 25): LengthAwarePaginator
@@ -22,7 +22,6 @@ class CustomerLicenses
         }
 
         $page = $this->query($user)->orderBy('id')->paginate($perPage)->appends(['per_page' => $perPage]);
-        $this->bindings->preload($page->getCollection());
 
         return $page->through(fn (Entitlement $entitlement): array => $this->summary->for($entitlement));
     }

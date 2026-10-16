@@ -35,7 +35,7 @@ test('host can disable its client example while preserving package APIs', functi
         ->toThrow(LicensingException::class, 'module disabled');
     expect(fn () => app(ClientSessions::class)->heartbeat($product, 'token', desktopRequest($user)['hwid']))
         ->toThrow(LicensingException::class, 'module disabled');
-    $this->assertDatabaseCount('licensekit_device_bindings', 0);
+    expect(lockedDeviceCount())->toBe(0);
     $this->assertDatabaseCount('client_sessions', 0);
 });
 
@@ -46,7 +46,7 @@ test('host controller grants and validates without default desktop tokens and re
     $product = Product::factory()->create();
     $entitlement = Entitlement::factory()->create(['user_id' => $user->id, 'product_id' => $product->id]);
     $token = $this->postJson('host/products/'.$product->slug.'/login', desktopRequest($user))->assertOk()->json('host_token');
-    $this->assertDatabaseCount('licensekit_device_bindings', 1);
+    expect(lockedDeviceCount())->toBe(1);
     $this->assertDatabaseCount('host_desktop_sessions', 1);
     $this->assertDatabaseCount('client_sessions', 0);
     $this->assertDatabaseCount('personal_access_tokens', 0);
@@ -54,7 +54,7 @@ test('host controller grants and validates without default desktop tokens and re
     $expiry = DB::table('host_desktop_sessions')->value('expires_at');
     $this->withToken($token)->postJson('host/products/'.$product->slug.'/heartbeat', desktopRequest($user, 'other'))->assertForbidden()->assertJsonPath('error', 'hwid_mismatch');
     expect(DB::table('host_desktop_sessions')->value('expires_at'))->toBe($expiry);
-    app(LicensedDevices::class)->reset($entitlement, $user);
+    app(LicensedDevices::class)->reset($entitlement->user, $entitlement->product);
     $this->assertDatabaseCount('host_desktop_sessions', 0);
     $this->withToken($token)->postJson('host/products/'.$product->slug.'/heartbeat', desktopRequest($user))->assertUnauthorized();
 });
@@ -66,7 +66,7 @@ test('custom protocol access denies revoked entitlements without creating bindin
     $product = Product::factory()->create();
     Entitlement::factory()->create(['user_id' => $user->id, 'product_id' => $product->id, 'status' => 'revoked']);
     $this->postJson('host/products/'.$product->slug.'/login', desktopRequest($user))->assertForbidden()->assertJsonPath('error', 'license_unavailable');
-    $this->assertDatabaseCount('licensekit_device_bindings', 0);
+    expect(lockedDeviceCount())->toBe(0);
     $this->assertDatabaseCount('host_desktop_sessions', 0);
 });
 
@@ -92,7 +92,7 @@ test('session continuation failure rolls back binding and host credential writes
             'fingerprint' => app(ClientSecurity::class)->fingerprint($user), 'hwid' => '{}', 'expires_at' => now()]);
         throw new RuntimeException('host session failed');
     }))->toThrow(RuntimeException::class, 'host session failed');
-    $this->assertDatabaseCount('licensekit_device_bindings', 0);
+    expect(lockedDeviceCount())->toBe(0);
     $this->assertDatabaseCount('host_desktop_sessions', 0);
 });
 
@@ -124,7 +124,7 @@ test('default session cleanup and termination work after disabling desktop route
     app(ClientSessions::class)->terminate($entitlement, 'test', 'Terminate inactive protocol');
     $this->assertDatabaseCount('client_sessions', 0);
     $this->assertDatabaseCount('personal_access_tokens', 0);
-    $this->assertDatabaseCount('licensekit_device_bindings', 1);
+    expect(lockedDeviceCount())->toBe(1);
 });
 
 test('custom protocol rechecks restrictions and credential fingerprints without extending denied sessions', function () {
@@ -162,7 +162,7 @@ test('suspension invalidates all participating custom sessions including multipl
     app(ManageEntitlements::class)->suspend($entitlement, $admin, 'Abuse');
     $this->assertDatabaseCount('host_desktop_sessions', 1);
     expect($entitlement->fresh()->expires_at->equalTo($before['expires_at']))->toBeTrue();
-    $this->assertDatabaseCount('licensekit_device_bindings', 2);
+    expect(lockedDeviceCount())->toBe(2);
     $this->postJson('host/products/'.$entitlement->product->slug.'/login', desktopRequest($user))->assertForbidden()->assertJsonPath('error', 'license_suspended');
     $this->withToken($token)->postJson('host/products/'.$entitlement->product->slug.'/heartbeat', desktopRequest($user))->assertUnauthorized();
     $this->withToken($otherToken)->postJson('host/products/'.$unrelated->product->slug.'/heartbeat', desktopRequest($other))->assertOk();

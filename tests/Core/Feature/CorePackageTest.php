@@ -60,7 +60,7 @@ test('restriction denies login without creating binding session or token', funct
     Entitlement::factory()->create(['user_id' => $user->id, 'product_id' => $product->id]);
     config(['licensekit.access_restrictions' => [MaintenanceRestriction::class]]);
     $this->postJson(route('licensekit.desktop.login', $product->slug), desktopRequest($user))->assertForbidden()->assertJsonPath('error', 'service_unavailable');
-    $this->assertDatabaseCount('licensekit_device_bindings', 0);
+    expect(lockedDeviceCount())->toBe(0);
     $this->assertDatabaseCount('client_sessions', 0);
     $this->assertDatabaseCount('personal_access_tokens', 0);
 });
@@ -116,7 +116,7 @@ test('host user security updates preserve unrelated host tokens', function () {
     $personal = $user->createToken('host-api', ['*'])->accessToken;
     $product = Product::factory()->create();
     Entitlement::factory()->create(['user_id' => $user->id, 'product_id' => $product->id]);
-    app(ClientSessions::class)->login($product, $user->email, 'password', ['value' => 'pc']);
+    app(ClientSessions::class)->login($product, $user->email, 'password', 'pc');
     $user->update(['password' => 'new-password']);
     $this->assertDatabaseCount('client_sessions', 0);
     expect($personal->fresh())->not->toBeNull();
@@ -190,7 +190,7 @@ test('user security cleanup works while optional module schema is unavailable', 
 
 test('host users can update and delete before licensing storage is installed', function () {
     Schema::drop('client_sessions');
-    Schema::drop('licensekit_device_bindings');
+    Schema::drop('licensekit_audit_events');
     Schema::drop('licensekit_license_keys');
     Schema::drop('licensekit_entitlements');
     $user = User::factory()->create();
@@ -207,12 +207,12 @@ test('admin reset override requires a reason', function () {
     $product = Product::factory()->create();
     $entitlement = Entitlement::factory()->create(['user_id' => $user->id, 'product_id' => $product->id]);
     app(ClientSessions::class)->login($product, $user->email, 'password', desktopRequest($user)['hwid']);
-    expect(fn () => app(LicensedDevices::class)->adminReset($entitlement, $admin, ''))
+    expect(fn () => app(LicensedDevices::class)->adminReset($entitlement->user, $entitlement->product, $admin, ''))
         ->toThrow(LicensingException::class, 'reason required');
-    app(LicensedDevices::class)->adminReset($entitlement, $admin, 'Support request');
-    expect($entitlement->fresh()->binding->hwid)->toBeNull();
+    app(LicensedDevices::class)->adminReset($entitlement->user, $entitlement->product, $admin, 'Support request');
+    expect($entitlement->fresh()->device)->toBeNull();
     $this->assertDatabaseCount('client_sessions', 0);
-    $this->assertDatabaseHas('licensekit_audit_events', ['event' => 'hwid_reset', 'reason' => 'Support request']);
+    $this->assertDatabaseHas('licensekit_audit_events', ['event' => 'device_reset', 'reason' => 'Support request']);
 });
 
 test('administrative revocation invalidates only affected desktop session and records reason', function () {

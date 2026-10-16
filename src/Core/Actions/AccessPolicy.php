@@ -28,7 +28,7 @@ class AccessPolicy
             return new AccessAuthorization($user, $product, null, 'host_free', $freeUntil->utc());
         }
         throw new LicensingException(match (true) {
-            $entitlement === null, $entitlement->isRevoked() => 'license_unavailable',
+            $entitlement === null, $entitlement->isRevoked(), ! $entitlement->is_lifetime && $entitlement->expires_at === null => 'license_unavailable',
             default => 'license_expired',
         });
     }

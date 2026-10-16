@@ -6,7 +6,7 @@ use LicenseKit\Core\Models\Entitlement;
 
 class CustomerLicenseSummary
 {
-    public function __construct(private EntitlementClock $clock, private DeviceResetEligibility $resets) {}
+    public function __construct(private EntitlementClock $clock, private LicensedDevices $devices) {}
 
     /** @return array<string, mixed> */
     public function for(Entitlement $entitlement): array
@@ -24,7 +24,7 @@ class CustomerLicenseSummary
             'lifetime' => $entitlement->is_lifetime, 'expires_at' => $entitlement->expires_at?->toIso8601String(),
             'paused_at' => $entitlement->paused_at?->toIso8601String(), 'remaining_seconds' => $entitlement->remaining_seconds,
             'product' => $entitlement->product->only(['id', 'name', 'slug']), 'status' => $status,
-            'device' => ['scope' => config('licensekit.device_binding.scope'), 'bound' => $entitlement->binding?->hwid !== null, 'bound_at' => $entitlement->binding?->bound_at?->toIso8601String()],
-            'reset' => $this->resets->for($entitlement)];
+            'device' => ['bound' => $entitlement->device !== null, 'bound_at' => $entitlement->device_bound_at?->toIso8601String()],
+            'reset' => $this->devices->eligibility($entitlement)];
     }
 }

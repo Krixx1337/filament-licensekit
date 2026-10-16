@@ -16,6 +16,7 @@ use LicenseKit\Database\Factories\Core\ProductFactory;
  * @property string $slug
  * @property string $status active, maintenance or discontinued
  * @property bool $requires_hwid
+ * @property int|null $device_move_cooldown_days days between customer device moves; null = support only
  * @property Collection<int, LicensePlan> $plans
  */
 #[ObservedBy([LicensingConfigurationObserver::class])]
@@ -32,7 +33,7 @@ class Product extends Model
 
     public const STATUSES = [self::ACTIVE, self::MAINTENANCE, self::DISCONTINUED];
 
-    protected $fillable = ['name', 'slug', 'status', 'requires_hwid'];
+    protected $fillable = ['name', 'slug', 'status', 'requires_hwid', 'device_move_cooldown_days'];
 
     /** @internal Actor supplied by supported catalog operations for synchronous auditing. */
     public ?string $auditActor = null;
@@ -47,12 +48,12 @@ class Product extends Model
     /** @use HasFactory<ProductFactory> */
     use HasFactory;
 
-    protected $attributes = ['status' => self::ACTIVE, 'requires_hwid' => true];
+    protected $attributes = ['status' => self::ACTIVE, 'requires_hwid' => true, 'device_move_cooldown_days' => 7];
 
     /** @return array<string, string> */
     protected function casts(): array
     {
-        return ['requires_hwid' => 'boolean'];
+        return ['requires_hwid' => 'boolean', 'device_move_cooldown_days' => 'integer'];
     }
 
     /** @return HasMany<LicensePlan, $this> */

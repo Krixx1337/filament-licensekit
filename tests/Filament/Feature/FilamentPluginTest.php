@@ -8,7 +8,6 @@ use LicenseKit\Core\Models\Batch;
 use LicenseKit\Core\Models\LicensePlan;
 use LicenseKit\Filament\Resources\ApiClients\ApiClientResource;
 use LicenseKit\Filament\Resources\AuditEvents\AuditEventResource;
-use LicenseKit\Filament\Resources\DeviceResetHistory\DeviceResetHistoryResource;
 use LicenseKit\Filament\Resources\Entitlements\EntitlementResource;
 use LicenseKit\Filament\Resources\LicenseKeys\LicenseKeyResource;
 use LicenseKit\Filament\Resources\LicenseKeys\Pages\ManageLicenseKeys;
@@ -25,7 +24,7 @@ test('core resources require panel registration and host gate', function () {
     $this->actingAs($user, 'staff')->get('/admin/licensekit/products')->assertForbidden();
     adminUser();
     $this->get('/admin/licensekit/products')->assertOk();
-    foreach (['license-plans', 'license-keys', 'entitlements', 'api-clients', 'audit-events', 'device-reset-history'] as $slug) {
+    foreach (['license-plans', 'license-keys', 'entitlements', 'api-clients', 'audit-events'] as $slug) {
         $this->get('/admin/licensekit/'.$slug)->assertOk();
     }
 });
@@ -58,7 +57,7 @@ test('key creation action uses package backend', function () {
 
 test('resources register on non-tenant panels and unsupported tenancy is rejected', function () {
     $core = Panel::make()->id('core')->authGuard('staff')->plugin(LicenseKitPlugin::make());
-    expect($core->getResources())->toHaveCount(8);
+    expect($core->getResources())->toHaveCount(7);
     $tenant = Panel::make()->id('tenant')->tenant(User::class)->plugin(LicenseKitPlugin::make());
     expect($tenant->getResources())->toBe([]);
     expect(fn () => $tenant->getPlugin('licensekit')->boot($tenant))->toThrow(LicensingException::class, 'licensing unavailable');
@@ -66,8 +65,7 @@ test('resources register on non-tenant panels and unsupported tenancy is rejecte
         ->and(LicensePlanResource::getNavigationLabel())->toBe('Plans')
         ->and(LicenseKeyResource::getNavigationLabel())->toBe('Keys')
         ->and(ApiClientResource::getNavigationLabel())->toBe('API clients')
-        ->and(AuditEventResource::getNavigationLabel())->toBe('Change log')
-        ->and(DeviceResetHistoryResource::getNavigationLabel())->toBe('HWID reset history');
+        ->and(AuditEventResource::getNavigationLabel())->toBe('Change log');
 });
 
 test('unauthenticated requests use host panel login', function () {

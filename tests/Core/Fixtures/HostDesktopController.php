@@ -7,8 +7,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use LicenseKit\Core\Actions\Hwids;
 use LicenseKit\Core\Actions\LicensedDevices;
+use LicenseKit\Core\Contracts\DeviceMatcher;
 use LicenseKit\Core\Data\AccessAuthorization;
 use LicenseKit\Core\Exceptions\LicensingException;
 use LicenseKit\Core\Models\Product;
@@ -17,7 +17,7 @@ class HostDesktopController
 {
     public function login(Request $request, Product $product, LicensedDevices $devices): JsonResponse
     {
-        $data = $request->validate(['login' => 'required|string', 'password' => 'required|string', 'hwid' => 'required|array']);
+        $data = $request->validate(['login' => 'required|string', 'password' => 'required|string', 'hwid' => 'required|string']);
         $authenticated = app(HostAuthenticateUser::class)->authenticate($data['login'], $data['password']) ?? throw new LicensingException('invalid_credentials', 401);
         $fingerprint = app(ClientSecurity::class)->fingerprint($authenticated);
         $token = DB::transaction(function () use ($devices, $product, $data, $authenticated, $fingerprint): string {
@@ -28,7 +28,7 @@ class HostDesktopController
             $context = $devices->bind($user, $product, $data['hwid']);
             $token = Str::random(48);
             DB::table('host_desktop_sessions')->insert(['user_id' => $user->getKey(), 'product_id' => $context->access->product->id,
-                'token_hash' => hash('sha256', $token), 'fingerprint' => $fingerprint, 'hwid' => json_encode($context->hwid, JSON_THROW_ON_ERROR), 'expires_at' => $this->expiry($context->access)]);
+                'token_hash' => hash('sha256', $token), 'fingerprint' => $fingerprint, 'hwid' => $context->device, 'expires_at' => $this->expiry($context->access)]);
 
             return $token;
         });
@@ -36,10 +36,10 @@ class HostDesktopController
         return response()->json(['host_token' => $token]);
     }
 
-    public function heartbeat(Request $request, Product $product, LicensedDevices $devices, ClientSecurity $security, Hwids $hwids): JsonResponse
+    public function heartbeat(Request $request, Product $product, LicensedDevices $devices, ClientSecurity $security, DeviceMatcher $matcher): JsonResponse
     {
-        $data = $request->validate(['hwid' => 'required|array']);
-        DB::transaction(function () use ($request, $product, $data, $devices, $security, $hwids): void {
+        $data = $request->validate(['hwid' => 'required|string']);
+        DB::transaction(function () use ($request, $product, $data, $devices, $security, $matcher): void {
             $session = DB::table('host_desktop_sessions')->where('token_hash', hash('sha256', $request->bearerToken() ?? ''))->where('expires_at', '>', now())->first();
             if ($session === null || $session->product_id !== $product->id) {
                 throw new LicensingException('invalid_token', 401);
@@ -50,7 +50,9 @@ class HostDesktopController
                 throw new LicensingException('invalid_token', 401);
             }
             $context = $devices->verify($user, $product, $data['hwid']);
-            $hwids->verify($context->access->product, json_decode($session->hwid, true, flags: JSON_THROW_ON_ERROR), $context->hwid);
+            if (! $matcher->matches($context->access->product, $session->hwid, $context->device)) {
+                throw new LicensingException('hwid_mismatch');
+            }
             DB::table('host_desktop_sessions')->where('id', $session->id)->update(['expires_at' => $this->expiry($context->access)]);
         });
 

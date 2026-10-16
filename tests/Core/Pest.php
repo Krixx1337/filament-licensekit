@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use LicenseKit\Core\Events\EntitlementAccessInvalidated;
 use LicenseKit\Core\Events\ProductAccessInvalidated;
+use LicenseKit\Core\Models\Entitlement;
 use LicenseKit\Tests\Core\Fixtures\HostDesktopController;
 use LicenseKit\Tests\Core\Fixtures\HostUserSecurityChanged;
 use LicenseKit\Tests\Core\Fixtures\User;
@@ -16,9 +17,14 @@ use LicenseKit\Tests\Core\TestCase;
 pest()->extend(TestCase::class)->in('Core/Feature');
 
 /** @return array{login: string, password: string, hwid: array{value: string}} */
+function lockedDeviceCount(): int
+{
+    return Entitlement::whereNotNull('device')->count();
+}
+
 function desktopRequest(User $user, string $device = 'desktop'): array
 {
-    return ['login' => $user->email, 'password' => 'password', 'hwid' => ['value' => $device]];
+    return ['login' => $user->email, 'password' => 'password', 'hwid' => $device];
 }
 
 function installHostDesktopProtocol(): void

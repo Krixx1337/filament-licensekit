@@ -38,11 +38,11 @@ test('session termination keeps device binding and requires reason', function ()
     $product = Product::factory()->create();
     $entitlement = Entitlement::factory()->create(['user_id' => $user->id, 'product_id' => $product->id]);
     $devices = app(ClientSessions::class);
-    $token = $devices->login($product, $user->email, 'password', ['value' => 'pc'])['token'];
+    $token = $devices->login($product, $user->email, 'password', 'pc')['token'];
     expect(fn () => $devices->terminate($entitlement, testAdminActor(), ''))->toThrow(LicensingException::class);
     $devices->terminate($entitlement, testAdminActor(), 'Support');
     expect(PersonalAccessToken::findToken($token))->toBeNull();
-    $this->assertDatabaseCount('licensekit_device_bindings', 1);
+    expect(lockedDeviceCount())->toBe(1);
     $this->assertDatabaseHas('licensekit_audit_events', ['event' => 'desktop_session_terminated', 'reason' => 'Support']);
 });
 

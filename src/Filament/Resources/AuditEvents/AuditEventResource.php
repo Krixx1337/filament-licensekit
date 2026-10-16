@@ -8,6 +8,7 @@ use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use LicenseKit\Core\Models\AuditEvent;
+use LicenseKit\Filament\AdminAccess;
 use LicenseKit\Filament\Resources\AuditEvents\Pages\ManageAuditEvents;
 use LicenseKit\Filament\Resources\LicensingResource;
 
@@ -16,6 +17,8 @@ class AuditEventResource extends LicensingResource
     protected static ?string $slug = 'licensekit/audit-events';
 
     protected static ?string $model = AuditEvent::class;
+
+    protected static string $access = AdminAccess::SUPPORT;
 
     protected static ?string $navigationLabel = 'Change log';
 
