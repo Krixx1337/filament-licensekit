@@ -16,7 +16,7 @@ class LicensesByStatusChart extends ChartWidget
 
     protected ?string $heading = 'Licenses by status';
 
-    protected ?string $maxHeight = '260px';
+    protected ?string $maxHeight = '300px';
 
     protected ?string $pollingInterval = null;
 
@@ -32,18 +32,21 @@ class LicensesByStatusChart extends ChartWidget
 
     protected function getData(): array
     {
-        $counts = [];
-        foreach (array_keys(self::SLICES) as $scope) {
+        $slices = [];
+        foreach (self::SLICES as $scope => [$state, $colour]) {
             $query = $this->licenses()->effectiveStatus($scope === 'active' ? License::ACTIVE : $scope);
             if ($scope === 'active') {
                 $query->whereNot(fn ($q) => $q->effectiveStatus('expiring'));
             }
-            $counts[] = $query->count();
+            // Empty slices are left out so the legend only lists statuses that exist.
+            if ($count = $query->count()) {
+                $slices[] = [$state->getLabel(), $count, $colour];
+            }
         }
 
         return [
-            'datasets' => [['data' => $counts, 'backgroundColor' => array_column(self::SLICES, 1), 'borderWidth' => 0]],
-            'labels' => array_map(fn (LicenseState $state): string => $state->getLabel(), array_column(self::SLICES, 0)),
+            'datasets' => [['data' => array_column($slices, 1), 'backgroundColor' => array_column($slices, 2), 'borderWidth' => 0]],
+            'labels' => array_column($slices, 0),
         ];
     }
 
