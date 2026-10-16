@@ -9,7 +9,7 @@ pest()->extend(MySqlTestCase::class)->in('Integration');
 function integrationAdmin(): User
 {
     $admin = User::factory()->create();
-    Gate::define('licensekit.manage', fn ($actor): bool => $actor->getKey() === $admin->getKey());
+    Gate::define('licensekit.admin', fn ($actor): bool => $actor->getKey() === $admin->getKey());
 
     return $admin;
 }

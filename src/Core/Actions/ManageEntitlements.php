@@ -36,7 +36,6 @@ class ManageEntitlements
 
         return DB::transaction(function () use ($product, $seconds, $actor, $reason, $since): int {
             $product = Product::whereKey($product->id)->lockForUpdate()->first() ?? throw new LicensingException('service_unavailable');
-            $this->authorize($actor, 'addTime', $product);
             $now = CarbonImmutable::now('UTC')->format('Y-m-d H:i:s');
             // $seconds is a validated integer, so interpolating it into the expression is safe.
             $expiry = DB::getDriverName() === 'sqlite' ? "datetime(expires_at, '+{$seconds} seconds')" : "DATE_ADD(expires_at, INTERVAL {$seconds} SECOND)";
@@ -117,7 +116,6 @@ class ManageEntitlements
             $actor = $users->first(fn (Model $user): bool => (string) $user->getKey() === (string) $actor->getKey()) ?? throw new LicensingException('admin_forbidden');
             Product::whereKey($entitlement->product_id)->lockForUpdate()->firstOrFail();
             $entitlement = Entitlement::whereKey($entitlement->id)->lockForUpdate()->first() ?? throw new LicensingException('license_unavailable');
-            $this->authorize($actor, $ability, $entitlement);
             if ($entitlement->user_id === null || $entitlement->is_lifetime || $entitlement->isRevoked()
                 || $entitlement->isSuspended()) {
                 throw new LicensingException('cannot_'.$ability.'_entitlement', 409);
@@ -148,23 +146,23 @@ class ManageEntitlements
     /** Stops all access to the product, including free access and key redemption, until lifted or $until passes. */
     public function suspend(Entitlement $entitlement, Model $actor, ?string $reason = null, ?CarbonImmutable $until = null): void
     {
-        $this->changeStatus($entitlement, $actor, $reason, 'block', Entitlement::SUSPENDED, $until);
+        $this->changeStatus($entitlement, $actor, $reason, Entitlement::SUSPENDED, $until);
     }
 
     public function unsuspend(Entitlement $entitlement, Model $actor, ?string $reason = null): void
     {
-        $this->changeStatus($entitlement, $actor, $reason, 'unblock');
+        $this->changeStatus($entitlement, $actor, $reason);
     }
 
     /** Cancels paid access, for example after a refund. Another key cannot renew a cancelled license. */
     public function revoke(Entitlement $entitlement, Model $actor, ?string $reason = null): void
     {
-        $this->changeStatus($entitlement, $actor, $reason, 'revoke', Entitlement::REVOKED);
+        $this->changeStatus($entitlement, $actor, $reason, Entitlement::REVOKED);
     }
 
     public function restore(Entitlement $entitlement, Model $actor, ?string $reason = null): void
     {
-        $this->changeStatus($entitlement, $actor, $reason, 'restoreAccess');
+        $this->changeStatus($entitlement, $actor, $reason);
     }
 
     /** Suspends a customer for a product, creating their license record if they have none yet. */
@@ -179,17 +177,16 @@ class ManageEntitlements
         }, 3);
     }
 
-    private function changeStatus(Entitlement $entitlement, Model $actor, ?string $reason, string $ability, ?string $status = null, ?CarbonImmutable $until = null): void
+    private function changeStatus(Entitlement $entitlement, Model $actor, ?string $reason, ?string $status = null, ?CarbonImmutable $until = null): void
     {
         $reason = $this->optionalReason($reason);
         if ($until !== null && ! $until->isFuture()) {
             throw new LicensingException('invalid_suspension_end', 422);
         }
-        DB::transaction(function () use ($entitlement, $actor, $reason, $ability, $status, $until): void {
+        DB::transaction(function () use ($entitlement, $actor, $reason, $status, $until): void {
             $actor->newQuery()->whereKey(array_filter([$actor->getKey(), $entitlement->user_id], fn ($id): bool => $id !== null))->orderBy($actor->getKeyName())->lockForUpdate()->get();
             Product::whereKey($entitlement->product_id)->lockForUpdate()->firstOrFail();
             $entitlement = Entitlement::whereKey($entitlement->id)->lockForUpdate()->first() ?? throw new LicensingException('license_unavailable');
-            $this->authorize($actor, $ability, $entitlement);
             $before = $entitlement->only(['status', 'suspended_until']);
             $entitlement->update([
                 'status' => $status ?? $entitlement->restingStatus(),
@@ -206,10 +203,8 @@ class ManageEntitlements
     public function revokeKey(LicenseKey $key, Model $actor, string $reason): void
     {
         DB::transaction(function () use ($key, $actor, $reason): void {
-            $actor = $actor->newQuery()->whereKey($actor->getKey())->sharedLock()->first() ?? throw new LicensingException('admin_forbidden');
             Product::whereKey($key->plan->product_id)->lockForUpdate()->firstOrFail();
             $key = LicenseKey::whereKey($key->id)->lockForUpdate()->first() ?? throw new LicensingException('invalid_key', 422);
-            $this->authorize($actor, 'revoke', $key);
             if ($key->claimed_at !== null || trim($reason) === '') {
                 throw new LicensingException('key_revocation_forbidden');
             }
@@ -225,10 +220,8 @@ class ManageEntitlements
             throw new LicensingException('invalid_key_note', 422);
         }
         DB::transaction(function () use ($key, $actor, $note): void {
-            $actor = $actor->newQuery()->whereKey($actor->getKey())->sharedLock()->first() ?? throw new LicensingException('admin_forbidden');
             Product::whereKey($key->plan->product_id)->lockForUpdate()->firstOrFail();
             $key = LicenseKey::whereKey($key->id)->lockForUpdate()->firstOrFail();
-            $this->authorize($actor, 'updateNote', $key);
             $before = $key->only(['note']);
             $key->update(['note' => $note === '' ? null : $note]);
             $this->audit->record('user:'.$actor->getKey(), 'key_note_updated', $key, $before, $key->only(['note']));
@@ -243,10 +236,8 @@ class ManageEntitlements
         }
 
         return DB::transaction(function () use ($batch, $actor, $reason): int {
-            $actor = $actor->newQuery()->whereKey($actor->getKey())->sharedLock()->first() ?? throw new LicensingException('admin_forbidden');
             Product::whereKey($batch->plan->product_id)->lockForUpdate()->firstOrFail();
             $batch = Batch::whereKey($batch->id)->lockForUpdate()->firstOrFail();
-            $this->authorize($actor, 'revokeUnclaimed', $batch);
             $count = $batch->keys()->whereNull('claimed_at')->whereNull('revoked_at')->update(['revoked_at' => now('UTC')]);
             $this->audit->record('user:'.$actor->getKey(), 'batch_unclaimed_revoked', $batch, [], ['revoked_count' => $count], $reason);
 
@@ -255,22 +246,8 @@ class ManageEntitlements
     }
 
     /** @return list<string> */
-    public function exportUnclaimedBatch(Batch $batch, Model $actor): array
+    public function exportUnclaimedBatch(Batch $batch): array
     {
-        return DB::transaction(function () use ($batch, $actor): array {
-            $batch = Batch::whereKey($batch->id)->firstOrFail();
-            $this->authorize($actor, 'exportUnclaimed', $batch);
-
-            return array_values($batch->keys()->whereNull('claimed_at')->whereNull('revoked_at')->orderBy('id')->pluck('key')->all());
-        });
-    }
-
-    /** @param class-string<Model>|Model $subject */
-    private function authorize(Model $actor, string $ability, string|Model $subject): void
-    {
-        $actor = $actor->newQuery()->whereKey($actor->getKey())->sharedLock()->first() ?? throw new LicensingException('admin_forbidden');
-        if (! app(AdminAuthorization::class)->allows($actor, $ability, $subject)) {
-            throw new LicensingException('admin_forbidden');
-        }
+        return array_values($batch->keys()->whereNull('claimed_at')->whereNull('revoked_at')->orderBy('id')->pluck('key')->all());
     }
 }

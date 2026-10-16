@@ -4,7 +4,6 @@ use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Gate;
 use LicenseKit\Core\Models\Entitlement;
 use LicenseKit\Filament\Resources\Entitlements\Pages\ManageEntitlements;
-use LicenseKit\Tests\Core\Fixtures\AdminPolicy;
 use LicenseKit\Tests\Filament\Fixtures\User;
 use Livewire\Livewire;
 
@@ -57,26 +56,11 @@ test('staff clock forms reject invalid duration units and reasons', function (ar
     'long reason' => [['reason' => str_repeat('x', 2001)], 'reason'],
 ]);
 
-test('staff clock actions require individual abilities even with master gate', function () {
-    $actor = adminUser();
-    $entitlement = Entitlement::factory()->create(['user_id' => User::factory()->create()->id]);
-    $paused = Entitlement::factory()->paused()->create(['user_id' => User::factory()->create()->id]);
-    Gate::policy(Entitlement::class, AdminPolicy::class);
-    config(['testing.admin_abilities' => ['viewAny', 'view', 'pause']]);
-
-    Livewire::test(ManageEntitlements::class)
-        ->assertTableActionHidden('extend', $entitlement)
-        ->assertTableActionHidden('resume', $paused)
-        ->callTableAction('pause', $entitlement, data: ['reason' => 'Vacation'])->assertHasNoActionErrors();
-
-    expect($entitlement->fresh()->paused_at)->not->toBeNull();
-});
-
 test('staff clock actions reauthorize after mounting', function () {
     adminUser();
     $entitlement = Entitlement::factory()->create(['user_id' => User::factory()->create()->id]);
     $component = Livewire::test(ManageEntitlements::class)->mountTableAction('pause', $entitlement);
-    Gate::define('licensekit.manage', fn (): bool => false);
+    Gate::define('licensekit.admin', fn (): bool => false);
 
     $component->callMountedTableAction(['reason' => 'Vacation'])->assertForbidden();
 

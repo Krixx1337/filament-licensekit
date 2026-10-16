@@ -111,9 +111,6 @@ class CreateBatch
             $actor = $actor->newQuery()->whereKey($actor->getKey())->lockForUpdate()->first() ?? throw new LicensingException('batch_forbidden');
             Product::whereKey($plan->product_id)->lockForUpdate()->firstOrFail();
             $plan = LicensePlan::whereKey($plan->id)->lockForUpdate()->first() ?? throw new LicensingException('plan_unavailable');
-            if (! app(AdminAuthorization::class)->allows($actor, 'createKeys', $plan)) {
-                throw new LicensingException('batch_forbidden');
-            }
 
             return $this->create($plan, $quantity, $reference, 'user:'.$actor->getKey(), $label, creator: $actor);
         }, 3);

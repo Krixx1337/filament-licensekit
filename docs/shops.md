@@ -45,7 +45,7 @@ Issuance joins an outer transaction. If purchase persistence rolls back, its bat
 
 Map commerce products to licensing products and plans in your application. Use immutable/versioned plans for accepted purchases: delayed issuance must use the purchased terms, not today's edited plan. The package does not verify payment, deduplicate provider events, or track orders/refunds. Purchase references are opaque and limited to 128 bytes. Do not rename an established issuer without migrating its fulfillment mappings.
 
-Admin PHP operations remain available through `CreateBatch::createFor($admin, ...)`. Catalog maintenance outside a panel uses `Core\Actions\CatalogWrites` with an explicit actor and Laravel policy checks. `Filament\CatalogWrites` is the panel actor adapter. `CreateBatch::create()` is an internal engine, not a supported authorization boundary.
+Admin PHP operations remain available through `CreateBatch::createFor($admin, ...)`. Catalog maintenance outside a panel uses `Core\Actions\CatalogWrites` with an explicit actor for the activity log. `Filament\CatalogWrites` is the panel actor adapter. PHP services do not check permissions; call them only from trusted code.
 
 ## From an external store or reseller
 
@@ -83,7 +83,7 @@ Plans are `$LICENSEKIT_API_ROOT/plans?product_id=1`. Listing products and plans 
 
 Without `keys:read`, creation still works and the response has no serials.
 
-From PHP on the server, an admin call checks the `createKeys` ability:
+From PHP on the server, record the admin who created the keys:
 
 ```php
 use LicenseKit\Core\Actions\CreateBatch;

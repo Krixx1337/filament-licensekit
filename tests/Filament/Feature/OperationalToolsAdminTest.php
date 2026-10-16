@@ -109,7 +109,7 @@ test('new action execution denies permissions removed after mounting', function 
     if ($operation !== 'export_unclaimed') {
         $component->mountTableAction($operation, $record);
     }
-    Gate::define('licensekit.manage', fn () => false);
+    Gate::define('licensekit.admin', fn () => false);
 
     if ($operation === 'export_unclaimed') {
         $component->call('$refresh')->assertForbidden();

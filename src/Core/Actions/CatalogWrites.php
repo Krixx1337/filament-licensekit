@@ -9,7 +9,6 @@ use Illuminate\Validation\Rule;
 use LicenseKit\Core\Exceptions\LicensingException;
 use LicenseKit\Core\Models\LicensePlan;
 use LicenseKit\Core\Models\Product;
-use LicenseKit\Core\Users\UserAccess;
 
 class CatalogWrites
 {
@@ -22,7 +21,6 @@ class CatalogWrites
             if (! in_array($model, [Product::class, LicensePlan::class], true)) {
                 throw new LicensingException('invalid_catalog_type', 422);
             }
-            self::authorize($actor, 'create', $model);
             $prototype = new $model;
             $prototype->auditActor = 'user:'.$actor->getKey();
             $prototype->fill(array_intersect_key($data, array_flip($prototype->getFillable())));
@@ -48,7 +46,6 @@ class CatalogWrites
             if (! $record instanceof Product && ! $record instanceof LicensePlan) {
                 throw new LicensingException('invalid_catalog_type', 422);
             }
-            self::authorize($actor, 'update', $record);
             $record->auditActor = 'user:'.$actor->getKey();
             $record->fill(array_intersect_key($data, array_flip($record->getFillable())));
             self::validate($record);
@@ -72,22 +69,8 @@ class CatalogWrites
         }
     }
 
-    /** @param class-string<Model>|Model $subject */
-    private static function authorize(Model $actor, string $ability, string|Model $subject): void
-    {
-        if (! app(AdminAuthorization::class)->allows($actor, $ability, $subject)) {
-            throw new LicensingException('admin_forbidden');
-        }
-    }
-
     private static function actor(?Model $actor): Model
     {
-        $actor ??= throw new LicensingException('admin_forbidden');
-        $actor = $actor->newQuery()->whereKey($actor->getKey())->lockForUpdate()->first() ?? throw new LicensingException('admin_forbidden');
-        if (! app(UserAccess::class)->available($actor)) {
-            throw new LicensingException('admin_forbidden');
-        }
-
-        return $actor;
+        return $actor ?? throw new LicensingException('admin_forbidden');
     }
 }

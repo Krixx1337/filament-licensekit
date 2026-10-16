@@ -41,7 +41,7 @@ class InstallLicenseKit extends Command
         }
         $this->info('Host user: '.ConfiguredUserModel::className());
         $this->line('Register LicenseKit\LicenseKitPlugin::make() in your existing non-tenant Filament panel.');
-        $this->line('Define host model policies or the licensekit.manage fallback Gate. Keep user authentication in your application.');
+        $this->line('Every panel user is a LicenseKit admin by default. Define the licensekit.admin and licensekit.support gates to restrict staff.');
         $this->line('Prepare your host users and Sanctum personal_access_tokens migrations, then run php artisan migrate.');
         $this->line('Run php artisan licensekit:check after migration. Module changes require rebuilding caches and restarting workers.');
 

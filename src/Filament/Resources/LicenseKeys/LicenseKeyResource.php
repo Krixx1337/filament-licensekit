@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Builder;
 use LicenseKit\Core\Models\Batch;
 use LicenseKit\Core\Models\LicenseKey;
 use LicenseKit\Filament\Actions\LicensingActions;
+use LicenseKit\Filament\AdminAccess;
 use LicenseKit\Filament\Resources\LicenseKeys\Pages\ManageLicenseKeys;
 use LicenseKit\Filament\Resources\LicensingResource;
 
@@ -18,6 +19,8 @@ class LicenseKeyResource extends LicensingResource
     protected static ?string $slug = 'licensekit/license-keys';
 
     protected static ?string $model = LicenseKey::class;
+
+    protected static string $access = AdminAccess::SUPPORT;
 
     protected static ?string $navigationLabel = 'Keys';
 

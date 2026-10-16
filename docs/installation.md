@@ -30,7 +30,7 @@ php artisan licensekit:check
 
 The installer writes `config/licensekit.php` only when that file is missing. It does not change your login, create an admin, or run migrations. Migrations add `licensekit_*` tables and leave your users table alone.
 
-Give each model a policy, or allow admins through the `licensekit.manage` gate where a model has no policy. A policy that denies an action wins over that gate.
+Every panel user is a LicenseKit admin until you define the [staff roles](#staff-roles).
 
 ## Settings to choose first
 
@@ -55,50 +55,25 @@ Turn on **Maintenance mode** on a product to stop the software for everyone, for
 
 Afterwards, use **Add time** on the product to give every running license the lost hours or days back. Paused licenses keep the time for later. You can also include licenses that expired after a chosen moment. It runs immediately and needs no queue worker.
 
-## Optional Filament Shield
+## Staff roles
 
-Shield is optional. Install [Filament Shield](https://github.com/bezhanSalleh/filament-shield), add Spatie `HasRoles` on your user model, and register `FilamentShieldPlugin::make()` next to `LicenseKitPlugin::make()`. The Shield guard must match that panel and your LicenseKit user provider. LicenseKit does not create roles.
+LicenseKit has two roles, defined as Laravel gates:
 
-In `config/filament-shield.php`, merge this into `resources.manage`:
+| Role | Can do |
+| --- | --- |
+| `licensekit.admin` | Everything. |
+| `licensekit.support` | Browse licenses, keys and HWID reset history; suspend and unsuspend; add time to, pause and resume a license; reset and inspect a device; suspend a customer. |
 
-```php
-\LicenseKit\Filament\Resources\Products\ProductResource::class => ['viewAny', 'view', 'create', 'update', 'resetHwid', 'inspectDevice', 'addTime'],
-\LicenseKit\Filament\Resources\LicensePlans\LicensePlanResource::class => ['viewAny', 'view', 'create', 'update', 'createKeys'],
-\LicenseKit\Filament\Resources\LicenseKeys\LicenseKeyResource::class => ['viewAny', 'view', 'claim', 'revoke', 'updateNote'],
-\LicenseKit\Filament\Resources\Batches\BatchResource::class => ['viewAny', 'view', 'exportUnclaimed', 'revokeUnclaimed'],
-\LicenseKit\Filament\Resources\Entitlements\EntitlementResource::class => ['viewAny', 'view', 'create', 'revoke', 'restoreAccess', 'block', 'unblock', 'extend', 'pause', 'resume'],
-\LicenseKit\Filament\Resources\ApiClients\ApiClientResource::class => ['viewAny', 'view', 'create', 'update', 'rotateToken', 'revokeTokens'],
-\LicenseKit\Filament\Resources\AuditEvents\AuditEventResource::class => ['viewAny', 'view'],
-\LicenseKit\Filament\Resources\DeviceResetHistory\DeviceResetHistoryResource::class => ['viewAny', 'view'],
-```
-
-Keep class-level `viewAny` and `create` in `policies.single_parameter_methods`. The other abilities need a record. `policies.merge=false` replaces the list for every resource in that config, so include your own resources too.
-
-```sh
-php artisan shield:generate --all --panel=admin --no-interaction
-```
-
-Replace `admin` with your panel id. Register the generated policies in `boot()` before requests. The files do nothing until you register them. Skip models you turned off.
+By default every user who can open your panel is an admin. To restrict staff, define the gates in your `AppServiceProvider::boot()`:
 
 ```php
 use Illuminate\Support\Facades\Gate;
 
-foreach ([
-    \LicenseKit\Core\Models\Product::class => \App\Policies\ProductPolicy::class,
-    \LicenseKit\Core\Models\LicensePlan::class => \App\Policies\LicensePlanPolicy::class,
-    \LicenseKit\Core\Models\LicenseKey::class => \App\Policies\LicenseKeyPolicy::class,
-    \LicenseKit\Core\Models\Batch::class => \App\Policies\BatchPolicy::class,
-    \LicenseKit\Core\Models\Entitlement::class => \App\Policies\EntitlementPolicy::class,
-    \LicenseKit\Core\Models\ApiClient::class => \App\Policies\ApiClientPolicy::class,
-    \LicenseKit\Core\Models\AuditEvent::class => \App\Policies\AuditEventPolicy::class,
-    \LicenseKit\Core\Models\DeviceResetHistory::class => \App\Policies\DeviceResetHistoryPolicy::class,
-] as $model => $policy) {
-    Gate::policy($model, $policy);
-}
+Gate::define('licensekit.admin', fn ($user) => $user->is_owner);
+Gate::define('licensekit.support', fn ($user) => $user->is_support);
 ```
 
-For a helper role, grant Entitlement `viewAny` / `view` / `block` / `unblock` (suspend and unsuspend) and Product `resetHwid` / `inspectDevice`. Entitlement `create` shows **Suspend a customer**. Add reset-history `viewAny` / `view` only if they should see past resets. Leave out key creation, plans, API clients, and product-wide Add time.
+With Filament Shield or spatie/laravel-permission, check a permission inside the gate, for example `Gate::define('licensekit.support', fn ($user) => $user->hasPermissionTo('license support'))`. If you register your own model policies for LicenseKit models, Filament still applies them after the role check.
 
-Grant Entitlement `extend`, `pause`, and `resume` separately when staff should manage individual license time. These actions require a reason. See [individual license support](client.md#individual-license-support) for behavior.
+LicenseKit's PHP services do not check permissions themselves. Your panel, API middleware or own code decides who may call them; the actor you pass is recorded in the activity log.
 
-A missing policy method denies the action. `licensekit.manage` cannot override that. Clear caches after you change this.

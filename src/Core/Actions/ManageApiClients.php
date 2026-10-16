@@ -18,7 +18,6 @@ class ManageApiClients
     {
         return DB::transaction(function () use ($client, $data, $actor): ApiClient {
             $record = $client === null ? new ApiClient : (ApiClient::whereKey($client->id)->lockForUpdate()->first() ?? throw new LicensingException('management_client_unavailable', 404));
-            $actor = $this->authorize($actor, $client === null ? 'create' : 'update', $client === null ? ApiClient::class : $record);
             $before = $record->only($record->getFillable());
             $record->fill(array_intersect_key($data, array_flip($record->getFillable())));
             if ($record->all_products) {
@@ -38,7 +37,6 @@ class ManageApiClients
     {
         return DB::transaction(function () use ($client, $expiresAt, $actor, $allowDisabled): string {
             $client = ApiClient::whereKey($client->id)->lockForUpdate()->first() ?? throw new LicensingException('management_client_unavailable', 404);
-            $actor = $this->authorize($actor, 'rotateToken', $client);
             if (! $allowDisabled && ! $client->is_enabled) {
                 throw new LicensingException('management_client_disabled');
             }
@@ -58,20 +56,8 @@ class ManageApiClients
     {
         DB::transaction(function () use ($client, $actor): void {
             $client = ApiClient::whereKey($client->id)->lockForUpdate()->first() ?? throw new LicensingException('management_client_unavailable', 404);
-            $actor = $this->authorize($actor, 'revokeTokens', $client);
             $client->tokens()->delete();
             $this->audit->record('user:'.$actor->getKey(), 'management_tokens_revoked', $client);
         }, 3);
-    }
-
-    /** @param class-string<Model>|Model $subject */
-    private function authorize(Model $actor, string $ability, string|Model $subject): Model
-    {
-        $actor = $actor->newQuery()->whereKey($actor->getKey())->sharedLock()->first() ?? throw new LicensingException('management_forbidden');
-        if (! app(AdminAuthorization::class)->allows($actor, $ability, $subject)) {
-            throw new LicensingException('management_forbidden');
-        }
-
-        return $actor;
     }
 }

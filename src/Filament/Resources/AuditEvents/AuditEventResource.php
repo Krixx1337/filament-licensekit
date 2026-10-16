@@ -8,7 +8,6 @@ use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use LicenseKit\Core\Models\AuditEvent;
-use LicenseKit\Filament\AdminAccess;
 use LicenseKit\Filament\Resources\AuditEvents\Pages\ManageAuditEvents;
 use LicenseKit\Filament\Resources\LicensingResource;
 
@@ -38,14 +37,14 @@ class AuditEventResource extends LicensingResource
             TextColumn::make('subject_type')->label('Record type')->searchable()->toggleable(isToggledHiddenByDefault: true),
             TextColumn::make('subject_id')->label('Record id')->toggleable(isToggledHiddenByDefault: true),
             TextColumn::make('reason')->limit(60)->toggleable(),
-            TextColumn::make('created_at')->label('When')->dateTime()->sortable()->toggleable()])->recordActions([Action::make('details')->authorize(fn (AuditEvent $record): bool => AdminAccess::can('view', $record, static::class))->schema([
+            TextColumn::make('created_at')->label('When')->dateTime()->sortable()->toggleable()])->recordActions([Action::make('details')->authorize(fn (AuditEvent $record): bool => static::canView($record))->schema([
                 Textarea::make('before')->default(function (AuditEvent $record): string {
-                    AdminAccess::authorize('view', $record, static::class);
+                    abort_unless(static::canView($record), 403);
 
                     return json_encode($record->before, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR);
                 })->disabled()->dehydrated(false)->rows(8),
                 Textarea::make('after')->default(function (AuditEvent $record): string {
-                    AdminAccess::authorize('view', $record, static::class);
+                    abort_unless(static::canView($record), 403);
 
                     return json_encode($record->after, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR);
                 })->disabled()->dehydrated(false)->rows(8),

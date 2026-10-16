@@ -44,7 +44,7 @@ public function bypassHwid($user, Product $product): bool
 }
 ```
 
-Use your host application's role or permission check in place of `is_admin`. With Shield/Spatie permissions, you can check `$user->hasPermissionTo('bypass_hwid')`. Create and assign that permission in the host application; LicenseKit does not generate a Shield checkbox. `licensekit.manage` alone does not grant immunity. Laravel Gate hooks, including host super-admin hooks, still apply.
+Use your host application's role or permission check in place of `is_admin`. With Shield/Spatie permissions, you can check `$user->hasPermissionTo('bypass_hwid')`. Create and assign that permission in the host application; LicenseKit does not generate a Shield checkbox. Being a LicenseKit admin does not grant immunity by itself. Laravel Gate hooks, including host super-admin hooks, still apply.
 
 Both exemptions affect direct `DeviceBindings::bind()`/`verify()` and `LicensedDevices::bind()`/`verify()`/`upgrade()`. These calls still require a valid HWID array and run your handler's `assertAllowed()` with the saved baseline when present. Account checks, license suspensions, product restrictions, maintenance mode, and license requirements still apply. Staff immunity grants no entitlement.
 
@@ -106,7 +106,7 @@ $licenses->pause($entitlement, $admin, 'Customer requested a vacation pause');
 $licenses->resume($entitlement, $admin, 'Customer returned');
 ```
 
-Each call checks its own policy ability, `extend`, `pause`, or `resume`, and requires a reason of 1–2000 characters after trimming. Extensions accept 1–315360000 seconds. They add to a future expiry or start from now if expired. A paused license banks the added seconds.
+Each call requires a reason of 1–2000 characters after trimming. In the admin, support staff can use these actions. Extensions accept 1–315360000 seconds. They add to a future expiry or start from now if expired. A paused license banks the added seconds.
 
 Pause saves remaining seconds and clears expiry. Resume starts that balance from now. Lifetime, cancelled, suspended, and deleted-user licenses cannot use these actions. Pausing an expired license or repeating a pause/resume returns HTTP 409 with `cannot_pause_entitlement` or `cannot_resume_entitlement`.
 

@@ -42,7 +42,7 @@ function installHostDesktopProtocol(): void
 function testAdminActor(): User
 {
     $actor = User::factory()->create();
-    Gate::define('licensekit.manage', fn (): bool => true);
+    Gate::define('licensekit.admin', fn (): bool => true);
 
     return $actor;
 }

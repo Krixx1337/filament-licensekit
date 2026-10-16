@@ -155,7 +155,7 @@ test('disabled customer reset rejects self service and still allows an admin ove
     config(['licensekit.device_binding.customer_reset.enabled' => false, 'licensekit.device_binding.customer_reset.require_reason' => true]);
     $admin = User::factory()->create();
     $user = User::factory()->create();
-    Gate::define('licensekit.manage', fn ($actor): bool => $actor->id === $admin->id);
+    Gate::define('licensekit.admin', fn ($actor): bool => $actor->id === $admin->id);
     $entitlement = Entitlement::factory()->create(['user_id' => $user->id]);
     $binding = DeviceBinding::factory()->forEntitlement($entitlement)->create();
 

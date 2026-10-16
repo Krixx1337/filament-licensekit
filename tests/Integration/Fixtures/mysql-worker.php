@@ -44,7 +44,7 @@ while (DB::table('licensekit_test_barrier')->count() < 2) {
 }
 $operation = $argv[1];
 $hwid = ['value' => 'pc'];
-Gate::define('licensekit.manage', fn ($actor): bool => $actor->getKey() === ($payload['actor_id'] ?? null) || in_array($actor->getKey(), $payload['actor_ids'] ?? [], true));
+Gate::define('licensekit.admin', fn ($actor): bool => $actor->getKey() === ($payload['actor_id'] ?? null) || in_array($actor->getKey(), $payload['actor_ids'] ?? [], true));
 $run = fn () => match ($operation) {
     'individual-pause', 'individual-extend' => (function () use ($operation, $payload): int {
         $entitlement = Entitlement::findOrFail($payload['entitlement_id']);

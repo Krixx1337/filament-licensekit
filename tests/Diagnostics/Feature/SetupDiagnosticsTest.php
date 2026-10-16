@@ -60,20 +60,14 @@ test('diagnostics identify panel guard mismatches without blocking Artisan boots
     expect(Filament::getPanel('admin')->getResources())->toBe([]);
 });
 
-test('diagnostics warn about inaccessible resources and continue schema checks without master Gate', function () {
-    $this->artisan('licensekit:check')
-        ->expectsOutput('LicenseKit\Filament\Resources\Products\ProductResource is inaccessible without a model policy or the licensekit.manage Gate.')
-        ->expectsOutput('Missing table: users. Prepare host/Sanctum migrations and run php artisan migrate.')->assertFailed();
-});
-
 test('diagnostics explain missing tables on a fresh installation', function () {
-    Gate::define('licensekit.manage', fn () => true);
+    Gate::define('licensekit.admin', fn () => true);
     $this->artisan('licensekit:check')->expectsOutput('Missing table: users. Prepare host/Sanctum migrations and run php artisan migrate.')->assertFailed();
 });
 
 test('database connection failure is sanitized without exposing its path', function () {
     $this->bootWithSettings(['database.connections.testing.database' => '/missing/private-secret/database.sqlite']);
-    Gate::define('licensekit.manage', fn () => true);
+    Gate::define('licensekit.admin', fn () => true);
     $this->artisan('licensekit:check')->expectsOutput('Database unavailable. Check the host database connection settings and connectivity.')
         ->doesntExpectOutputToContain('private-secret')->assertFailed();
 });

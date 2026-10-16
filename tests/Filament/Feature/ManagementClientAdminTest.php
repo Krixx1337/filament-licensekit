@@ -1,13 +1,9 @@
 <?php
 
-use Carbon\CarbonImmutable;
-use Filament\Facades\Filament;
-use Filament\Panel;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use LicenseKit\Core\Actions\Audit;
 use LicenseKit\Core\Actions\ManageApiClients;
-use LicenseKit\Core\Exceptions\LicensingException;
 use LicenseKit\Core\Models\ApiClient;
 use LicenseKit\Core\Models\Product;
 use LicenseKit\Filament\Resources\ApiClients\ApiClientResource;
@@ -76,7 +72,7 @@ test('client create edit rotation and revocation reject permission removal after
     } else {
         $component->mountTableAction($operation, $client);
     }
-    Gate::define('licensekit.manage', fn () => false);
+    Gate::define('licensekit.admin', fn () => false);
     if ($operation === 'create') {
         $component->callMountedAction()->assertForbidden();
     } else {
@@ -85,24 +81,6 @@ test('client create edit rotation and revocation reject permission removal after
     $this->assertDatabaseCount('licensekit_api_clients', 1);
     expect($client->tokens()->count())->toBe(1);
 })->with(['create', 'edit', 'rotate_token', 'revoke_tokens']);
-
-test('management admin requires registered host panel and fresh host eligibility', function () {
-    $admin = adminUser();
-    Filament::setCurrentPanel(Panel::make()->id('outside')->authGuard('staff'));
-    Livewire::test(ManageClientsPage::class)->assertForbidden();
-    Filament::setCurrentPanel(Filament::getPanel('admin'));
-    $admin->update(['is_suspended' => true]);
-    Livewire::test(ManageClientsPage::class)->assertForbidden();
-});
-
-test('trusted credential operations recheck actor privilege and validation preserves prior state', function () {
-    $actor = adminUser();
-    $client = ApiClient::factory()->create();
-    $actor->update(['is_suspended' => true]);
-    expect(fn () => app(ManageApiClients::class)->save($client, ['all_products' => true], $actor))->toThrow(LicensingException::class);
-    expect(fn () => app(ManageApiClients::class)->rotate($client, CarbonImmutable::now()->addDay(), $actor))->toThrow(LicensingException::class);
-    expect($client->fresh()->all_products)->toBeFalse();
-});
 
 test('client forms reject unsupported permissions invalid quantities and render names escaped', function () {
     adminUser();

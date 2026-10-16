@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
 use LicenseKit\Core\Events\ProductAccessInvalidated;
 use LicenseKit\Core\Exceptions\LicensingException;
@@ -28,7 +29,7 @@ class DeviceBindings
     /** @internal Evaluate with current user and product records after access authorization. */
     public function requiresBinding(Model $user, Product $product): bool
     {
-        return $product->requires_hwid && ! app(AdminAuthorization::class)->allowsExplicit($user, 'bypassHwid', $product);
+        return $product->requires_hwid && ! ($this->users->available($user) && Gate::forUser($user)->allows('bypassHwid', $product));
     }
 
     public function find(Model $user, Product $product): ?DeviceBinding
@@ -138,10 +139,7 @@ class DeviceBindings
             $actor = $actor->newQuery()->whereKey($actor->getKey())->sharedLock()->first() ?? throw new LicensingException('user_unavailable');
             $user = $user->newQuery()->whereKey($user->getKey())->lockForUpdate()->first() ?? throw new LicensingException('user_unavailable');
             $product = $product->fresh() ?? throw new LicensingException('service_unavailable');
-            if ($admin && ! app(AdminAuthorization::class)->allows($actor, 'resetHwid', $product, [$user])) {
-                throw new LicensingException('reset_forbidden');
-            }
-            if (! $this->users->available($actor) || (! $admin && (string) $user->getKey() !== (string) $actor->getKey())) {
+            if (! $admin && (! $this->users->available($actor) || (string) $user->getKey() !== (string) $actor->getKey())) {
                 throw new LicensingException('reset_forbidden');
             }
             if (! $admin && config('licensekit.device_binding.customer_reset.enabled') !== true) {

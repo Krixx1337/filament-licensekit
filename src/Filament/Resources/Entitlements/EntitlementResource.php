@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use LicenseKit\Core\Models\Entitlement;
 use LicenseKit\Filament\Actions\LicensingActions;
+use LicenseKit\Filament\AdminAccess;
 use LicenseKit\Filament\Resources\Entitlements\Pages\ManageEntitlements;
 use LicenseKit\Filament\Resources\LicensingResource;
 
@@ -19,6 +20,8 @@ class EntitlementResource extends LicensingResource
     protected static ?string $slug = 'licensekit/entitlements';
 
     protected static ?string $model = Entitlement::class;
+
+    protected static string $access = AdminAccess::SUPPORT;
 
     protected static ?string $navigationLabel = 'Licenses';
 

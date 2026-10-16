@@ -280,7 +280,7 @@ test('management limits reads per client independently of shared IP and configur
 
 test('credential rotation narrows snapshots revokes previous token and audits no secrets', function () {
     $actor = User::factory()->create();
-    Gate::define('licensekit.manage', fn (User $user) => $user->id === $actor->id);
+    Gate::define('licensekit.admin', fn (User $user) => $user->id === $actor->id);
     [$client, $old] = managementCredential();
     $new = app(ManageApiClients::class)->rotate($client, now()->toImmutable()->addDay(), $actor);
     $this->withToken($old)->getJson('/api/licensekit/v1/manage/products')->assertUnauthorized();
@@ -292,7 +292,7 @@ test('credential rotation narrows snapshots revokes previous token and audits no
 
 test('invalid token expiry and failed rotation audit preserve previous credentials', function (bool $auditFails) {
     $actor = User::factory()->create();
-    Gate::define('licensekit.manage', fn () => true);
+    Gate::define('licensekit.admin', fn () => true);
     [$client, $old] = managementCredential();
     if ($auditFails) {
         $this->mock(Audit::class)->shouldReceive('record')->once()->andThrow(new RuntimeException('audit failed'));
@@ -358,7 +358,7 @@ test('missing management storage returns sanitized no-store failure and log', fu
 });
 
 test('read only HTTP clients see their own batches within allowed products', function () {
-    Gate::define('licensekit.manage', fn () => true);
+    Gate::define('licensekit.admin', fn () => true);
     $actor = User::factory()->create();
     $allowed = LicensePlan::factory()->create();
     $excluded = LicensePlan::factory()->create();

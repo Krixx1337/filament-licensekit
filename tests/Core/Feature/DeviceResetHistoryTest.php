@@ -41,7 +41,7 @@ test('successful resets append scoped history using the cooldown timestamp witho
 test('admin override is distinguished from an admin using customer self service', function () {
     $admin = User::factory()->create();
     $user = User::factory()->create();
-    Gate::define('licensekit.manage', fn ($actor): bool => $actor->id === $admin->id);
+    Gate::define('licensekit.admin', fn ($actor): bool => $actor->id === $admin->id);
     $product = Product::factory()->create();
     DeviceBinding::factory()->create(['user_id' => $user->id, 'scope_key' => 'product:'.$product->id, 'last_hwid_reset_at' => now()]);
     app(DeviceBindings::class)->adminReset($user, $product, $admin, 'PC replaced');
@@ -60,7 +60,7 @@ test('denied resets create no history or audit and leave binding unchanged', fun
         'last_hwid_reset_at' => $failure === 'reset_cooldown' ? now() : null,
         ...($failure === 'device_not_bound' ? ['hwid' => null] : [])]);
     if ($failure === 'reason_required') {
-        Gate::define('licensekit.manage', fn () => true);
+        Gate::define('licensekit.admin', fn () => true);
     }
     $original = $binding->fresh()->getAttributes();
     expect(fn () => $failure === 'reason_required' ? app(DeviceBindings::class)->adminReset($user, $product, $actor, ' ') : app(DeviceBindings::class)->reset($user, $product, $actor))
@@ -96,7 +96,7 @@ test('history survives permitted deletion of its owner actor and product', funct
     $user = User::factory()->create();
     $admin = User::factory()->create();
     $product = Product::factory()->create();
-    Gate::define('licensekit.manage', fn () => true);
+    Gate::define('licensekit.admin', fn () => true);
     DeviceBinding::factory()->create(['user_id' => $user->id, 'scope_key' => 'product:'.$product->id]);
     app(DeviceBindings::class)->adminReset($user, $product, $admin, 'Support');
     $history = DeviceResetHistory::firstOrFail();
@@ -122,7 +122,7 @@ test('reset history uses configured UUID and ULID host identities', function (st
     DB::connection()->beginTransaction();
     $user = $model::create(User::factory()->make()->getAttributes());
     $admin = $model::create(User::factory()->make()->getAttributes());
-    Gate::define('licensekit.manage', fn () => true);
+    Gate::define('licensekit.admin', fn () => true);
     $product = Product::factory()->create();
     DeviceBinding::factory()->create(['user_id' => $user->getKey(), 'scope_key' => 'product:'.$product->id]);
     app(DeviceBindings::class)->adminReset($user, $product, $admin, 'Support');

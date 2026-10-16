@@ -12,6 +12,7 @@ use Livewire\Livewire;
 
 test('reset history is always registered and read only for licensed administrators', function () {
     $user = User::factory()->create();
+    Gate::define('licensekit.admin', fn (): bool => false);
     $this->actingAs($user, 'staff')->get('/admin/licensekit/device-reset-history')->assertForbidden();
     adminUser();
     $history = DeviceResetHistory::factory()->create();
@@ -27,9 +28,9 @@ test('reset history is always registered and read only for licensed administrato
 test('reset history requires registered panel and rechecks permission on subsequent requests', function () {
     adminUser();
     $component = Livewire::test(ManageDeviceResetHistory::class);
-    Gate::define('licensekit.manage', fn () => false);
+    Gate::define('licensekit.admin', fn () => false);
     $component->searchTable('owner')->assertForbidden();
-    Gate::define('licensekit.manage', fn () => true);
+    Gate::define('licensekit.admin', fn () => true);
     Filament::setCurrentPanel(Panel::make()->id('outside')->authGuard('staff'));
     Livewire::test(ManageDeviceResetHistory::class)->assertForbidden();
 });

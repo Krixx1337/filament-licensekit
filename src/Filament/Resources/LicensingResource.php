@@ -13,57 +13,23 @@ abstract class LicensingResource extends Resource
 {
     protected static bool $editable = false;
 
+    /** Support staff may browse resources marked AdminAccess::SUPPORT; everything else is admin-only. */
+    protected static string $access = AdminAccess::ADMIN;
+
     protected static string|UnitEnum|null $navigationGroup = 'Licensing';
 
     protected static bool $isScopedToTenant = false;
 
+    /** The LicenseKit role gate comes first; host model policies (for example from Shield) still apply after it. */
     public static function getAuthorizationResponse(string|UnitEnum $action, ?Model $record = null): Response
     {
         $ability = $action instanceof BackedEnum ? $action->value : ($action instanceof UnitEnum ? $action->name : $action);
         $allowed = match ($ability) {
-            'viewAny' => static::canViewAny(),
-            'view' => $record !== null && static::canView($record),
-            'create' => static::canCreate(),
-            'update' => $record !== null && static::canEdit($record),
-            'delete' => $record !== null && static::canDelete($record),
+            'viewAny', 'view' => static::$access === AdminAccess::SUPPORT ? AdminAccess::isSupport() : AdminAccess::isAdmin(),
+            'create', 'update' => static::$editable && AdminAccess::isAdmin(),
             default => false,
         };
 
-        return $allowed ? Response::allow() : Response::deny();
-    }
-
-    public static function canViewAny(): bool
-    {
-        return AdminAccess::can('viewAny', static::getModel(), static::class);
-    }
-
-    public static function canView(Model $record): bool
-    {
-        return AdminAccess::can('view', $record, static::class);
-    }
-
-    public static function canCreate(): bool
-    {
-        return static::$editable && AdminAccess::can('create', static::getModel(), static::class);
-    }
-
-    public static function canEdit(Model $record): bool
-    {
-        return static::$editable && AdminAccess::can('update', $record, static::class);
-    }
-
-    public static function canDelete(Model $record): bool
-    {
-        return false;
-    }
-
-    public static function canDeleteAny(): bool
-    {
-        return false;
-    }
-
-    public static function canReplicate(Model $record): bool
-    {
-        return false;
+        return $allowed ? parent::getAuthorizationResponse($action, $record) : Response::deny();
     }
 }

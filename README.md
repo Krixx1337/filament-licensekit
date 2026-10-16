@@ -27,7 +27,7 @@ Maintainer instructions are in [publishing](docs/releasing.md). Changes are reco
 * **💻 Resilient HWID Node-Locking**: Strict exact matching out of the box, with a custom handler interface for multi-signal fuzzy matching. Define your own hardware-change rules so legitimate GPU or SSD upgrades can stay allowed.
 * **⚡ Downtime Compensation**: Planned game update or unexpected crash? Put the product in maintenance mode, then give every running license the lost time back in one click.
 * **🤝 Built for Reseller Distribution**: Create license keys in batches, export clean `.txt` files in 1 click, and revoke unsold batches with one click if a reseller disputes payment.
-* **🎨 Beautiful Filament Admin UI**: Turnkey dashboard, [Filament Shield](https://github.com/bezhanSalleh/filament-shield) ready. Shield is optional and not bundled. Let support staff inspect hardware diffs and reset devices without giving them access to create license keys or API tokens.
+* **🎨 Filament Admin UI**: Two simple roles. Support staff look up customers, reset devices and suspend licenses without access to creating keys or API tokens.
 * **🔒 Host-Owned Security**: LicenseKit owns the entitlement math and hardware locks. You own customer authentication, desktop handshake protocols, and billing.
 
 ### 📊 Quick comparison
@@ -75,10 +75,8 @@ public function login(Request $request, LicensedDevices $devices)
 | **Laravel** | 12, 13 |
 | **Filament** | 4.13.3+ or 5.8.3+ |
 | **Sanctum** | 4.1+ on Laravel 12, 4.3.1+ on Laravel 13 |
-| **[Filament Shield](https://github.com/bezhanSalleh/filament-shield)** | 4.x, optional |
-| **spatie/laravel-permission** | Selected by Composer for your PHP and Shield versions, optional |
 
-LicenseKit checks ordinary Laravel policies. Install Shield in your app when you want roles. It is not a LicenseKit dependency. Custom actions such as reset HWID and create keys need the [Shield recipe](docs/installation.md#optional-filament-shield). A policy that says no is final.
+Every panel user is a LicenseKit admin by default. Define the `licensekit.admin` and `licensekit.support` gates to restrict staff. See [staff roles](docs/installation.md#staff-roles).
 
 ### 📦 Installation
 
@@ -102,4 +100,4 @@ php artisan migrate
 php artisan licensekit:check
 ```
 
-Shield permissions, host user settings, and the rest of setup are in [installation](docs/installation.md). After that, [connect your app](docs/client.md) and [create license keys](docs/shops.md).
+Staff roles, host user settings, and the rest of setup are in [installation](docs/installation.md). After that, [connect your app](docs/client.md) and [create license keys](docs/shops.md).

@@ -21,6 +21,7 @@ use Livewire\Livewire;
 
 test('core resources require panel registration and host gate', function () {
     $user = User::factory()->create();
+    Gate::define('licensekit.admin', fn (): bool => false);
     $this->actingAs($user, 'staff')->get('/admin/licensekit/products')->assertForbidden();
     adminUser();
     $this->get('/admin/licensekit/products')->assertOk();
@@ -43,7 +44,7 @@ test('product creation validates catalog settings and records panel actor once',
 test('permission removal after component mount rejects create', function () {
     adminUser();
     $component = Livewire::test(ManageProducts::class)->mountAction('create');
-    Gate::define('licensekit.manage', fn () => false);
+    Gate::define('licensekit.admin', fn () => false);
     $component->callMountedAction()->assertForbidden();
     $this->assertDatabaseCount('licensekit_products', 0);
 });
@@ -69,11 +70,8 @@ test('resources register on non-tenant panels and unsupported tenancy is rejecte
         ->and(DeviceResetHistoryResource::getNavigationLabel())->toBe('HWID reset history');
 });
 
-test('unauthenticated requests use host panel login and unverified administrators cannot mount', function () {
+test('unauthenticated requests use host panel login', function () {
     $this->get('/admin/licensekit/products')->assertRedirect('/admin/login');
-    $admin = adminUser();
-    $admin->update(['email_verified_at' => null]);
-    Livewire::test(ManageProducts::class)->assertForbidden();
 });
 
 test('issued keys are exported through backend batch with audit identity', function () {

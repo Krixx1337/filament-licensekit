@@ -2,7 +2,6 @@
 
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Event;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
 use LicenseKit\Core\Actions\ClaimLicense;
 use LicenseKit\Core\Actions\CreateBatch;
@@ -11,7 +10,6 @@ use LicenseKit\Core\Actions\LicensedDevices;
 use LicenseKit\Core\Actions\ManageEntitlements;
 use LicenseKit\Core\Exceptions\LicensingException;
 use LicenseKit\Core\Models\AuditEvent;
-use LicenseKit\Core\Models\Batch;
 use LicenseKit\Core\Models\DeviceBinding;
 use LicenseKit\Core\Models\DeviceResetHistory;
 use LicenseKit\Core\Models\Entitlement;
@@ -19,7 +17,6 @@ use LicenseKit\Core\Models\LicenseKey;
 use LicenseKit\Core\Models\LicensePlan;
 use LicenseKit\Core\Models\Product;
 use LicenseKit\Support\ModuleReadiness;
-use LicenseKit\Tests\Core\Fixtures\AdminPolicy;
 use LicenseKit\Tests\Core\Fixtures\User;
 
 test('batch export and revocation isolate unclaimed nonrevoked keys and preserve claimed access', function () {
@@ -61,28 +58,6 @@ test('key notes are trimmed cleared private and limited', function () {
     $tools->updateNote($key, $actor, ' ');
     expect($key->fresh()->note)->toBeNull();
 });
-
-test('new admin tools deny stale permissions and suspended actors', function (string $operation, bool $suspended) {
-    $actor = testAdminActor();
-    $plan = LicensePlan::factory()->create();
-    $batch = app(CreateBatch::class)->createFor($actor, $plan, 1, 'batch');
-    if ($suspended) {
-        $actor->update(['is_suspended' => true]);
-    } else {
-        Gate::define('licensekit.manage', fn () => false);
-    }
-    $tools = app(ManageEntitlements::class);
-
-    expect(fn () => match ($operation) {
-        'export' => $tools->exportUnclaimedBatch($batch, $actor),
-        'revoke' => $tools->revokeUnclaimedBatch($batch, $actor, 'Reason'),
-        'note' => $tools->updateNote($batch->keys->first(), $actor, 'Note'),
-    })->toThrow(LicensingException::class, 'admin forbidden');
-
-    expect($batch->keys->first()->fresh()->revoked_at)->toBeNull();
-    expect($batch->keys->first()->fresh()->note)->toBeNull();
-    $this->assertDatabaseCount('licensekit_license_keys', 1);
-})->with(['export', 'revoke', 'note'])->with([false, true]);
 
 test('new writes roll back on audit failure', function (string $operation) {
     $actor = testAdminActor();
@@ -142,34 +117,6 @@ test('optional blank reset reason stores null and reasons do not allow resetting
 
     expect(DeviceResetHistory::firstOrFail()->reason)->toBeNull();
 });
-
-test('registered policies control new tools independently of broad fallback grants', function (string $operation, string $ability, string $model) {
-    $actor = testAdminActor();
-    $plan = LicensePlan::factory()->create();
-    $batch = app(CreateBatch::class)->createFor($actor, $plan, 1, 'one');
-    $tools = app(ManageEntitlements::class);
-    Gate::policy($model, AdminPolicy::class);
-    config(['testing.admin_abilities' => []]);
-    $run = fn () => match ($operation) {
-        'export' => $tools->exportUnclaimedBatch($batch, $actor),
-        'revoke' => $tools->revokeUnclaimedBatch($batch, $actor, 'Reason'),
-        'note' => $tools->updateNote($batch->keys->first(), $actor, 'Note'),
-    };
-
-    expect($run)->toThrow(LicensingException::class, 'admin forbidden');
-    config(['testing.admin_abilities' => [$ability]]);
-    $run();
-
-    expect(match ($operation) {
-        'export' => $run() === [$batch->keys->first()->key],
-        'revoke' => $batch->keys->first()->fresh()->revoked_at !== null,
-        'note' => $batch->keys->first()->fresh()->note === 'Note',
-    })->toBeTrue();
-})->with([
-    ['export', 'exportUnclaimed', Batch::class],
-    ['revoke', 'revokeUnclaimed', Batch::class],
-    ['note', 'updateNote', LicenseKey::class],
-]);
 
 test('invalid batch reasons do not revoke keys or create audit', function (string $reason) {
     $actor = testAdminActor();

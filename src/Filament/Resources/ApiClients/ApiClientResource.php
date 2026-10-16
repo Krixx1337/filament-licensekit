@@ -60,7 +60,7 @@ class ApiClientResource extends LicensingResource
         return $table->columns([TextColumn::make('name')->searchable()->toggleable(), IconColumn::make('is_enabled')->label('Enabled')->boolean()->toggleable(),
             IconColumn::make('all_products')->label('All products')->boolean()->toggleable(isToggledHiddenByDefault: true), TextColumn::make('maximum_quantity')->label('Max keys')->toggleable(isToggledHiddenByDefault: true)])->recordActions([
                 EditAction::make()->using(fn (ApiClient $record, array $data): ApiClient => self::save($record, $data)),
-                Action::make('rotate_token')->authorize(fn (ApiClient $record): bool => AdminAccess::can('rotateToken', $record, static::class))->label('Rotate management token')->requiresConfirmation()
+                Action::make('rotate_token')->authorize(fn (): bool => AdminAccess::isAdmin())->label('Rotate management token')->requiresConfirmation()
                     ->schema([DateTimePicker::make('expires_at')->label('Expiry (UTC)')->timezone('UTC')->default(fn (): string => now('UTC')->addYear()->format('Y-m-d H:i:s'))->required()])
                     ->action(fn (ApiClient $record, array $data): StreamedResponse => self::execute(function (Model $actor) use ($record, $data): StreamedResponse {
                         $token = app(ManageApiClients::class)->rotate($record, CarbonImmutable::parse($data['expires_at'], 'UTC'), $actor);
@@ -69,7 +69,7 @@ class ApiClientResource extends LicensingResource
                             echo $token;
                         }, 'management-token.txt', ['Cache-Control' => 'private, no-store']);
                     })),
-                Action::make('revoke_tokens')->authorize(fn (ApiClient $record): bool => AdminAccess::can('revokeTokens', $record, static::class))->label('Revoke management tokens')->requiresConfirmation()
+                Action::make('revoke_tokens')->authorize(fn (): bool => AdminAccess::isAdmin())->label('Revoke management tokens')->requiresConfirmation()
                     ->action(fn (ApiClient $record) => self::execute(fn (Model $actor) => app(ManageApiClients::class)->revoke($record, $actor))),
             ])->defaultSort('id', 'desc');
     }

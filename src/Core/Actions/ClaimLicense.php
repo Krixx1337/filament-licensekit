@@ -27,9 +27,6 @@ class ClaimLicense
             $user = $users->first(fn (Model $locked): bool => (string) $locked->getKey() === (string) $user->getKey()) ?? throw new LicensingException('user_unavailable');
             Product::whereKey($key->plan->product_id)->lockForUpdate()->firstOrFail();
             $key = LicenseKey::whereKey($key->id)->lockForUpdate()->first() ?? throw new LicensingException('invalid_key', 422);
-            if (! app(AdminAuthorization::class)->allows($actor, 'claim', $key)) {
-                throw new LicensingException('admin_forbidden');
-            }
 
             return $this->claimLocked($user, $key, 'user:'.$actor->getKey());
         }, 3);

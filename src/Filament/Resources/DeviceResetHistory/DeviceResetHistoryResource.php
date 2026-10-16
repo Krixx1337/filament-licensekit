@@ -21,6 +21,8 @@ class DeviceResetHistoryResource extends LicensingResource
 
     protected static ?string $model = DeviceResetHistory::class;
 
+    protected static string $access = AdminAccess::SUPPORT;
+
     protected static ?string $navigationLabel = 'HWID reset history';
 
     protected static ?string $modelLabel = 'HWID reset';
@@ -53,14 +55,14 @@ class DeviceResetHistoryResource extends LicensingResource
                 SelectFilter::make('product')->relationship('product', 'name')->searchable(),
                 SelectFilter::make('performed_by')->options(['customer' => 'Customer', 'admin' => 'Admin']),
             ])->recordActions([
-                Action::make('details')->label('View details')->authorize(fn (DeviceResetHistory $record): bool => AdminAccess::can('view', $record, static::class))
+                Action::make('details')->label('View details')->authorize(fn (DeviceResetHistory $record): bool => static::canView($record))
                     ->schema([Textarea::make('reason')->default(function (DeviceResetHistory $record): ?string {
                         abort_unless(static::canView($record), 403);
 
                         return $record->reason;
                     })->disabled()->dehydrated(false)->rows(8),
                         Textarea::make('before_hwid')->label('Device cleared')->default(function (DeviceResetHistory $record): string {
-                            AdminAccess::authorize('view', $record, static::class);
+                            abort_unless(static::canView($record), 403);
                             $payload = $record->fresh()->before_hwid;
 
                             return $payload === null ? 'Unavailable' : json_encode($payload, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR);

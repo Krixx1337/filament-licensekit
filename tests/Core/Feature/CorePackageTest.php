@@ -3,7 +3,6 @@
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Event;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 use Laravel\Fortify\Fortify;
@@ -202,15 +201,12 @@ test('host users can update and delete before licensing storage is installed', f
     expect($user->fresh())->toBeNull();
 });
 
-test('admin reset override requires host gate and reason', function () {
+test('admin reset override requires a reason', function () {
     $user = User::factory()->create();
     $admin = User::factory()->create();
     $product = Product::factory()->create();
     $entitlement = Entitlement::factory()->create(['user_id' => $user->id, 'product_id' => $product->id]);
     app(ClientSessions::class)->login($product, $user->email, 'password', desktopRequest($user)['hwid']);
-    expect(fn () => app(LicensedDevices::class)->adminReset($entitlement, $admin, 'Support request'))
-        ->toThrow(LicensingException::class, 'reset forbidden');
-    Gate::define('licensekit.manage', fn (User $actor) => $actor->id === $admin->id);
     expect(fn () => app(LicensedDevices::class)->adminReset($entitlement, $admin, ''))
         ->toThrow(LicensingException::class, 'reason required');
     app(LicensedDevices::class)->adminReset($entitlement, $admin, 'Support request');

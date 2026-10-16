@@ -3,7 +3,6 @@
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
-use Illuminate\Support\Facades\Gate;
 use LicenseKit\Core\Actions\AccessPolicy;
 use LicenseKit\Core\Actions\ClaimLicense;
 use LicenseKit\Core\Actions\CustomerLicenseSummary;
@@ -17,7 +16,6 @@ use LicenseKit\Core\Models\AuditEvent;
 use LicenseKit\Core\Models\Entitlement;
 use LicenseKit\Core\Models\LicenseKey;
 use LicenseKit\Core\Models\LicensePlan;
-use LicenseKit\Tests\Core\Fixtures\AdminPolicy;
 use LicenseKit\Tests\Core\Fixtures\User;
 
 test('individual extensions preserve future time and reactivate expired licenses', function (string $expiry, string $expected) {
@@ -112,23 +110,6 @@ test('clock changes reject unavailable licenses', function (string $operation, a
     'suspended' => [['status' => 'suspended']],
     'deleted owner' => [['user_id' => null]],
 ]);
-
-test('clock changes honor policy denial and fresh actor state', function (string $operation, string $denial) {
-    $actor = testAdminActor();
-    $entitlement = Entitlement::factory()->create(['user_id' => User::factory()->create()->id]);
-    if ($denial === 'policy') {
-        Gate::policy(Entitlement::class, AdminPolicy::class);
-    } elseif ($denial === 'suspended') {
-        $actor->newQuery()->whereKey($actor->getKey())->update(['is_suspended' => true]);
-    } else {
-        $actor->delete();
-    }
-    $tools = app(ManageEntitlements::class);
-
-    expect(fn () => $operation === 'extend' ? $tools->extend($entitlement, 1, $actor, 'Support') : $tools->{$operation}($entitlement, $actor, 'Support'))->toThrow(LicensingException::class, 'admin forbidden');
-
-    expect(AuditEvent::where('event', 'like', 'entitlement_%')->count())->toBe(0);
-})->with(['extend', 'pause', 'resume'])->with(['policy', 'suspended', 'deleted']);
 
 test('pause and resume reject repeated transitions and invalid balances', function () {
     $actor = testAdminActor();

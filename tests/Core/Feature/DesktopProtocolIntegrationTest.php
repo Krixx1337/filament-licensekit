@@ -148,7 +148,7 @@ test('suspension invalidates all participating custom sessions including multipl
     bootWithoutDefaultDesktop();
     installHostDesktopProtocol();
     $admin = User::factory()->create();
-    Gate::define('licensekit.manage', fn ($actor): bool => $actor->getKey() === $admin->id);
+    Gate::define('licensekit.admin', fn ($actor): bool => $actor->getKey() === $admin->id);
     $user = User::factory()->create();
     $other = User::factory()->create();
     $entitlement = Entitlement::factory()->create(['user_id' => $user->id]);

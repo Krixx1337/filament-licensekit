@@ -10,7 +10,7 @@ uses(TestCase::class)->in('Filament/Feature');
 function adminUser(): User
 {
     $user = User::factory()->create();
-    Gate::define('licensekit.manage', fn ($actor): bool => $actor->getKey() === $user->getKey());
+    Gate::define('licensekit.admin', fn ($actor): bool => $actor->getKey() === $user->getKey());
     Filament::setCurrentPanel(Filament::getPanel('admin'));
     test()->actingAs($user, 'staff');
 

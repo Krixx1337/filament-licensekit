@@ -8,12 +8,10 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\SQLiteDatabaseDoesNotExistException;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
 use Laravel\Sanctum\Sanctum;
 use LicenseKit\Core\Models\Entitlement;
 use LicenseKit\Core\Users\ConfiguredUserModel;
-use LicenseKit\Filament\Resources\LicensingResource;
 use LicenseKit\Support\ModuleReadiness;
 use LicenseKit\Support\SetupDiagnostics;
 use PDOException;
@@ -44,14 +42,6 @@ class CheckInstallation extends Command
                     $this->error($error);
 
                     return self::FAILURE;
-                }
-                if (! Gate::has('licensekit.manage')) {
-                    foreach ($panel->getResources() as $resource) {
-                        if (is_subclass_of($resource, LicensingResource::class)
-                            && Gate::getPolicyFor($resource::getModel()) === null) {
-                            $this->warn($resource.' is inaccessible without a model policy or the licensekit.manage Gate.');
-                        }
-                    }
                 }
             }
         }

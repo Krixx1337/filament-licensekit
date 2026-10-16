@@ -3,9 +3,11 @@
 namespace LicenseKit;
 
 use Illuminate\Contracts\Http\Kernel as HttpKernelContract;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Http\Kernel as HttpKernel;
 use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Routing\Middleware\ThrottleRequestsWithRedis;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use LicenseKit\Console\CheckInstallation;
 use LicenseKit\Console\InstallLicenseKit;
@@ -13,6 +15,7 @@ use LicenseKit\Core\Contracts\ReadinessCheck;
 use LicenseKit\Core\CoreServiceProvider;
 use LicenseKit\Core\Http\Middleware\JsonResponse;
 use LicenseKit\Core\Http\Middleware\RequireApiClient;
+use LicenseKit\Filament\AdminAccess;
 use LicenseKit\Http\Middleware\EnsureConfigured;
 use LicenseKit\Support\ModuleReadiness;
 
@@ -34,6 +37,13 @@ class LicenseKitServiceProvider extends ServiceProvider
     {
         $this->publishes([__DIR__.'/../config/licensekit.php' => config_path('licensekit.php')], 'licensekit-config');
         $this->commands([InstallLicenseKit::class, CheckInstallation::class]);
+        // Defaults: every panel user is an admin and nobody is support-only. Hosts redefine these gates.
+        if (! Gate::has(AdminAccess::ADMIN)) {
+            Gate::define(AdminAccess::ADMIN, fn (Model $user): bool => true);
+        }
+        if (! Gate::has(AdminAccess::SUPPORT)) {
+            Gate::define(AdminAccess::SUPPORT, fn (Model $user): bool => false);
+        }
         $this->callAfterResolving(HttpKernelContract::class, function (HttpKernel $kernel): void {
             $kernel->prependToMiddlewarePriority(EnsureConfigured::class);
             $kernel->prependToMiddlewarePriority(JsonResponse::class);

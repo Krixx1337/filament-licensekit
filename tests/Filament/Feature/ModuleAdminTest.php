@@ -49,12 +49,6 @@ test('issuance token rotates as private download and can be revoked', function (
     expect($client->tokens()->count())->toBe(0);
 });
 
-test('unavailable administrator is rejected before rendering or writing', function () {
-    $admin = adminUser();
-    $admin->update(['is_suspended' => true]);
-    Livewire::test(ManageProducts::class)->assertForbidden();
-});
-
 test('string host user IDs survive administrative claims and audit actors', function (string $model) {
     config(['auth.providers.users.model' => $model]);
     $this->app['db']->connection()->rollBack();
@@ -63,7 +57,7 @@ test('string host user IDs survive administrative claims and audit actors', func
     $admin = $model::create(['email' => 'admin@example.test', 'password' => 'password', 'email_verified_at' => now()]);
     $customer = $model::create(['email' => 'customer@example.test', 'password' => 'password', 'email_verified_at' => now()]);
     $this->actingAs($admin, 'staff');
-    Gate::define('licensekit.manage', fn ($actor): bool => $actor->getKey() === $admin->getKey());
+    Gate::define('licensekit.admin', fn ($actor): bool => $actor->getKey() === $admin->getKey());
     Filament::setCurrentPanel(Filament::getPanel('admin'));
     $plan = LicensePlan::factory()->create();
     $key = app(CreateBatch::class)->create($plan, 1, 'sale', 'test')->keys->first();

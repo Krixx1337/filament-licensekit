@@ -2,7 +2,6 @@
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
@@ -132,13 +131,11 @@ test('host can choose its own HTTP mapping for neutral device denials', function
     $this->assertDatabaseCount('licensekit_device_bindings', 0);
 });
 
-test('custom host catalog operations enforce Gate validation and actor auditing without a panel', function () {
+test('custom host catalog operations validate and audit the actor without a panel', function () {
     $admin = User::factory()->create();
-    Gate::define('licensekit.manage', fn ($user): bool => $user->id === $admin->id);
     expect(fn () => CatalogWrites::create(Product::class, ['name' => '', 'slug' => 'invalid'], $admin))->toThrow(ValidationException::class);
     $product = CatalogWrites::create(Product::class, ['name' => 'Custom host', 'slug' => 'custom-host'], $admin);
     $this->assertDatabaseHas('licensekit_audit_events', ['actor' => 'user:'.$admin->id, 'event' => 'configuration_created', 'subject_id' => (string) $product->id]);
-    $user = User::factory()->create();
-    expect(fn () => CatalogWrites::update($product, ['name' => 'Unauthorized'], $user))->toThrow(LicensingException::class, 'admin forbidden');
-    expect($product->fresh()->name)->toBe('Custom host');
+    CatalogWrites::update($product, ['name' => 'Renamed'], $admin);
+    expect($product->fresh()->name)->toBe('Renamed');
 });

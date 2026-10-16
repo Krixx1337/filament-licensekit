@@ -34,7 +34,7 @@ class HostBanRestriction implements AccessRestriction
 function suspensionAdministrator(): User
 {
     $actor = User::factory()->create();
-    Gate::define('licensekit.manage', fn ($user): bool => $user->getKey() === $actor->getKey());
+    Gate::define('licensekit.admin', fn ($user): bool => $user->getKey() === $actor->getKey());
 
     return $actor;
 }

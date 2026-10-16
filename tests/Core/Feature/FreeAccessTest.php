@@ -88,7 +88,7 @@ test('suspension denies free access before any purchase and invalidates host ses
     $this->travelTo(now()->startOfSecond());
     $user = User::factory()->create();
     $admin = User::factory()->create();
-    Gate::define('licensekit.manage', fn ($actor): bool => $actor->getKey() === $admin->getKey());
+    Gate::define('licensekit.admin', fn ($actor): bool => $actor->getKey() === $admin->getKey());
     $product = Product::factory()->create();
     config(['host_client.free_until' => now()->addHour()->toIso8601String()]);
     app(ClientSessions::class)->login($product, $user->email, 'password', desktopRequest($user)['hwid']);
