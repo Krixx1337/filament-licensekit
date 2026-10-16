@@ -18,6 +18,7 @@ use LicenseKit\Core\Models\LicenseKey;
 use LicenseKit\Core\Models\LoaderSession;
 use LicenseKit\Filament\Enums\LicenseState;
 use LicenseKit\Filament\Resources\ActivityLog\ActivityEntryResource;
+use LicenseKit\Filament\Support\PcHistory;
 use LicenseKit\Filament\Support\TimeLeft;
 
 /** The license page: who, what state, which PC, which keys and what happened. */
@@ -52,6 +53,10 @@ class LicenseInfolist
                     TextEntry::make('move_rule')->label('Customer can move it')->state(fn (License $record): string => self::moveRule($record)),
                     TextEntry::make('device_reset_at')->label('Last moved or reset')->state(fn (License $record): string => TimeLeft::date($record->device_reset_at))
                         ->placeholder('Never'),
+                    TextEntry::make('frequent')->label('Changes PC often')->columnSpanFull()->color('warning')->icon(Heroicon::OutlinedExclamationTriangle)
+                        ->state(fn (License $record): string => PcHistory::recentChanges($record).' moves or resets in the last '.PcHistory::WINDOW_DAYS.' days.')
+                        ->helperText('Frequent changes can mean the key is being shared. Check the PC history below.')
+                        ->visible(fn (License $record): bool => PcHistory::recentChanges($record) >= PcHistory::FREQUENT_CHANGES),
                     TextEntry::make('shared')->label('Shared PC warning')->columnSpanFull()->color('danger')->icon(Heroicon::OutlinedExclamationTriangle)
                         ->state(fn (License $record): array => self::sharedWith($record))->listWithLineBreaks()
                         ->helperText('Other accounts logged in from this PC. It may be a family PC, or one person with several accounts.')
@@ -63,6 +68,22 @@ class LicenseInfolist
                         ->where('expires_at', '>', now())->latest('last_seen_at')->limit(5)->pluck('last_seen_at')
                         ->map(fn ($seen): string => 'App open, last check-in '.$seen->diffForHumans())->all()),
             ]),
+            Section::make('PC history')->icon(Heroicon::OutlinedComputerDesktop)->columnSpanFull()->collapsible()
+                ->description('Every lock, move and reset. The same PC always gets the same short name.')
+                ->schema([
+                    RepeatableEntry::make('pc_history')->label('PC history')->hiddenLabel()->placeholder('No PC changes yet.')
+                        ->state(fn (License $record): array => PcHistory::for($record))
+                        ->table([TableColumn::make('When'), TableColumn::make('What'), TableColumn::make('By'), TableColumn::make('PC'), TableColumn::make('Note')])
+                        ->schema([
+                            TextEntry::make('when'),
+                            TextEntry::make('what')->weight(FontWeight::Medium)->color(fn (string $state): string => match ($state) {
+                                'Locked on first login' => 'gray', 'Reset by staff' => 'info', default => 'warning',
+                            }),
+                            TextEntry::make('who'),
+                            TextEntry::make('pc')->fontFamily(FontFamily::Mono),
+                            TextEntry::make('note')->placeholder('—'),
+                        ]),
+                ]),
             Section::make('Keys redeemed')->icon(Heroicon::OutlinedKey)->columnSpanFull()->schema([
                 RepeatableEntry::make('keys')->hiddenLabel()->placeholder('No keys redeemed yet.')
                     ->table([TableColumn::make('Key'), TableColumn::make('Batch'), TableColumn::make('Redeemed')])

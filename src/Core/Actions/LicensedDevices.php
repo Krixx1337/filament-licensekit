@@ -121,6 +121,8 @@ class LicensedDevices
             }
         } elseif ($bind && $license !== null) {
             $license->update(['device' => $device, 'device_bound_at' => now()]);
+            $this->audit->record('user:'.$access->user->getKey(), 'device_locked', $license, ['before' => ['device' => null],
+                'after' => ['device' => $device, 'performed_by' => 'customer'], 'note' => null]);
         } else {
             throw new LicensingException('device_not_bound', 409);
         }

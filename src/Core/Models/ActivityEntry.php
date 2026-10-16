@@ -37,6 +37,7 @@ class ActivityEntry extends Model
         'batch_unused_cancelled' => 'cancelled unused keys', 'key_note_updated' => 'edited a key note',
         'license_extended' => 'added time', 'product_time_added' => 'added time to a product', 'license_paused' => 'paused a license',
         'license_resumed' => 'resumed a license', 'license_status_changed' => 'changed a license status', 'license_note_updated' => 'edited a license note',
+        'device_locked' => 'locked a license to their PC',
         'device_moved' => 'moved to a new PC', 'device_reset' => 'reset the PC', 'device_banned' => 'banned a PC', 'device_unbanned' => 'unbanned a PC',
         'product_created' => 'created a product', 'product_saved' => 'updated a product',
         'connection_saved' => 'saved a store connection', 'connection_token_regenerated' => 'made a new store token',

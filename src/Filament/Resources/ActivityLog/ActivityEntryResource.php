@@ -21,6 +21,7 @@ use LicenseKit\Filament\Navigation;
 use LicenseKit\Filament\Resources\ActivityLog\Pages\ManageActivityLog;
 use LicenseKit\Filament\Resources\Licenses\LicenseResource;
 use LicenseKit\Filament\Resources\LicensingResource;
+use LicenseKit\Filament\Support\PcHistory;
 
 class ActivityEntryResource extends LicensingResource
 {
@@ -61,6 +62,8 @@ class ActivityEntryResource extends LicensingResource
                     ? LicenseResource::getUrl('view', ['record' => $record->subject_id]) : null),
             TextColumn::make('actor')->label('Person')->searchable(['actor', 'meta'])->toggleable(isToggledHiddenByDefault: true),
         ])->filters([
+            Filter::make('pc_changes')->label('PC changes only')->toggle()
+                ->query(fn ($query) => $query->whereIn('event', PcHistory::EVENTS)),
             SelectFilter::make('event')->label('Type')->multiple()
                 ->options(collect(ActivityEntry::EVENTS)->map(fn (string $verb): string => ucfirst($verb))->sort()->all()),
             SelectFilter::make('product_id')->label('Product')->options(fn () => Product::pluck('name', 'id'))
