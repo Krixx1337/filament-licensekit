@@ -33,6 +33,12 @@ class ActivityEntry extends Model
 
     public function description(): string
     {
+        return $this->summary().' on '.class_basename($this->subject_type).' #'.$this->subject_id;
+    }
+
+    /** Who did what, without the subject: "admin@example.com added time". */
+    public function summary(): string
+    {
         $actor = $this->meta['actor_label'] ?? $this->actor;
         $verb = match ($this->event) {
             'key_redeemed' => 'redeemed a key', 'device_moved' => 'moved the device', 'device_reset' => 'reset the device',
@@ -43,7 +49,7 @@ class ActivityEntry extends Model
             default => str_replace('_', ' ', $this->event),
         };
 
-        return $actor.' '.$verb.' on '.class_basename($this->subject_type).' #'.$this->subject_id;
+        return $actor.' '.$verb;
     }
 
     /** @return array<string, string> */

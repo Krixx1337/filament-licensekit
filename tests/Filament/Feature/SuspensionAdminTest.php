@@ -90,13 +90,13 @@ test('bulk suspend keeps an existing timed suspension unchanged', function () {
         ->and($running->fresh()->status)->toBe(License::SUSPENDED)->and($running->fresh()->suspended_until)->toBeNull();
 });
 
-test('status filter treats a passed suspension as lifted', function () {
+test('status tabs treat a passed suspension as lifted', function () {
     adminUser();
     $lapsed = License::factory()->create(['user_id' => User::factory()->create()->id, 'status' => License::SUSPENDED,
         'suspended_until' => now()->subMinute(), 'expires_at' => now()->addDays(5)]);
     $suspended = License::factory()->create(['user_id' => User::factory()->create()->id, 'status' => License::SUSPENDED]);
 
-    Livewire::test(ManageLicenses::class)->filterTable('status', 'suspended')
+    Livewire::test(ManageLicenses::class)->set('activeTab', 'suspended')
         ->assertCanSeeTableRecords([$suspended])->assertCanNotSeeTableRecords([$lapsed])
-        ->filterTable('status', 'active')->assertCanSeeTableRecords([$lapsed])->assertCanNotSeeTableRecords([$suspended]);
+        ->set('activeTab', 'active')->assertCanSeeTableRecords([$lapsed])->assertCanNotSeeTableRecords([$suspended]);
 });

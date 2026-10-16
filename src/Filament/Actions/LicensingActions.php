@@ -3,7 +3,9 @@
 namespace LicenseKit\Filament\Actions;
 
 use Carbon\CarbonImmutable;
+use Closure;
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Field;
 use Filament\Forms\Components\Select;
@@ -14,6 +16,7 @@ use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Text;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
+use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -33,6 +36,7 @@ use LicenseKit\Core\Models\LicensePlan;
 use LicenseKit\Core\Models\Product;
 use LicenseKit\Core\Users\ConfiguredUserModel;
 use LicenseKit\Filament\AdminAccess;
+use LicenseKit\Filament\Support\TimeLeft;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class LicensingActions
@@ -52,11 +56,42 @@ class LicensingActions
         return AdminAccess::actor();
     }
 
+    /**
+     * The license "Manage" menu, split into time, PC, note and access sections. Add time sits outside it as the main button.
+     *
+     * @return list<ActionGroup>
+     */
+    public static function licenseMenu(): array
+    {
+        return [
+            ActionGroup::make([self::pauseLicense(), self::resumeLicense()])->dropdown(false),
+            ActionGroup::make([self::reset(), self::inspectDevice(), self::banDevice()])->dropdown(false),
+            ActionGroup::make([self::licenseNote()])->dropdown(false),
+            ActionGroup::make([self::suspend(), self::unsuspend(), self::cancelLicense(), self::restoreLicense()])->dropdown(false),
+        ];
+    }
+
+    /** Refreshes the shown license and confirms what happened, naming the customer. */
+    private static function finish(Action $action, Closure $message): Action
+    {
+        return $action->after(function (License $record, array $data) use ($message): void {
+            $record->refresh();
+            Notification::make()->title($message(self::who($record), $data))->success()->send();
+        });
+    }
+
+    private static function who(License $license): string
+    {
+        return ($license->user?->getAttribute(config('licensekit.user_label')) ?? 'Deleted customer').' · '.$license->product->name;
+    }
+
     public static function licenseNote(): Action
     {
-        return Action::make('license_note')->label('Edit note')->authorize(fn (License $record) => self::mayChange($record, true))
-            ->schema([Textarea::make('note')->maxLength(2000)])->fillForm(fn (License $record) => ['note' => $record->note])
-            ->action(fn (License $record, array $data) => app(ManageLicenses::class)->updateNote($record, self::actor(), $data['note'] ?? null));
+        return self::finish(Action::make('license_note')->label('Edit note')->icon(Heroicon::OutlinedPencilSquare)
+            ->authorize(fn (License $record) => self::mayChange($record, true))
+            ->schema([Textarea::make('note')->label('Note')->helperText('Only your team sees this.')->maxLength(2000)])->fillForm(fn (License $record) => ['note' => $record->note])
+            ->action(fn (License $record, array $data) => app(ManageLicenses::class)->updateNote($record, self::actor(), $data['note'] ?? null)),
+            fn (string $who): string => 'Note saved for '.$who);
     }
 
     public static function editNote(): Action
@@ -138,13 +173,19 @@ class LicensingActions
 
     public static function banDevice(): Action
     {
-        return Action::make('ban_device')->label('Ban device')->color('danger')->requiresConfirmation()
+        return self::finish(Action::make('ban_device')->label('Ban this PC')->icon(Heroicon::OutlinedNoSymbol)->color('danger')->requiresConfirmation()
+            ->modalIcon(Heroicon::OutlinedNoSymbol)->modalHeading('Ban this PC')
+            ->modalDescription('This PC can no longer log in, even with another account. Use it for cheaters and chargebacks.')
             ->authorize(fn (License $record): bool => self::mayChange($record))->visible(fn (License $record): bool => $record->device !== null)
             ->schema([
                 Text::make(function (License $record): string {
                     $others = app(DeviceBans::class)->sharedAccounts($record);
 
-                    return 'This PC is also used by '.$others->unique('user_id')->count().' other accounts: '.$others->map(fn ($license) => $license->user
+                    if ($others->isEmpty()) {
+                        return 'No other accounts have used this PC.';
+                    }
+
+                    return 'Shared PC warning: also used by '.$others->unique('user_id')->count().' other accounts: '.$others->map(fn ($license) => $license->user
                         ?->getAttribute(config('licensekit.user_label')))->unique()->implode(', ');
                 }),
                 Toggle::make('all_products')->label('Ban across all products')->default(false),
@@ -154,7 +195,8 @@ class LicensingActions
                         ?->getAttribute(config('licensekit.user_label')).' / '.$license->product->name])->all()),
                 Textarea::make('note')->label('Note (optional)')->maxLength(2000),
             ])->action(fn (License $record, array $data) => app(DeviceBans::class)->ban($record, self::actor(),
-                $data['all_products'] ?? false, $data['suspend'] ?? true, array_values(array_map('intval', $data['also_suspend'] ?? [])), $data['note'] ?? null));
+                $data['all_products'] ?? false, $data['suspend'] ?? true, array_values(array_map('intval', $data['also_suspend'] ?? [])), $data['note'] ?? null)),
+            fn (string $who): string => 'PC banned for '.$who);
     }
 
     public static function userSelect(string $name = 'user_id'): Select
@@ -188,40 +230,45 @@ class LicensingActions
 
     public static function suspend(): Action
     {
-        return Action::make('suspend')->label('Suspend')->color('danger')
+        return self::finish(Action::make('suspend')->label('Suspend')->icon(Heroicon::OutlinedNoSymbol)->color('danger')->modalIcon(Heroicon::OutlinedNoSymbol)
             ->authorize(fn (License $record): bool => self::mayChange($record, true))
             ->visible(fn (License $record): bool => ! $record->isSuspended() && ! $record->isRevoked())
             ->modalDescription('The customer can no longer use this product or redeem keys for it. Their time keeps running.')
             ->schema(self::suspensionFields())
-            ->action(fn (License $record, array $data) => app(ManageLicenses::class)->suspend($record, self::actor(), $data['reason'] ?? null, self::suspensionEnd($data)));
+            ->action(fn (License $record, array $data) => app(ManageLicenses::class)->suspend($record, self::actor(), $data['reason'] ?? null, self::suspensionEnd($data))),
+            fn (string $who): string => 'Suspended '.$who);
     }
 
     public static function unsuspend(): Action
     {
-        return Action::make('unsuspend')->label('Unsuspend')
+        return self::finish(Action::make('unsuspend')->label('Unsuspend')->icon(Heroicon::OutlinedCheckCircle)->color('success')
             ->authorize(fn (License $record): bool => self::mayChange($record, true))
             ->visible(fn (License $record): bool => $record->isSuspended())
             ->schema([Textarea::make('reason')->label('Note (optional)')->maxLength(2000)])
-            ->action(fn (License $record, array $data) => app(ManageLicenses::class)->unsuspend($record, self::actor(), $data['reason'] ?? null));
+            ->action(fn (License $record, array $data) => app(ManageLicenses::class)->unsuspend($record, self::actor(), $data['reason'] ?? null)),
+            fn (string $who): string => 'Unsuspended '.$who);
     }
 
     public static function cancelLicense(): Action
     {
-        return Action::make('cancel')->label('Cancel license')->color('danger')->requiresConfirmation()
+        return self::finish(Action::make('cancel')->label('Cancel license')->icon(Heroicon::OutlinedXCircle)->color('danger')->requiresConfirmation()
+            ->modalIcon(Heroicon::OutlinedXCircle)
             ->authorize(fn (License $record): bool => self::mayChange($record))
             ->visible(fn (License $record): bool => ! $record->isRevoked())
             ->modalDescription('Use this after a refund. Paid access stops and new keys cannot renew this license.')
             ->schema([Textarea::make('reason')->label('Note (optional)')->maxLength(2000)])
-            ->action(fn (License $record, array $data) => app(ManageLicenses::class)->revoke($record, self::actor(), $data['reason'] ?? null));
+            ->action(fn (License $record, array $data) => app(ManageLicenses::class)->revoke($record, self::actor(), $data['reason'] ?? null)),
+            fn (string $who): string => 'Cancelled '.$who);
     }
 
     public static function restoreLicense(): Action
     {
-        return Action::make('restore')->label('Restore license')
+        return self::finish(Action::make('restore')->label('Restore license')->icon(Heroicon::OutlinedArrowUturnLeft)
             ->authorize(fn (License $record): bool => self::mayChange($record))
             ->visible(fn (License $record): bool => $record->isRevoked())
             ->schema([Textarea::make('reason')->label('Note (optional)')->maxLength(2000)])
-            ->action(fn (License $record, array $data) => app(ManageLicenses::class)->restore($record, self::actor(), $data['reason'] ?? null));
+            ->action(fn (License $record, array $data) => app(ManageLicenses::class)->restore($record, self::actor(), $data['reason'] ?? null)),
+            fn (string $who): string => 'Restored '.$who);
     }
 
     /** Header action for customers who may not have a license yet, such as a ban before first purchase. */
@@ -254,60 +301,70 @@ class LicensingActions
 
     public static function extendLicense(): Action
     {
-        return Action::make('extend')->label('Extend time')
+        return self::finish(Action::make('extend')->label('Add time')->icon(Heroicon::OutlinedPlusCircle)->modalHeading('Add time')->modalSubmitActionLabel('Add time')
             ->authorize(fn (License $record): bool => self::mayChange($record, true))
             ->visible(fn (License $record): bool => $record->user_id !== null && ! $record->is_lifetime && ! $record->isRevoked())
             ->modalDescription('Adds time from the current expiry, or from now if expired. Paused licenses keep the added time banked.')
             ->schema([
-                TextInput::make('duration')->integer()->minValue(1)->maxValue(fn (Get $get): int => $get('unit') === 'days' ? 3650 : 87600)->default(1)->required(),
+                TextInput::make('duration')->label('How much')->integer()->minValue(1)->maxValue(fn (Get $get): int => $get('unit') === 'days' ? 3650 : 87600)->default(1)->required(),
                 Select::make('unit')->options(['hours' => 'Hours', 'days' => 'Days'])->default('days')->live()->required(),
-                Textarea::make('reason')->maxLength(2000),
+                Textarea::make('reason')->label('Note (optional)')->maxLength(2000),
             ])
             ->action(function (License $record, array $data): void {
-                $seconds = (int) $data['duration'] * ($data['unit'] === 'days' ? 86400 : 3600);
-                app(ManageLicenses::class)->extend($record, $seconds, self::actor(), ($data['reason'] ?? null));
-            });
+                app(ManageLicenses::class)->extend($record, self::seconds($data), self::actor(), ($data['reason'] ?? null));
+            }),
+            fn (string $who, array $data): string => 'Added '.TimeLeft::duration(self::seconds($data)).' to '.$who);
+    }
+
+    /** @param array<string, mixed> $data */
+    private static function seconds(array $data): int
+    {
+        return (int) $data['duration'] * ($data['unit'] === 'days' ? 86400 : 3600);
     }
 
     public static function pauseLicense(): Action
     {
-        return Action::make('pause')->label('Pause')
+        return self::finish(Action::make('pause')->label('Pause')->icon(Heroicon::OutlinedPauseCircle)
             ->authorize(fn (License $record): bool => self::mayChange($record, true))
             ->visible(fn (License $record): bool => $record->user_id !== null && ! $record->is_lifetime && $record->status === License::ACTIVE && $record->paused_at === null
                 && (bool) $record->expires_at?->isFuture())
-            ->modalDescription('Preserves remaining time and stops access until staff resume this license.')
-            ->schema([DateTimePicker::make('paused_until')->label('Pause until')->minDate(fn () => now()), Textarea::make('reason')->maxLength(2000)])
+            ->modalDescription('Stops access and saves the remaining time until you resume it.')
+            ->schema([DateTimePicker::make('paused_until')->label('Resume automatically on (optional)')->seconds(false)->minDate(fn () => now()),
+                Textarea::make('reason')->label('Note (optional)')->maxLength(2000)])
             ->action(fn (License $record, array $data) => app(ManageLicenses::class)->pause($record, self::actor(), $data['reason'] ?? null,
-                empty($data['paused_until']) ? null : CarbonImmutable::parse($data['paused_until'], config('app.timezone'))->utc()));
+                empty($data['paused_until']) ? null : CarbonImmutable::parse($data['paused_until'], config('app.timezone'))->utc())),
+            fn (string $who): string => 'Paused '.$who.'. Their remaining time is saved.');
     }
 
     public static function resumeLicense(): Action
     {
-        return Action::make('resume')->label('Resume')
+        return self::finish(Action::make('resume')->label('Resume')->icon(Heroicon::OutlinedPlayCircle)->color('success')
             ->authorize(fn (License $record): bool => self::mayChange($record, true))
             ->visible(fn (License $record): bool => $record->user_id !== null && ! $record->is_lifetime && $record->status === License::PAUSED)
-            ->modalDescription('Starts the banked time from now. Other access restrictions still apply.')
-            ->schema([Textarea::make('reason')->maxLength(2000)])
-            ->action(fn (License $record, array $data) => app(ManageLicenses::class)->resume($record, self::actor(), ($data['reason'] ?? null)));
+            ->modalDescription('The saved time starts counting down again from now.')
+            ->schema([Textarea::make('reason')->label('Note (optional)')->maxLength(2000)])
+            ->action(fn (License $record, array $data) => app(ManageLicenses::class)->resume($record, self::actor(), ($data['reason'] ?? null))),
+            fn (string $who): string => 'Resumed '.$who);
     }
 
     public static function reset(): Action
     {
-        return Action::make('reset_hwid')->label('Reset device')
+        return self::finish(Action::make('reset_hwid')->label('Reset PC')->icon(Heroicon::OutlinedArrowPath)->modalHeading('Reset PC')->modalSubmitActionLabel('Reset PC')
             ->authorize(fn (License $record): bool => $record->user !== null && self::mayChange($record, true))
             ->visible(fn (License $record): bool => $record->device !== null)
-            ->modalDescription('Clears the locked device now, ignoring the waiting period. The customer\'s next login locks their new PC.')
-            ->schema([Textarea::make('reason')->label('Note')->maxLength(2000)])
-            ->action(fn (License $record, array $data) => app(LicensedDevices::class)->adminReset($record->user, $record->product, self::actor(), ($data['reason'] ?? null)));
+            ->modalDescription('Unlocks the license from the current PC right away, ignoring the waiting period. The customer\'s next login locks their new PC.')
+            ->schema([Textarea::make('reason')->label('Note (optional)')->maxLength(2000)])
+            ->action(fn (License $record, array $data) => app(LicensedDevices::class)->adminReset($record->user, $record->product, self::actor(), ($data['reason'] ?? null))),
+            fn (string $who): string => 'PC reset for '.$who.'. Their next login locks the new PC.');
     }
 
     public static function inspectDevice(): Action
     {
-        return Action::make('inspect_device')->label('Show device')
+        return Action::make('inspect_device')->label('Show PC fingerprint')->icon(Heroicon::OutlinedFingerPrint)
             ->authorize(fn (License $record): bool => $record->user !== null && AdminAccess::isSupport())
             ->visible(fn (License $record): bool => $record->device !== null)
             ->schema([
-                Textarea::make('device')->label('Locked device fingerprint')->default(function (License $record): ?string {
+                Textarea::make('device')->label('The fingerprint your app sent for this PC')->default(function (License $record): ?string {
                     abort_unless(AdminAccess::isSupport(), 403);
 
                     return $record->device;

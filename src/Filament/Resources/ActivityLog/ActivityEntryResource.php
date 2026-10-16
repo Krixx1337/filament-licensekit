@@ -11,6 +11,7 @@ use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use LicenseKit\Core\Models\ActivityEntry;
+use LicenseKit\Core\Models\License;
 use LicenseKit\Core\Models\Product;
 use LicenseKit\Filament\AdminAccess;
 use LicenseKit\Filament\Navigation;
@@ -55,7 +56,8 @@ class ActivityEntryResource extends LicensingResource
             SelectFilter::make('product_id')->label('Product')->options(fn () => Product::pluck('name', 'id'))
                 ->query(fn ($query, array $data) => $query->when($data['value'] ?? null, fn ($q, $id) => $q->where('meta->product_id', $id))),
             Filter::make('license')->schema([TextInput::make('license_id')->integer()->label('License number')])
-                ->query(fn ($query, array $data) => $query->when($data['license_id'] ?? null, fn ($q, $id) => $q->where('meta->license_id', $id))),
+                ->query(fn ($query, array $data) => $query->when($data['license_id'] ?? null, fn ($q, $id) => $q->where(fn ($q) => $q
+                    ->where(fn ($q) => $q->where('subject_type', (new License)->getMorphClass())->where('subject_id', (string) $id))->orWhere('meta->license_id', $id)))),
         ])->recordActions([Action::make('details')->authorize(fn (ActivityEntry $record): bool => static::canView($record))->schema([
             Textarea::make('meta')->label('Details')->default(fn (ActivityEntry $record) => json_encode($record->meta, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR))
                 ->disabled()->dehydrated(false)->rows(10),

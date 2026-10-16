@@ -23,7 +23,7 @@ test('staff extend pause and resume licenses from table', function () {
         ->callTableAction('pause', $license, data: ['reason' => 'Vacation'])->assertHasNoActionErrors();
 
     Livewire::test(ManageLicenses::class)
-        ->assertSee('Paused')->assertSee('1d 2h 0m 0s')
+        ->assertSee('Paused')->assertSee('Paused · 1 day saved')
         ->assertTableActionHidden('pause', $license)
         ->callTableAction('extend', $license, data: ['duration' => 1, 'unit' => 'days', 'reason' => 'Support'])->assertHasNoActionErrors();
     expect($license->fresh()->remaining_seconds)->toBe(180000);
