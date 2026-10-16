@@ -12,7 +12,7 @@ class ManagementProductResource extends JsonResource
     /** @return array<string, mixed> */
     public function toArray(Request $request): array
     {
-        return ['id' => $this->id, 'name' => $this->name, 'slug' => $this->slug, 'product_group_id' => $this->product_group_id,
-            'group_name' => $this->group?->name, 'is_enabled' => $this->is_enabled, 'requires_hwid' => $this->requires_hwid];
+        return ['id' => $this->id, 'name' => $this->name, 'slug' => $this->slug,
+            'is_enabled' => $this->is_enabled, 'requires_hwid' => $this->requires_hwid];
     }
 }

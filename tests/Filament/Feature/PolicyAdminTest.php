@@ -23,7 +23,6 @@ use LicenseKit\Core\Models\LicenseKey;
 use LicenseKit\Core\Models\LicensePlan;
 use LicenseKit\Core\Models\LicensingBan;
 use LicenseKit\Core\Models\Product;
-use LicenseKit\Core\Models\ProductGroup;
 use LicenseKit\Filament\AdminAccess;
 use LicenseKit\Filament\CatalogWrites;
 use LicenseKit\Filament\Resources\AuditEvents\Pages\ManageAuditEvents;
@@ -45,7 +44,7 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 
 function registerAdminPolicies(array $abilities): void
 {
-    foreach ([Product::class, ProductGroup::class, Provider::class, LicensePlan::class, LicenseKey::class, Entitlement::class,
+    foreach ([Product::class, Provider::class, LicensePlan::class, LicenseKey::class, Entitlement::class,
         LicensingBan::class, ApiClient::class, AuditEvent::class, DeviceResetHistory::class, Outage::class, LicensingOperation::class] as $model) {
         Gate::policy($model, AdminPolicy::class);
     }
@@ -101,7 +100,6 @@ test('all admin mutations deny policy refusal even when master gate allows', fun
     $ban = app(ManageLicensingBans::class)->create($user, $product, 'Fixture', $actor);
     $outage = app(ManageOutages::class)->start($product, 'fixture-outage', 'Fixture', $actor);
     $outage->operation->update(['status' => 'failed']);
-    $group = ProductGroup::factory()->create();
     registerAdminPolicies([]);
     $audits = AuditEvent::count();
     Queue::fake([ApplyCompensation::class]);
@@ -126,9 +124,8 @@ test('all admin mutations deny policy refusal even when master gate allows', fun
         'add_time' => fn () => app(ManageOutages::class)->addTime($product, 60, CarbonImmutable::now(), 'denied', 'Denied', $actor),
         'retry' => fn () => app(ManageOutages::class)->retry($outage->operation, $actor),
         'cancel' => fn () => app(ManageOutages::class)->cancel($outage->operation, $actor),
-        'create_catalog' => fn () => CatalogWrites::create(ProductGroup::class, ['name' => 'Denied'], $actor),
+        'create_catalog' => fn () => CatalogWrites::create(Product::class, ['name' => 'Denied', 'slug' => 'denied'], $actor),
         'update_catalog' => fn () => CatalogWrites::update($product, ['name' => 'Denied'], $actor),
-        'delete_group' => fn () => CatalogWrites::deleteGroup($group, $actor),
     };
     expect($call)->toThrow(LicensingException::class);
     expect(AuditEvent::count())->toBe($audits)
@@ -137,15 +134,14 @@ test('all admin mutations deny policy refusal even when master gate allows', fun
         ->and($ban->fresh()->lifted_at)->toBeNull()
         ->and($token->fresh())->not->toBeNull()->and($outage->fresh()->stopped_at)->toBeNull()
         ->and($outage->operation->fresh()->status)->toBe('failed')
-        ->and($entitlement->fresh()->is_revoked)->toBeFalse()->and($entitlement->fresh()->is_blocked)->toBeFalse()
-        ->and($group->fresh())->not->toBeNull();
+        ->and($entitlement->fresh()->is_revoked)->toBeFalse()->and($entitlement->fresh()->is_blocked)->toBeFalse();
     $this->assertDatabaseCount('licensekit_license_keys', 1);
     $this->assertDatabaseCount('licensekit_api_clients', 1);
     Queue::assertNothingPushed();
 })->with(['createKeys', 'claim', 'revoke_key', 'revoke', 'restoreAccess', 'block', 'unblock', 'reset',
     'create_ban', 'lift_ban', 'create_client', 'update_client',
     'rotate_token', 'revoke_tokens', 'start_outage', 'stop_outage', 'preview', 'add_time', 'retry', 'cancel',
-    'create_catalog', 'update_catalog', 'delete_group']);
+    'create_catalog', 'update_catalog']);
 
 test('policy permission loss after modal mount refuses creation without affecting resource browsing', function () {
     adminUser();
@@ -230,16 +226,14 @@ test('credential create update rotate and revoke use separate exact abilities', 
     expect($client->fresh()->name)->toBe('Edited')->and($client->tokens()->count())->toBe(0);
 });
 
-test('catalog create update and supported deletes use model policies without panel dependency', function () {
+test('catalog create and update use model policies without panel dependency', function () {
     $actor = adminUser();
     Gate::define('licensekit.manage', fn () => false);
     registerAdminPolicies(['create']);
-    $group = CatalogWrites::create(ProductGroup::class, ['name' => 'Group'], $actor);
+    $product = CatalogWrites::create(Product::class, ['name' => 'Product', 'slug' => 'product'], $actor);
     config(['testing.admin_abilities' => ['update']]);
-    CatalogWrites::update($group, ['name' => 'Edited'], $actor);
-    expect($group->fresh()->name)->toBe('Edited');
-    config(['testing.admin_abilities' => ['delete']]);
-    expect(CatalogWrites::deleteGroup($group, $actor))->toBeTrue();
+    CatalogWrites::update($product, ['name' => 'Edited'], $actor);
+    expect($product->fresh()->name)->toBe('Edited');
 });
 
 test('outage start stop preview credit retry and cancel use their exact policy abilities', function () {

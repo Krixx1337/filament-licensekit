@@ -8,7 +8,6 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -44,13 +43,9 @@ class LicensePlanResource extends LicensingResource
     public static function table(Table $table): Table
     {
         return $table->columns([TextColumn::make('product.name')->searchable()->toggleable(),
-            TextColumn::make('product.group.name')->label('Product group')->placeholder('Ungrouped')->searchable()->toggleable(isToggledHiddenByDefault: true),
             TextColumn::make('name')->searchable()->toggleable(),
             TextColumn::make('duration_days')->label('Duration (days)')->placeholder('Lifetime')->toggleable(),
-            TextColumn::make('unclaimed_count')->label('Keys left')->toggleable()])->filters([
-                SelectFilter::make('group')->label('Product group')->relationship('product.group', 'name', hasEmptyOption: true)
-                    ->emptyRelationshipOptionLabel('Ungrouped')->searchable()->preload(),
-            ])->recordActions([EditAction::make()->using(fn (Model $record, array $data) => CatalogWrites::update($record, $data)),
+            TextColumn::make('unclaimed_count')->label('Keys left')->toggleable()])->recordActions([EditAction::make()->using(fn (Model $record, array $data) => CatalogWrites::update($record, $data)),
                 LicensingActions::createKeys()])->defaultSort('id', 'desc');
     }
 
@@ -62,7 +57,7 @@ class LicensePlanResource extends LicensingResource
     /** @return Builder<LicensePlan> */
     public static function getEloquentQuery(): Builder
     {
-        return LicensePlan::query()->with(['product.group'])->withCount([
+        return LicensePlan::query()->with(['product'])->withCount([
             'keys as unclaimed_count' => fn (Builder $query) => $query->whereNull('claimed_at')->whereNull('revoked_at'),
         ]);
     }

@@ -28,7 +28,7 @@ test('core resources require panel registration and host gate', function () {
     $this->actingAs($user, 'staff')->get('/admin/licensekit/products')->assertForbidden();
     adminUser();
     $this->get('/admin/licensekit/products')->assertOk();
-    foreach (['product-groups', 'license-plans', 'license-keys', 'entitlements', 'api-clients', 'audit-events', 'device-reset-history', 'bans'] as $slug) {
+    foreach (['license-plans', 'license-keys', 'entitlements', 'api-clients', 'audit-events', 'device-reset-history', 'bans'] as $slug) {
         $this->get('/admin/licensekit/'.$slug)->assertOk();
     }
     $this->get('/admin/licensekit/outages')->assertOk();
@@ -65,8 +65,8 @@ test('optional resources follow global flags and unsupported tenancy is rejected
     $core = Panel::make()->id('core')->authGuard('staff')->plugin(LicenseKitPlugin::make());
     config(['licensekit.modules.outages' => true, 'licensekit.modules.downloads' => true]);
     $full = Panel::make()->id('full')->authGuard('staff')->plugin(LicenseKitPlugin::make());
-    expect($core->getResources())->toHaveCount(10);
-    expect($full->getResources())->toHaveCount(12);
+    expect($core->getResources())->toHaveCount(9);
+    expect($full->getResources())->toHaveCount(11);
     $tenant = Panel::make()->id('tenant')->tenant(User::class)->plugin(LicenseKitPlugin::make());
     expect($tenant->getResources())->toBe([]);
     expect(fn () => $tenant->getPlugin('licensekit')->boot($tenant))->toThrow(LicensingException::class, 'licensing unavailable');

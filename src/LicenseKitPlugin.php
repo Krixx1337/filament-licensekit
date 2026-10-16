@@ -15,7 +15,6 @@ use LicenseKit\Filament\Resources\LicenseKeys\LicenseKeyResource;
 use LicenseKit\Filament\Resources\LicensePlans\LicensePlanResource;
 use LicenseKit\Filament\Resources\LicensingBans\LicensingBanResource;
 use LicenseKit\Filament\Resources\Outages\OutageResource;
-use LicenseKit\Filament\Resources\ProductGroups\ProductGroupResource;
 use LicenseKit\Filament\Resources\Products\ProductResource;
 use LicenseKit\Support\Modules;
 use LicenseKit\Support\SetupDiagnostics;
@@ -43,7 +42,7 @@ final class LicenseKitPlugin implements Plugin
         if ($diagnostics->configurationErrors() !== [] || $diagnostics->panelError($panel) !== null) {
             return;
         }
-        $resources = [ProductGroupResource::class, ProductResource::class, LicensePlanResource::class, LicenseKeyResource::class, BatchResource::class, EntitlementResource::class, ApiClientResource::class, DeviceResetHistoryResource::class, AuditEventResource::class];
+        $resources = [ProductResource::class, LicensePlanResource::class, LicenseKeyResource::class, BatchResource::class, EntitlementResource::class, ApiClientResource::class, DeviceResetHistoryResource::class, AuditEventResource::class];
         if (config('licensekit.features.licensing_bans') === true) {
             $resources[] = LicensingBanResource::class;
         }

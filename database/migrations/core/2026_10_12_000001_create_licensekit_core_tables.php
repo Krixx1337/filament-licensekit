@@ -9,14 +9,8 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('licensekit_product_groups', function (Blueprint $table): void {
-            $table->id();
-            $table->string('name');
-            $table->timestamps();
-        });
         Schema::create('licensekit_products', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('product_group_id')->nullable()->constrained('licensekit_product_groups')->nullOnDelete();
             $table->string('name');
             $table->string('slug')->unique();
             $table->boolean('is_enabled')->default(true);
@@ -138,7 +132,7 @@ return new class extends Migration
 
     public function down(): void
     {
-        foreach (['licensekit_audit_events', 'licensekit_device_reset_history', 'licensekit_device_bindings', 'licensekit_license_keys', 'licensekit_entitlements', 'licensekit_batches', 'licensekit_api_clients', 'licensekit_license_plans', 'licensekit_licensing_bans', 'licensekit_products', 'licensekit_product_groups'] as $table) {
+        foreach (['licensekit_audit_events', 'licensekit_device_reset_history', 'licensekit_device_bindings', 'licensekit_license_keys', 'licensekit_entitlements', 'licensekit_batches', 'licensekit_api_clients', 'licensekit_license_plans', 'licensekit_licensing_bans', 'licensekit_products'] as $table) {
             Schema::dropIfExists($table);
         }
     }

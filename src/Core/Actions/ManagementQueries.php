@@ -23,7 +23,7 @@ class ManagementQueries
         }
 
         return $this->access->run($bearer, null, function (ManagementAuthorization $context) use ($perPage, $page, $search): LengthAwarePaginator {
-            $query = Product::query()->with('group');
+            $query = Product::query();
             if (! $context->client->all_products) {
                 $query->whereIn('id', $context->client->allowed_product_ids);
             }

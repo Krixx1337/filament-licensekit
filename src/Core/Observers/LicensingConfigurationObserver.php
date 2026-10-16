@@ -6,7 +6,6 @@ use Illuminate\Database\Eloquent\Model;
 use LicenseKit\Core\Actions\Audit;
 use LicenseKit\Core\Models\LicensePlan;
 use LicenseKit\Core\Models\Product;
-use LicenseKit\Core\Models\ProductGroup;
 
 class LicensingConfigurationObserver
 {
@@ -29,7 +28,7 @@ class LicensingConfigurationObserver
 
     private function actor(Model $model): string
     {
-        $actor = $model instanceof Product || $model instanceof LicensePlan || $model instanceof ProductGroup ? $model->auditActor : null;
+        $actor = $model instanceof Product || $model instanceof LicensePlan ? $model->auditActor : null;
         if (is_string($actor)) {
             return $actor;
         }

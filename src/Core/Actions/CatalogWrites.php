@@ -9,36 +9,17 @@ use Illuminate\Validation\Rule;
 use LicenseKit\Core\Exceptions\LicensingException;
 use LicenseKit\Core\Models\LicensePlan;
 use LicenseKit\Core\Models\Product;
-use LicenseKit\Core\Models\ProductGroup;
 use LicenseKit\Core\Users\UserAccess;
 
 class CatalogWrites
 {
-    public static function deleteGroup(ProductGroup $group, ?Model $actor = null): bool
-    {
-        return DB::transaction(function () use ($group, $actor): bool {
-            $actor = self::actor($actor);
-            $group = $group->fresh() ?? abort(404);
-            self::authorize($actor, 'delete', $group);
-            $actor = 'user:'.$actor->getKey();
-            $before = ['name' => $group->name, 'affected_product_count' => $group->products()->count()];
-            $deleted = $group->delete();
-            if ($deleted !== true) {
-                return false;
-            }
-            app(Audit::class)->record($actor, 'configuration_deleted', $group, $before);
-
-            return true;
-        });
-    }
-
     /** @param class-string<Model> $model
      * @param array<string,mixed> $data */
     public static function create(string $model, array $data, ?Model $actor = null): Model
     {
         return DB::transaction(function () use ($model, $data, $actor): Model {
             $actor = self::actor($actor);
-            if (! in_array($model, [Product::class, LicensePlan::class, ProductGroup::class], true)) {
+            if (! in_array($model, [Product::class, LicensePlan::class], true)) {
                 throw new LicensingException('invalid_catalog_type', 422);
             }
             self::authorize($actor, 'create', $model);
@@ -64,7 +45,7 @@ class CatalogWrites
             if ($record instanceof LicensePlan) {
                 unset($data['product_id']);
             }
-            if (! $record instanceof Product && ! $record instanceof LicensePlan && ! $record instanceof ProductGroup) {
+            if (! $record instanceof Product && ! $record instanceof LicensePlan) {
                 throw new LicensingException('invalid_catalog_type', 422);
             }
             self::authorize($actor, 'update', $record);
@@ -85,7 +66,6 @@ class CatalogWrites
                 'slug' => ['required', 'string', 'max:255', Rule::unique('licensekit_products', 'slug')->ignore($record->getKey())],
                 'is_enabled' => ['required', 'boolean'], 'is_blocked' => ['required', 'boolean'],
                 'requires_hwid' => ['required', 'boolean'],
-                'product_group_id' => ['nullable', 'integer', 'exists:licensekit_product_groups,id'],
             ])->validate();
         } elseif ($record instanceof LicensePlan) {
             Validator::make($record->getAttributes(), ['name' => ['required', 'string', 'max:255'], 'product_id' => ['required', 'integer', 'exists:licensekit_products,id'], 'is_enabled' => ['required', 'boolean']])->validate();

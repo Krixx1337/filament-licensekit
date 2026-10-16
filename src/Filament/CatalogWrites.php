@@ -4,7 +4,6 @@ namespace LicenseKit\Filament;
 
 use Illuminate\Database\Eloquent\Model;
 use LicenseKit\Core\Actions\CatalogWrites as CoreCatalogWrites;
-use LicenseKit\Core\Models\ProductGroup;
 
 /** Panel adapter. Non-panel callers use Core\Actions\CatalogWrites with an explicit actor. */
 class CatalogWrites
@@ -20,10 +19,5 @@ class CatalogWrites
     public static function update(Model $record, array $data, ?Model $actor = null): Model
     {
         return CoreCatalogWrites::update($record, $data, $actor ?? AdminAccess::actor());
-    }
-
-    public static function deleteGroup(ProductGroup $group, ?Model $actor = null): bool
-    {
-        return CoreCatalogWrites::deleteGroup($group, $actor ?? AdminAccess::actor());
     }
 }

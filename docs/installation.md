@@ -66,7 +66,6 @@ Shield is optional. Install [Filament Shield](https://github.com/bezhanSalleh/fi
 In `config/filament-shield.php`, merge this into `resources.manage`:
 
 ```php
-\LicenseKit\Filament\Resources\ProductGroups\ProductGroupResource::class => ['viewAny', 'view', 'create', 'update', 'delete'],
 \LicenseKit\Filament\Resources\Products\ProductResource::class => ['viewAny', 'view', 'create', 'update', 'resetHwid', 'inspectDevice', 'startOutage', 'addTime'],
 \LicenseKit\Filament\Resources\LicensePlans\LicensePlanResource::class => ['viewAny', 'view', 'create', 'update', 'createKeys'],
 \LicenseKit\Filament\Resources\LicenseKeys\LicenseKeyResource::class => ['viewAny', 'view', 'claim', 'revoke', 'updateNote'],
@@ -92,7 +91,6 @@ Replace `admin` with your panel id. Register the generated policies in `boot()` 
 use Illuminate\Support\Facades\Gate;
 
 foreach ([
-    \LicenseKit\Core\Models\ProductGroup::class => \App\Policies\ProductGroupPolicy::class,
     \LicenseKit\Core\Models\Product::class => \App\Policies\ProductPolicy::class,
     \LicenseKit\Core\Models\LicensePlan::class => \App\Policies\LicensePlanPolicy::class,
     \LicenseKit\Core\Models\LicenseKey::class => \App\Policies\LicenseKeyPolicy::class,
