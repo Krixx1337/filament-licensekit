@@ -9,8 +9,10 @@ enum ErrorCode: string
     case Cancelled = 'cancelled';
     case CannotExtendLicense = 'cannot_extend_license';
     case CannotPauseLicense = 'cannot_pause_license';
+    case CannotRestoreLicense = 'cannot_restore_license';
     case CannotResumeLicense = 'cannot_resume_license';
     case CannotSuspendLicense = 'cannot_suspend_license';
+    case CannotUnsuspendLicense = 'cannot_unsuspend_license';
     case CustomerResetDisabled = 'customer_reset_disabled';
     case DeviceBanned = 'device_banned';
     case DeviceMismatch = 'device_mismatch';
@@ -48,7 +50,7 @@ enum ErrorCode: string
     {
         return match ($this) {
             self::AlreadyLifetime, self::BatchConflict, self::CannotExtendLicense, self::CannotPauseLicense, self::CannotResumeLicense,
-            self::CannotSuspendLicense, self::DeviceNotBound, self::KeyAlreadyUsed,
+            self::CannotSuspendLicense, self::CannotUnsuspendLicense, self::CannotRestoreLicense, self::DeviceNotBound, self::KeyAlreadyUsed,
             self::KeyRevocationForbidden, self::PlanProductIsImmutable => 409,
             self::InvalidCredentials, self::InvalidToken => 401,
             self::KeyGenerationFailed, self::LicensingUnavailable, self::SigningUnavailable => 503,

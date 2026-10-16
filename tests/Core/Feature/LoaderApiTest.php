@@ -164,3 +164,19 @@ test('product bans stay scoped and global bans cover other products', function (
     $this->postJson(route('licensekit.client.login', $second->product->slug), loaderPayload(['login' => $user->email, 'password' => 'password', 'device' => 'pc']))
         ->assertForbidden()->assertJsonPath('error', 'device_banned');
 });
+
+test('logging in clears that customer\'s expired loader sessions', function () {
+    $user = User::factory()->create();
+    $other = User::factory()->create();
+    $license = License::factory()->create(['user_id' => $user->id]);
+    License::factory()->create(['user_id' => $other->id, 'product_id' => $license->product_id]);
+    loaderLogin($user, $license->product);
+    loaderLogin($other, $license->product);
+
+    $this->travel(16)->minutes();
+    $fresh = loaderLogin($user, $license->product);
+
+    expect(LoaderSession::where('user_id', $user->id)->count())->toBe(1)
+        ->and(LoaderSession::where('user_id', $user->id)->sole()->getRawOriginal('token_hash'))->toBe(hash('sha256', $fresh['token']))
+        ->and(LoaderSession::where('user_id', $other->id)->count())->toBe(1);
+});

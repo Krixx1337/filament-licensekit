@@ -117,6 +117,7 @@ class ManageLicenses
 
         DB::transaction(function () use ($license, $ability, $actor, $reason, $seconds, $until): void {
             $license = License::whereKey($license->id)->lockForUpdate()->first() ?? throw new LicensingException('no_license');
+            $license->liftExpiredSuspension();
             if ($license->user_id === null || $license->is_lifetime || $license->isRevoked()
                 || $license->isSuspended()) {
                 throw new LicensingException('cannot_'.$ability.'_license', 409);
@@ -152,7 +153,7 @@ class ManageLicenses
 
     public function unsuspend(License $license, Model $actor, ?string $reason = null): void
     {
-        $this->changeStatus($license, $actor, $reason);
+        $this->changeStatus($license, $actor, $reason, lifting: License::SUSPENDED);
     }
 
     /** Cancels paid access, for example after a refund. Another key cannot renew a cancelled license. */
@@ -163,7 +164,7 @@ class ManageLicenses
 
     public function restore(License $license, Model $actor, ?string $reason = null): void
     {
-        $this->changeStatus($license, $actor, $reason);
+        $this->changeStatus($license, $actor, $reason, lifting: License::REVOKED);
     }
 
     /** Suspends a customer for a product, creating their license record if they have none yet. */
@@ -178,16 +179,20 @@ class ManageLicenses
         }, 3);
     }
 
-    private function changeStatus(License $license, Model $actor, ?string $reason, ?string $status = null, ?CarbonImmutable $until = null): void
+    /** @param 'suspended'|'revoked'|null $lifting the status that unsuspend or restore must find */
+    private function changeStatus(License $license, Model $actor, ?string $reason, ?string $status = null, ?CarbonImmutable $until = null, ?string $lifting = null): void
     {
         $reason = $this->optionalReason($reason);
         if ($until !== null && ! $until->isFuture()) {
             throw new LicensingException('invalid_suspension_end', 422);
         }
-        DB::transaction(function () use ($license, $actor, $reason, $status, $until): void {
+        DB::transaction(function () use ($license, $actor, $reason, $status, $until, $lifting): void {
             $license = License::whereKey($license->id)->lockForUpdate()->first() ?? throw new LicensingException('no_license');
             if ($status === License::SUSPENDED && $license->isRevoked()) {
                 throw new LicensingException('cannot_suspend_license', 409);
+            }
+            if ($lifting !== null && $license->status !== $lifting) {
+                throw new LicensingException($lifting === License::SUSPENDED ? 'cannot_unsuspend_license' : 'cannot_restore_license');
             }
             $before = $license->only(['status', 'suspended_until']);
             $license->update([

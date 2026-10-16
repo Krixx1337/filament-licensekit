@@ -77,3 +77,26 @@ test('configured user selector limits results and resolves selected users outsid
     expect($select->getSearchResults('selected'))->toBe([$last->getKey() => 'selected-player']);
     expect($select->getOptionLabel())->toBe('selected-player');
 });
+
+test('bulk suspend keeps an existing timed suspension unchanged', function () {
+    adminUser();
+    $until = now()->addDay()->startOfSecond();
+    $timed = License::factory()->create(['user_id' => User::factory()->create()->id, 'status' => License::SUSPENDED, 'suspended_until' => $until]);
+    $running = License::factory()->create(['user_id' => User::factory()->create()->id]);
+
+    Livewire::test(ManageLicenses::class)->callTableBulkAction('suspend', [$timed, $running])->assertHasNoTableBulkActionErrors();
+
+    expect($timed->fresh()->suspended_until->equalTo($until))->toBeTrue()
+        ->and($running->fresh()->status)->toBe(License::SUSPENDED)->and($running->fresh()->suspended_until)->toBeNull();
+});
+
+test('status filter treats a passed suspension as lifted', function () {
+    adminUser();
+    $lapsed = License::factory()->create(['user_id' => User::factory()->create()->id, 'status' => License::SUSPENDED,
+        'suspended_until' => now()->subMinute(), 'expires_at' => now()->addDays(5)]);
+    $suspended = License::factory()->create(['user_id' => User::factory()->create()->id, 'status' => License::SUSPENDED]);
+
+    Livewire::test(ManageLicenses::class)->filterTable('status', 'suspended')
+        ->assertCanSeeTableRecords([$suspended])->assertCanNotSeeTableRecords([$lapsed])
+        ->filterTable('status', 'active')->assertCanSeeTableRecords([$lapsed])->assertCanNotSeeTableRecords([$suspended]);
+});

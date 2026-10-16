@@ -21,6 +21,8 @@ return [
     'cannot_extend_license' => 'This license cannot receive more time in its current state.',
     'cannot_pause_license' => 'Only a running subscription can be paused.',
     'cannot_suspend_license' => 'This license is cancelled. Restore it before changing its status.',
+    'cannot_unsuspend_license' => 'This license is not suspended.',
+    'cannot_restore_license' => 'Only a cancelled license can be restored.',
     'cannot_resume_license' => 'This license has no paused time to resume.',
     'customer_reset_disabled' => 'Contact support to move your license to a new PC.',
     'device_not_bound' => 'This license has no device to reset. Sign in to your app first.',

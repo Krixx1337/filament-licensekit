@@ -4,6 +4,7 @@ namespace LicenseKit\Core\Models;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -74,6 +75,42 @@ class License extends Model
     public function isRevoked(): bool
     {
         return $this->status === self::REVOKED;
+    }
+
+    /** Saves the resting status once a timed suspension has passed, so the stored status matches isSuspended(). */
+    public function liftExpiredSuspension(): void
+    {
+        if ($this->status === self::SUSPENDED && ! $this->isSuspended()) {
+            $this->update(['status' => $this->restingStatus(), 'suspended_until' => null]);
+        }
+    }
+
+    /**
+     * Filters by the status shown in the admin, treating a passed suspension as lifted.
+     *
+     * @param  Builder<self>  $query
+     */
+    public function scopeEffectiveStatus(Builder $query, string $status): void
+    {
+        $now = now()->utc()->format('Y-m-d H:i:s');
+        $suspended = fn ($q) => $q->where('status', self::SUSPENDED)->where(fn ($q) => $q->whereNull('suspended_until')->orWhere('suspended_until', '>', $now));
+        if ($status === self::SUSPENDED) {
+            $query->where($suspended);
+
+            return;
+        }
+        if ($status === self::REVOKED) {
+            $query->where('status', self::REVOKED);
+
+            return;
+        }
+        $query->where('status', '!=', self::REVOKED)->whereNot($suspended);
+        match ($status) {
+            self::PAUSED => $query->whereNotNull('paused_at'),
+            self::ACTIVE => $query->whereNull('paused_at')->where(fn ($q) => $q->where('is_lifetime', true)->orWhere('expires_at', '>', $now)),
+            'expired' => $query->whereNull('paused_at')->where('is_lifetime', false)->where('expires_at', '<=', $now),
+            default => null,
+        };
     }
 
     /** The status to return to when a suspension or cancellation is lifted. */

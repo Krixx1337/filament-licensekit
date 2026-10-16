@@ -75,14 +75,7 @@ class LicenseResource extends LicensingResource
             TextColumn::make('device_bound_at')->label('Linked at')->dateTime()->placeholder('Not linked')->toggleable(isToggledHiddenByDefault: true)])->filters([
                 SelectFilter::make('product_id')->label('Product')->relationship('product', 'name'),
                 SelectFilter::make('status')->options(['active' => 'Active', 'expired' => 'Expired', 'paused' => 'Paused', 'suspended' => 'Suspended', 'revoked' => 'Cancelled'])
-                    ->query(function ($query, array $data) {
-                        return match ($data['value'] ?? '') {
-                            'active' => $query->where('status', 'active')->where(fn ($q) => $q->where('is_lifetime', true)->orWhere('expires_at', '>', now())),
-                            'expired' => $query->where('status', 'active')->where('is_lifetime', false)->where('expires_at', '<=', now()),
-                            'paused', 'suspended', 'revoked' => $query->where('status', $data['value']),
-                            default => $query,
-                        };
-                    }),
+                    ->query(fn ($query, array $data) => filled($data['value'] ?? null) ? $query->effectiveStatus($data['value']) : $query),
             ])->toolbarActions([
                 BulkAction::make('add_time')->label('Add time')->authorize(fn () => AdminAccess::isSupport())
                     ->schema([TextInput::make('days')->integer()->minValue(1)->maxValue(3650)->required()])
@@ -97,7 +90,7 @@ class LicenseResource extends LicensingResource
                 BulkAction::make('suspend')->label('Suspend')->authorize(fn () => AdminAccess::isSupport())->requiresConfirmation()
                     ->action(function ($records): void {
                         foreach ($records as $record) {
-                            if (static::canView($record) && LicensingActions::mayChange($record, true) && ! $record->isRevoked()) {
+                            if (static::canView($record) && LicensingActions::mayChange($record, true) && ! $record->isRevoked() && ! $record->isSuspended()) {
                                 app(\LicenseKit\Core\Actions\ManageLicenses::class)->suspend($record, AdminAccess::actor());
                             }
                         }

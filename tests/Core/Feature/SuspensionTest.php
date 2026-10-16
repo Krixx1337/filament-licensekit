@@ -141,3 +141,37 @@ test('suspension cannot undo a cancellation', function () {
     expect(fn () => app(ManageLicenses::class)->suspend($license, $user))->toThrow(LicensingException::class, 'cannot suspend license');
     expect($license->fresh()->status)->toBe('revoked');
 });
+
+test('unsuspend never restores a cancelled license and restore never lifts a suspension', function () {
+    $actor = suspensionAdministrator();
+    $license = License::factory()->create(['user_id' => User::factory()->create()->id]);
+    $tools = app(ManageLicenses::class);
+
+    $tools->revoke($license, $actor);
+    expect(fn () => $tools->unsuspend($license, $actor))->toThrow(LicensingException::class, 'cannot unsuspend license');
+    expect($license->fresh()->status)->toBe(License::REVOKED);
+
+    $tools->restore($license, $actor);
+    $tools->suspend($license, $actor);
+    expect(fn () => $tools->restore($license, $actor))->toThrow(LicensingException::class, 'cannot restore license');
+    expect($license->fresh()->status)->toBe(License::SUSPENDED);
+    expect(fn () => $tools->unsuspend($license->fresh(), $actor))->not->toThrow(LicensingException::class);
+    expect(fn () => $tools->unsuspend($license->fresh(), $actor))->toThrow(LicensingException::class, 'cannot unsuspend license');
+});
+
+test('a passed suspension no longer blocks staff clock actions or status filters', function () {
+    $this->freezeTime();
+    $actor = suspensionAdministrator();
+    $license = License::factory()->create(['user_id' => User::factory()->create()->id, 'expires_at' => now()->addDays(10)]);
+    app(ManageLicenses::class)->suspend($license, $actor, until: CarbonImmutable::now()->addHour());
+
+    expect(License::effectiveStatus(License::SUSPENDED)->pluck('id')->all())->toBe([$license->id]);
+    $this->travel(2)->hours();
+    expect(License::effectiveStatus(License::SUSPENDED)->count())->toBe(0)
+        ->and(License::effectiveStatus(License::ACTIVE)->pluck('id')->all())->toBe([$license->id]);
+
+    app(ManageLicenses::class)->pause($license, $actor);
+
+    expect($license->fresh())->status->toBe(License::PAUSED)->suspended_until->toBeNull();
+    expect(License::effectiveStatus(License::PAUSED)->pluck('id')->all())->toBe([$license->id]);
+});

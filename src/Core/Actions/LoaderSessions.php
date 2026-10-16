@@ -54,6 +54,8 @@ class LoaderSessions
                 $this->assertDevice($product, $license, $device);
             }
             $result = $this->accessResult($user, $product, $device);
+            // Expired sessions are cleared here, so the table stays small without a scheduler.
+            LoaderSession::where('user_id', $user->getKey())->where('product_id', $product->id)->where('expires_at', '<=', now())->delete();
             $token = bin2hex(random_bytes(32));
             $session = LoaderSession::create(['token_hash' => hash('sha256', $token), 'user_id' => $user->getKey(),
                 'product_id' => $product->id, 'device' => $device, 'user_fingerprint' => $fingerprint,
@@ -121,9 +123,7 @@ class LoaderSessions
     {
         $license = License::where('user_id', $user->getKey())->where('product_id', $product->id)->lockForUpdate()->first();
         if ($license !== null) {
-            if ($license->status === License::SUSPENDED && ! $license->isSuspended()) {
-                $license->update(['status' => $license->restingStatus(), 'suspended_until' => null]);
-            }
+            $license->liftExpiredSuspension();
             $this->clock->resumeWhenDue($license);
         }
 
