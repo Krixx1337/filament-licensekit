@@ -100,14 +100,6 @@ try {
     }
     $customer = CompatibilityUser::create(['email' => 'customer@example.test', 'password' => 'unused']);
     app(\LicenseKit\Core\Actions\ClaimLicense::class)->claim($customer, $first->serials[0]);
-    config(['licensekit.imports.enabled' => true]);
-    $importer = app(\LicenseKit\Core\Actions\ImportLicensing::class);
-    $source = new \LicenseKit\Core\Data\ImportSource('example', 'key:1', 'migration');
-    $snapshot = new \LicenseKit\Core\Data\KeySnapshot('AAAAA-BBBBB-CCCCC-DDDDD-EEEEE', $plan->id, 30);
-    $import = $importer->key($source, $snapshot);
-    if ($importer->key($source, $snapshot)->targetId !== $import->targetId) {
-        throw new RuntimeException('Historical import retry failed.');
-    }
 
     echo 'Runtime smoke passed on Laravel '.$app->version().' / PHP '.PHP_VERSION.".\n";
 } catch (Throwable $exception) {

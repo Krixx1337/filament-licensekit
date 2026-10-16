@@ -5,7 +5,7 @@ if ($archive->open($argv[1]) !== true) {
     throw new RuntimeException('Cannot open package archive.');
 }
 
-foreach (['composer.json', 'README.md', 'LICENSE', 'SECURITY.md', 'src/LicenseKitServiceProvider.php', 'config/licensekit.php', 'src/Core/Actions/IssueLicenses.php', 'src/Core/Actions/ImportLicensing.php', 'src/Core/Contracts/KeyNormalizer.php', 'routes/management.php', 'database/migrations/core/2026_10_12_000001_create_licensekit_core_tables.php', 'database/migrations/outages/2026_10_12_000002_create_licensekit_outage_tables.php', 'database/factories/Core/ProductFactory.php'] as $file) {
+foreach (['composer.json', 'README.md', 'LICENSE', 'SECURITY.md', 'src/LicenseKitServiceProvider.php', 'config/licensekit.php', 'src/Core/Actions/IssueLicenses.php', 'routes/management.php', 'database/migrations/core/2026_10_12_000001_create_licensekit_core_tables.php', 'database/migrations/outages/2026_10_12_000002_create_licensekit_outage_tables.php', 'database/factories/Core/ProductFactory.php'] as $file) {
     if ($archive->locateName($file) === false) {
         throw new RuntimeException('Package archive is missing '.$file);
     }

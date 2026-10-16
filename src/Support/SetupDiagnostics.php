@@ -6,7 +6,6 @@ use Filament\Panel;
 use Illuminate\Auth\AuthManager;
 use InvalidArgumentException;
 use LicenseKit\Core\Contracts\HwidHandler;
-use LicenseKit\Core\Contracts\KeyNormalizer;
 use LicenseKit\Core\Exceptions\LicensingException;
 use LicenseKit\Core\Users\ConfiguredUserModel;
 
@@ -33,13 +32,6 @@ final class SetupDiagnostics
             if (! is_bool(config('licensekit.modules.'.$module))) {
                 $errors[] = 'licensekit.modules.'.$module.' must be true or false.';
             }
-        }
-        $normalizer = config('licensekit.key_normalizer');
-        if (! is_string($normalizer) || ! is_a($normalizer, KeyNormalizer::class, true)) {
-            $errors[] = 'licensekit.key_normalizer must implement KeyNormalizer.';
-        }
-        if (! is_bool(config('licensekit.imports.enabled'))) {
-            $errors[] = 'licensekit.imports.enabled must be true or false.';
         }
         $handler = config('licensekit.hwid_handler');
         if (! is_string($handler) || ! is_a($handler, HwidHandler::class, true)) {

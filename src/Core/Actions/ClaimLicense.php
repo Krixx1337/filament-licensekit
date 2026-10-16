@@ -18,7 +18,7 @@ use LicenseKit\Support\OutageState;
 
 class ClaimLicense
 {
-    public function __construct(private CanonicalKeys $serial, private EntitlementClock $clock, private UserAccess $users, private Audit $audit, private LicensingBans $bans, private OutageState $outages, private AccessRestrictions $restrictions) {}
+    public function __construct(private SerialKey $serial, private EntitlementClock $clock, private UserAccess $users, private Audit $audit, private LicensingBans $bans, private OutageState $outages, private AccessRestrictions $restrictions) {}
 
     public function claimFor(Model $actor, Model $user, LicenseKey $key): Entitlement
     {

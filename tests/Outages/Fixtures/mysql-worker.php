@@ -8,15 +8,12 @@ use LicenseKit\Core\Actions\Audit;
 use LicenseKit\Core\Actions\ClaimLicense;
 use LicenseKit\Core\Actions\CreateBatch;
 use LicenseKit\Core\Actions\DeviceBindings;
-use LicenseKit\Core\Actions\ImportLicensing;
 use LicenseKit\Core\Actions\IssueLicenses;
 use LicenseKit\Core\Actions\LicensedDevices;
 use LicenseKit\Core\Actions\ManageApiClients;
 use LicenseKit\Core\Actions\ManageEntitlements;
 use LicenseKit\Core\Actions\ManageLicensingBans;
 use LicenseKit\Core\Actions\ManagementOperations;
-use LicenseKit\Core\Data\ImportSource;
-use LicenseKit\Core\Data\KeySnapshot;
 use LicenseKit\Core\Exceptions\LicensingException;
 use LicenseKit\Core\Models\ApiClient;
 use LicenseKit\Core\Models\Batch;
@@ -80,13 +77,6 @@ $run = fn () => match ($operation) {
         $result = app(IssueLicenses::class)->issue('store', $payload['plan_id'], 2, 'purchase', discloseSerials: true);
 
         return ['batch_id' => $result->batchId, 'key_ids' => $result->keyIds, 'serials' => $result->serials, 'replayed' => $result->replayed];
-    })(),
-    'import-key' => (function () use ($payload): int {
-        config(['licensekit.imports.enabled' => true]);
-
-        return app(ImportLicensing::class)->key(
-            new ImportSource('old', 'key:1', 'migration'),
-            new KeySnapshot('AAAAA-BBBBB-CCCCC-DDDDD-EEEEE', $payload['plan_id'], 30))->targetId;
     })(),
     'management-issue' => app(ManagementOperations::class)->create($payload['token'], $payload['plan_id'], 2, 'issue')->id,
     'management-retire' => (function () use ($payload): int {

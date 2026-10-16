@@ -16,7 +16,7 @@ use LicenseKit\Core\Users\UserAccess;
 
 class CreateBatch
 {
-    public function __construct(private SerialKey $serial, private Audit $audit, private CanonicalKeys $canonical, private ReadinessCheck $readiness) {}
+    public function __construct(private SerialKey $serial, private Audit $audit, private ReadinessCheck $readiness) {}
 
     /** @internal Use createFor for admin calls or ManagementOperations for machine calls. */
     public function create(LicensePlan $plan, int $quantity, string $reference, string $issuer, ?string $label = null, ?int $apiClientId = null, ?Model $creator = null, ?Model $reseller = null): Batch
@@ -95,9 +95,6 @@ class CreateBatch
                 $unique = [];
                 foreach ($chunk as $unused) {
                     $value = $this->serial->generate();
-                    if ($this->canonical->normalize($value) !== $value) {
-                        throw new LicensingException('invalid_key_normalizer', 503);
-                    }
                     $unique[$value] = true;
                     $rows[] = ['license_plan_id' => $plan->id, 'key' => $value, 'duration_days' => $plan->duration_days, 'batch_id' => $batchId, 'created_at' => now(), 'updated_at' => now()];
                 }

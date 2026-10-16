@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Simplification (breaking):** removed historical imports (`ImportLicensing`, snapshot DTOs, `licensekit_import_records`, `imports.*` config) and replaceable key normalization (`KeyNormalizer`, `CanonicalKeys`, `key_normalizer` config). `SerialKey::normalize()` is the single key parser again, and the key column is back to the standard 29-character format. Initial migration changed; rebuild disposable databases.
+
 - Reseller-owned batch access across clients and host PHP through `ResellerInventory`, with licensing counts and paginated key status reads. Existing key-list responses now use resource pagination, default 25 keys per page. Sales and delivery remain host-owned.
 
 - Optional registered-user ownership of API clients, immutable batch attribution across API/admin/local issuance, and client/reseller administration filters.

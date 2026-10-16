@@ -1,12 +1,9 @@
 <?php
 
 use LicenseKit\Core\Actions\DefaultHwidHandler;
-use LicenseKit\Core\Actions\StandardKeyNormalizer;
 
 return [
-    'key_normalizer' => StandardKeyNormalizer::class,
     'local_integrations' => [],
-    'imports' => ['enabled' => false, 'fingerprint_key' => null],
     'features' => ['licensing_bans' => true],
     'modules' => ['outages' => false],
     'device_binding' => ['scope' => 'per_product', 'storage' => 'plain', 'customer_reset' => ['enabled' => true, 'cooldown_days' => 7, 'require_reason' => false]],
