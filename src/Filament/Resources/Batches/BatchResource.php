@@ -27,7 +27,6 @@ class BatchResource extends LicensingResource
             TextColumn::make('plan.name')->label('Plan')->searchable()->toggleable(),
             TextColumn::make('creator.'.config('licensekit.user.display_column'))->label('Created by')->searchable()->toggleable(),
             TextColumn::make('apiClient.name')->label('API client')->searchable()->toggleable(),
-            TextColumn::make('reseller.'.config('licensekit.user.display_column'))->label('Reseller')->searchable()->toggleable(),
             TextColumn::make('issuer')->searchable()->toggleable(isToggledHiddenByDefault: true),
             TextColumn::make('reference')->searchable()->toggleable(isToggledHiddenByDefault: true),
             TextColumn::make('quantity')->label('Original quantity')->toggleable(isToggledHiddenByDefault: true),
@@ -37,7 +36,6 @@ class BatchResource extends LicensingResource
             TextColumn::make('created_at')->dateTime()->toggleable(isToggledHiddenByDefault: true),
         ])->filters([
             SelectFilter::make('api_client_id')->label('API client')->relationship('apiClient', 'name')->searchable(),
-            SelectFilter::make('reseller_user_id')->label('Reseller')->relationship('reseller', config('licensekit.user.display_column'))->searchable(),
         ])->recordActions([
             Action::make('keys')->label('View keys')->visible(fn (): bool => LicenseKeyResource::canViewAny())
                 ->url(fn (Batch $record): string => LicenseKeyResource::getUrl('index', ['filters' => ['batch_id' => ['value' => $record->id]]])),
@@ -48,7 +46,7 @@ class BatchResource extends LicensingResource
     /** @return Builder<Batch> */
     public static function getEloquentQuery(): Builder
     {
-        return Batch::query()->with(['plan', 'creator', 'apiClient', 'reseller'])->withCount([
+        return Batch::query()->with(['plan', 'creator', 'apiClient'])->withCount([
             'keys as claimed_count' => fn (Builder $query) => $query->whereNotNull('claimed_at'),
             'keys as unclaimed_count' => fn (Builder $query) => $query->whereNull('claimed_at')->whereNull('revoked_at'),
             'keys as revoked_count' => fn (Builder $query) => $query->whereNotNull('revoked_at'),

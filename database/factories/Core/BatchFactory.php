@@ -17,6 +17,6 @@ class BatchFactory extends Factory
         return ['issuer' => 'admin:1', 'reference' => fake()->uuid(), 'license_plan_id' => LicensePlan::factory(),
             'quantity' => 1,
             'duration_days' => fn (array $attributes): ?int => LicensePlan::whereKey($attributes['license_plan_id'])->firstOrFail()->duration_days,
-            'label' => null, 'api_client_id' => null, 'created_by_user_id' => null, 'reseller_user_id' => null];
+            'label' => null, 'api_client_id' => null, 'created_by_user_id' => null];
     }
 }

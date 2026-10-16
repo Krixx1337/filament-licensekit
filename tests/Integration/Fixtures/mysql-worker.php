@@ -73,16 +73,6 @@ $run = fn () => match ($operation) {
         return ['batch_id' => $result->batchId, 'key_ids' => $result->keyIds, 'serials' => $result->serials, 'replayed' => $result->replayed];
     })(),
     'management-issue' => app(ManagementOperations::class)->create($payload['token'], $payload['plan_id'], 2, 'issue')->id,
-    'management-retire' => (function () use ($payload): int {
-        app(ManageApiClients::class)->retire(ApiClient::findOrFail($payload['client_id']), User::findOrFail($payload['actor_id']), 'Partnership ended');
-
-        return $payload['client_id'];
-    })(),
-    'reseller-suspend' => (function () use ($payload): int {
-        User::whereKey($payload['user_id'])->update(['is_suspended' => true]);
-
-        return $payload['user_id'];
-    })(),
     'management-revoke' => (function () use ($payload): int {
         app(ManageApiClients::class)->revoke(ApiClient::findOrFail($payload['client_id']), User::findOrFail($payload['actor_id']));
 

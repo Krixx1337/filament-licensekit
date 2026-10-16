@@ -27,22 +27,18 @@ return new class extends Migration
         });
         Schema::create('licensekit_api_clients', function (Blueprint $table): void {
             $table->id();
-            $table->foreignIdFor(ConfiguredUserModel::className(), 'owner_user_id')->nullable()->constrained()->restrictOnDelete();
-            $table->dateTime('retired_at')->nullable();
             $table->string('name');
             $table->boolean('is_enabled')->default(true);
             $table->boolean('all_products')->default(false);
             $table->json('allowed_product_ids');
             $table->json('permissions');
             $table->unsignedInteger('maximum_quantity')->default(100);
-            $table->index(['owner_user_id', 'id']);
             $table->timestamps();
         });
         Schema::create('licensekit_batches', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('api_client_id')->nullable()->constrained('licensekit_api_clients')->nullOnDelete();
             $table->foreignIdFor(ConfiguredUserModel::className(), 'created_by_user_id')->nullable()->constrained()->nullOnDelete();
-            $table->foreignIdFor(ConfiguredUserModel::className(), 'reseller_user_id')->nullable()->constrained()->nullOnDelete();
             $table->string('issuer');
             $table->string('reference', 128);
             $table->foreignId('license_plan_id')->constrained('licensekit_license_plans')->restrictOnDelete();
@@ -52,7 +48,6 @@ return new class extends Migration
             $table->timestamps();
             $table->unique(['issuer', 'reference']);
             $table->index(['api_client_id', 'id']);
-            $table->index(['reseller_user_id', 'id']);
         });
         Schema::create('licensekit_entitlements', function (Blueprint $table): void {
             $table->id();

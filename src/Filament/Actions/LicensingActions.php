@@ -83,11 +83,9 @@ class LicensingActions
             TextInput::make('quantity')->integer()->minValue(1)->maxValue(config('licensekit.maximum_batch_size'))->default(1)->required(),
             TextInput::make('reference')->default(fn (): string => (string) Str::uuid())->maxLength(128)->required(),
             TextInput::make('label')->label('Batch label')->maxLength(255),
-            self::userSelect('reseller_user_id')->label('Reseller')->required(false)->helperText('Optional recipient of these keys. Does not claim them.'),
             Toggle::make('download')->label('Download keys')->default(true),
         ])->action(function (LicensePlan $record, array $data): ?StreamedResponse {
-            $reseller = isset($data['reseller_user_id']) ? ConfiguredUserModel::className()::findOrFail($data['reseller_user_id']) : null;
-            $batch = app(CreateBatch::class)->createFor(self::actor(), $record, (int) $data['quantity'], $data['reference'], label: $data['label'] ?? null, reseller: $reseller);
+            $batch = app(CreateBatch::class)->createFor(self::actor(), $record, (int) $data['quantity'], $data['reference'], label: $data['label'] ?? null);
             if (! ($data['download'] ?? true)) {
                 Notification::make()->title('Batch #'.$batch->id.' created')->success()->send();
 

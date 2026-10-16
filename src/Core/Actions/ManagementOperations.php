@@ -17,7 +17,7 @@ class ManagementOperations
             $plan = $this->plan($context, $planId, $quantity);
 
             return $this->batches->create($plan, $quantity, $reference, $context->issuer(), label: $label,
-                apiClientId: $context->client->id, reseller: $context->client->owner);
+                apiClientId: $context->client->id);
         });
     }
 

@@ -99,12 +99,7 @@ class ManagementQueries
     {
         $query = Batch::query()->whereIn('license_plan_id', $this->plansFor($context)->select('id'));
         if (! $context->allows('batches:read-all')) {
-            $query->where(function (Builder $visible) use ($context): void {
-                $visible->where('issuer', $context->issuer());
-                if ($context->client->owner_user_id !== null) {
-                    $visible->orWhere('reseller_user_id', $context->client->owner_user_id);
-                }
-            });
+            $query->where('issuer', $context->issuer());
         }
 
         return $this->inventory->counts($query);

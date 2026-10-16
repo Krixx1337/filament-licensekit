@@ -22,20 +22,19 @@ use LicenseKit\Database\Factories\Core\BatchFactory;
  * @property string|null $label
  * @property int|null $api_client_id
  * @property int|string|null $created_by_user_id
- * @property int|string|null $reseller_user_id
  * @property LicensePlan $plan
  * @property Collection<int, LicenseKey> $keys
  */
 class Batch extends Model
 {
-    protected $fillable = ['issuer', 'reference', 'license_plan_id', 'quantity', 'duration_days', 'label', 'api_client_id', 'created_by_user_id', 'reseller_user_id'];
+    protected $fillable = ['issuer', 'reference', 'license_plan_id', 'quantity', 'duration_days', 'label', 'api_client_id', 'created_by_user_id'];
 
     protected $table = 'licensekit_batches';
 
     protected static function booted(): void
     {
         static::updating(function (Batch $batch): void {
-            if ($batch->isDirty(['api_client_id', 'created_by_user_id', 'reseller_user_id'])) {
+            if ($batch->isDirty(['api_client_id', 'created_by_user_id'])) {
                 throw new LicensingException('batch_attribution_immutable', 409);
             }
         });
@@ -65,12 +64,6 @@ class Batch extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(ConfiguredUserModel::className(), 'created_by_user_id');
-    }
-
-    /** @return BelongsTo<Model&Authenticatable, $this> */
-    public function reseller(): BelongsTo
-    {
-        return $this->belongsTo(ConfiguredUserModel::className(), 'reseller_user_id');
     }
 
     /** @return HasMany<LicenseKey, $this> */

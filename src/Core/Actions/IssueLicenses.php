@@ -2,19 +2,17 @@
 
 namespace LicenseKit\Core\Actions;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use LicenseKit\Core\Data\IssuanceResult;
 use LicenseKit\Core\Exceptions\LicensingException;
 use LicenseKit\Core\Models\LicensePlan;
 use LicenseKit\Core\Models\Product;
-use LicenseKit\Core\Users\ConfiguredUserModel;
 
 class IssueLicenses
 {
     public function __construct(private CreateBatch $batches) {}
 
-    public function issue(string $integration, int $planId, int $quantity, string $reference, ?string $label = null, bool $discloseSerials = false, ?Model $reseller = null): IssuanceResult
+    public function issue(string $integration, int $planId, int $quantity, string $reference, ?string $label = null, bool $discloseSerials = false): IssuanceResult
     {
         $settings = config('licensekit.local_integrations');
         $settings = is_array($settings) ? ($settings[$integration] ?? null) : null;
@@ -26,11 +24,7 @@ class IssueLicenses
             throw new LicensingException('integration_forbidden');
         }
 
-        return DB::transaction(function () use ($integration, $planId, $quantity, $reference, $label, $discloseSerials, $settings, $reseller): IssuanceResult {
-            $userModel = ConfiguredUserModel::className();
-            if ($reseller instanceof $userModel) {
-                $userModel::whereKey($reseller->getKey())->sharedLock()->first();
-            }
+        return DB::transaction(function () use ($integration, $planId, $quantity, $reference, $label, $discloseSerials, $settings): IssuanceResult {
             $plan = LicensePlan::find($planId) ?? throw new LicensingException('plan_unavailable');
             Product::whereKey($plan->product_id)->lockForUpdate()->firstOrFail();
             $allowed = $settings['allowed_product_ids'] ?? [];
@@ -38,7 +32,7 @@ class IssueLicenses
                 throw new LicensingException('integration_forbidden');
             }
             $issuer = 'local:'.$integration;
-            $batch = $this->batches->create($plan, $quantity, $reference, $issuer, $label, reseller: $reseller);
+            $batch = $this->batches->create($plan, $quantity, $reference, $issuer, $label);
 
             $ids = [];
             $serials = [];

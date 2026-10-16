@@ -11,15 +11,13 @@ use LicenseKit\Core\Models\Batch;
 use LicenseKit\Core\Models\LicenseKey;
 use LicenseKit\Core\Models\LicensePlan;
 use LicenseKit\Core\Models\Product;
-use LicenseKit\Core\Users\ConfiguredUserModel;
-use LicenseKit\Core\Users\UserAccess;
 
 class CreateBatch
 {
     public function __construct(private SerialKey $serial, private Audit $audit, private ReadinessCheck $readiness) {}
 
     /** @internal Use createFor for admin calls or ManagementOperations for machine calls. */
-    public function create(LicensePlan $plan, int $quantity, string $reference, string $issuer, ?string $label = null, ?int $apiClientId = null, ?Model $creator = null, ?Model $reseller = null): Batch
+    public function create(LicensePlan $plan, int $quantity, string $reference, string $issuer, ?string $label = null, ?int $apiClientId = null, ?Model $creator = null): Batch
     {
         $this->readiness->assertReady();
         if (trim($issuer) === '' || strlen($issuer) > 255) {
@@ -31,12 +29,7 @@ class CreateBatch
         }
         $label = $label === '' ? null : $label;
 
-        $operation = function () use ($plan, $quantity, $reference, $issuer, $label, $apiClientId, $creator, $reseller): Batch {
-            $userModel = ConfiguredUserModel::className();
-            $recipient = $reseller instanceof $userModel
-                && $reseller->getTable() === (new $userModel)->getTable()
-                && ($reseller->getConnectionName() ?? config('database.default')) === config('database.default')
-                ? $userModel::whereKey($reseller->getKey())->sharedLock()->first() : null;
+        $operation = function () use ($plan, $quantity, $reference, $issuer, $label, $apiClientId, $creator): Batch {
             if (trim($reference) === '' || strlen($reference) > 128) {
                 throw new LicensingException('invalid_reference', 422);
             }
@@ -50,17 +43,14 @@ class CreateBatch
 
                 return $batch->load(['keys' => fn ($query) => $query->orderBy('id')->lockForUpdate()]);
             }
-            if ($reseller !== null && ($recipient === null || ! app(UserAccess::class)->available($recipient))) {
-                throw new LicensingException('invalid_reseller', 422);
-            }
             $this->validatePlan($plan, $quantity);
             $batch = Batch::create(['issuer' => $issuer, 'reference' => $reference, 'license_plan_id' => $plan->id,
                 'quantity' => $quantity, 'duration_days' => $plan->duration_days, 'label' => $label,
-                'api_client_id' => $apiClientId, 'created_by_user_id' => $creator?->getKey(), 'reseller_user_id' => $recipient?->getKey()]);
+                'api_client_id' => $apiClientId, 'created_by_user_id' => $creator?->getKey()]);
             $this->generate($plan, $quantity, $batch->id);
             $this->audit->record($issuer, 'batch_created', $batch, [], ['quantity' => $quantity, 'plan_id' => $plan->id,
                 'duration_days' => $plan->duration_days, 'api_client_id' => $apiClientId,
-                'created_by_user_id' => $creator?->getKey(), 'reseller_user_id' => $recipient?->getKey()]);
+                'created_by_user_id' => $creator?->getKey()]);
 
             return $batch->load(['keys' => fn ($query) => $query->orderBy('id')->lockForUpdate()]);
         };
@@ -115,20 +105,17 @@ class CreateBatch
         }
     }
 
-    public function createFor(Model $actor, LicensePlan $plan, int $quantity, string $reference, ?string $label = null, ?Model $reseller = null): Batch
+    public function createFor(Model $actor, LicensePlan $plan, int $quantity, string $reference, ?string $label = null): Batch
     {
-        return DB::transaction(function () use ($actor, $plan, $quantity, $reference, $label, $reseller): Batch {
-            $userModel = ConfiguredUserModel::className();
-            $ids = [$actor->getKey(), ...($reseller instanceof $userModel ? [$reseller->getKey()] : [])];
-            $users = $actor->newQuery()->whereKey($ids)->orderBy($actor->getKeyName())->lockForUpdate()->get();
-            $actor = $users->first(fn (Model $user): bool => (string) $user->getKey() === (string) $actor->getKey()) ?? throw new LicensingException('batch_forbidden');
+        return DB::transaction(function () use ($actor, $plan, $quantity, $reference, $label): Batch {
+            $actor = $actor->newQuery()->whereKey($actor->getKey())->lockForUpdate()->first() ?? throw new LicensingException('batch_forbidden');
             Product::whereKey($plan->product_id)->lockForUpdate()->firstOrFail();
             $plan = LicensePlan::whereKey($plan->id)->lockForUpdate()->first() ?? throw new LicensingException('plan_unavailable');
             if (! app(AdminAuthorization::class)->allows($actor, 'createKeys', $plan)) {
                 throw new LicensingException('batch_forbidden');
             }
 
-            return $this->create($plan, $quantity, $reference, 'user:'.$actor->getKey(), $label, creator: $actor, reseller: $reseller);
+            return $this->create($plan, $quantity, $reference, 'user:'.$actor->getKey(), $label, creator: $actor);
         }, 3);
     }
 }

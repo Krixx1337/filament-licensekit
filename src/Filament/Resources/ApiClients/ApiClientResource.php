@@ -8,14 +8,12 @@ use Filament\Actions\Action;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
-use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -23,7 +21,6 @@ use Illuminate\Support\Facades\DB;
 use LicenseKit\Core\Actions\ManageApiClients;
 use LicenseKit\Core\Models\ApiClient;
 use LicenseKit\Core\Models\Product;
-use LicenseKit\Filament\Actions\LicensingActions;
 use LicenseKit\Filament\AdminAccess;
 use LicenseKit\Filament\Resources\ApiClients\Pages\ManageApiClients as ManageClientsPage;
 use LicenseKit\Filament\Resources\LicensingResource;
@@ -47,9 +44,6 @@ class ApiClientResource extends LicensingResource
     {
         return $schema->components([
             TextInput::make('name')->required()->maxLength(255),
-            LicensingActions::userSelect('owner_user_id')->label('Owner / reseller')->required(false)
-                ->disabled(fn (?ApiClient $record): bool => $record !== null)->dehydrated(fn (?ApiClient $record): bool => $record === null)
-                ->helperText('Optional. Ownership is permanent. Retire this client before deleting its owner.'),
             Toggle::make('is_enabled')->default(true),
             Toggle::make('all_products')->default(false)->live()->helperText('Includes every current and future product. Otherwise only selected products are authorized.'),
             Select::make('allowed_product_ids')->label('Products')->options(fn (): array => Product::pluck('name', 'id')->all())->multiple()->searchable()->default([])
@@ -64,14 +58,9 @@ class ApiClientResource extends LicensingResource
     public static function table(Table $table): Table
     {
         return $table->columns([TextColumn::make('name')->searchable()->toggleable(), IconColumn::make('is_enabled')->label('Enabled')->boolean()->toggleable(),
-            TextColumn::make('owner.'.config('licensekit.user.display_column'))->label('Owner')->searchable()->placeholder('No owner')->toggleable(),
-            TextColumn::make('retired_at')->label('Retired at')->dateTime()->placeholder('Not retired')->toggleable(),
-            IconColumn::make('all_products')->label('All products')->boolean()->toggleable(isToggledHiddenByDefault: true), TextColumn::make('maximum_quantity')->label('Max keys')->toggleable(isToggledHiddenByDefault: true)])->filters([
-                SelectFilter::make('owner_user_id')->label('Owner')->relationship('owner', config('licensekit.user.display_column'))->searchable(),
-            ])->recordActions([
+            IconColumn::make('all_products')->label('All products')->boolean()->toggleable(isToggledHiddenByDefault: true), TextColumn::make('maximum_quantity')->label('Max keys')->toggleable(isToggledHiddenByDefault: true)])->recordActions([
                 EditAction::make()->using(fn (ApiClient $record, array $data): ApiClient => self::save($record, $data)),
                 Action::make('rotate_token')->authorize(fn (ApiClient $record): bool => AdminAccess::can('rotateToken', $record, static::class))->label('Rotate management token')->requiresConfirmation()
-                    ->visible(fn (ApiClient $record): bool => $record->retired_at === null)
                     ->schema([DateTimePicker::make('expires_at')->label('Expiry (UTC)')->timezone('UTC')->default(fn (): string => now('UTC')->addYear()->format('Y-m-d H:i:s'))->required()])
                     ->action(fn (ApiClient $record, array $data): StreamedResponse => self::execute(function (Model $actor) use ($record, $data): StreamedResponse {
                         $token = app(ManageApiClients::class)->rotate($record, CarbonImmutable::parse($data['expires_at'], 'UTC'), $actor);
@@ -82,19 +71,13 @@ class ApiClientResource extends LicensingResource
                     })),
                 Action::make('revoke_tokens')->authorize(fn (ApiClient $record): bool => AdminAccess::can('revokeTokens', $record, static::class))->label('Revoke management tokens')->requiresConfirmation()
                     ->action(fn (ApiClient $record) => self::execute(fn (Model $actor) => app(ManageApiClients::class)->revoke($record, $actor))),
-                Action::make('retire')->label('Retire client')->requiresConfirmation()
-                    ->authorize(fn (ApiClient $record): bool => AdminAccess::can('retire', $record, static::class))
-                    ->visible(fn (ApiClient $record): bool => $record->retired_at === null)
-                    ->modalDescription('Permanently disables this client and revokes its tokens. Issued keys remain valid.')
-                    ->schema([Textarea::make('reason')->required()->maxLength(2000)])
-                    ->action(fn (ApiClient $record, array $data) => self::execute(fn (Model $actor) => app(ManageApiClients::class)->retire($record, $actor, $data['reason']))),
             ])->defaultSort('id', 'desc');
     }
 
     /** @return Builder<ApiClient> */
     public static function getEloquentQuery(): Builder
     {
-        return ApiClient::query()->with('owner');
+        return ApiClient::query();
     }
 
     /** @param array<string, mixed> $data */

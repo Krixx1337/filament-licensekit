@@ -42,19 +42,6 @@ beforeEach(function () {
     bootManagementApi();
 });
 
-test('owned management HTTP credentials reject ineligible owners before returning data or issuing keys', function (string $path, string $method) {
-    $owner = User::factory()->create();
-    [$client, $token] = managementCredential(['owner_user_id' => $owner->id]);
-    $plan = LicensePlan::factory()->create();
-    $batch = app(ManagementOperations::class)->create($token, $plan->id, 1, 'sale');
-    $owner->update(['is_suspended' => true]);
-    $path = str_replace('{batch}', (string) $batch->id, $path);
-    $this->withToken($token)->json($method, '/api/licensekit/v1/manage/'.$path,
-        ['plan_id' => $plan->id, 'quantity' => 1, 'reference' => 'sale'])
-        ->assertUnauthorized()->assertJsonPath('error', 'invalid_token');
-    $this->assertDatabaseCount('licensekit_batches', 1);
-})->with([['products', 'GET'], ['plans', 'GET'], ['batches', 'GET'], ['batches/{batch}', 'GET'], ['batches/{batch}/keys', 'GET'], ['batches', 'POST']]);
-
 test('management catalog reports product HWID requirement as boolean', function (bool $required) {
     [$client, $token] = managementCredential();
     Product::factory()->create(['requires_hwid' => $required]);
@@ -370,17 +357,16 @@ test('missing management storage returns sanitized no-store failure and log', fu
         ->assertHeader('Cache-Control', 'no-store, private');
 });
 
-test('read only reseller HTTP clients share owned stock with product isolation', function () {
+test('read only HTTP clients see their own batches within allowed products', function () {
     Gate::define('licensekit.manage', fn () => true);
-    $owner = User::factory()->create();
     $actor = User::factory()->create();
     $allowed = LicensePlan::factory()->create();
     $excluded = LicensePlan::factory()->create();
-    [$client, $token] = managementCredential(['owner_user_id' => $owner->id, 'permissions' => ['keys:read'],
+    [$client, $token] = managementCredential(['permissions' => ['keys:read'],
         'all_products' => false, 'allowed_product_ids' => [$allowed->product_id]]);
-    $staffBatch = app(CreateBatch::class)->createFor($actor, $allowed, 2, 'staff', reseller: $owner);
-    $outside = app(CreateBatch::class)->createFor($actor, $excluded, 1, 'outside', reseller: $owner);
-    $unrelated = app(CreateBatch::class)->createFor($actor, $allowed, 1, 'unrelated', reseller: $actor);
+    $staffBatch = app(CreateBatch::class)->create($allowed, 2, 'own', 'api:'.$client->id, apiClientId: $client->id);
+    $outside = app(CreateBatch::class)->createFor($actor, $excluded, 1, 'outside');
+    $unrelated = app(CreateBatch::class)->createFor($actor, $allowed, 1, 'unrelated');
     $ownOutside = app(CreateBatch::class)->create($excluded, 1, 'own-outside', 'api:'.$client->id);
     $staffBatch->keys[0]->update(['revoked_at' => now()]);
     $this->withToken($token)->getJson('/api/licensekit/v1/manage/batches')->assertOk()

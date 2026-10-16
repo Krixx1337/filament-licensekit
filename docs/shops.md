@@ -73,7 +73,7 @@ curl --fail-with-body --silent --show-error \
   "$LICENSEKIT_API_ROOT/products?search=your-product-slug"
 ```
 
-Plans are `$LICENSEKIT_API_ROOT/plans?product_id=1`. Listing products and plans needs no extra permission. Clients can read batches they issued and batches attributed to their owner, within their product scope. Other batches need `batches:read-all`.
+Plans are `$LICENSEKIT_API_ROOT/plans?product_id=1`. Listing products and plans needs no extra permission. Clients can read batches they issued, within their product scope. Other batches need `batches:read-all`.
 
 | Permission | What it allows |
 | --- | --- |
@@ -95,63 +95,19 @@ A shop webhook that already holds a management token uses `ManagementOperations:
 
 Keys do not start the clock until someone [claims](client.md#claim-a-key) them. LicenseKit does not check that Stripe or Shopify was actually paid. Your store does that, then calls this.
 
-## Registered resellers
+## Resellers
 
-Ask a reseller to register on your website, then select that account as the optional owner when creating their API client. Internal storefront integrations can remain ownerless. No reseller profile table or special user role is required.
+Give each reseller their own API client, for example "Reseller: Bob". The client is the reseller: its batches are recorded with its `api_client_id`, and the **Batches** page filters by client. Give a reseller only the products they sell and a sensible **Maximum keys per request**.
 
-Tokens still belong to the API client. The owner's availability is checked on every management operation, including reads and retries. Suspension, required-but-missing email verification, a missing account, or soft deletion blocks access with `invalid_token`, HTTP 401. Ownership gives no admin-panel access. Clients belonging to the same user share access to that reseller's attributed batches, subject to each client's product scope. Issuance reference namespaces remain separate per client. Retire attached clients before hard-deleting their owner. See [account ownership](installation.md#reseller-account-ownership).
+To hand a reseller keys without the API, use **Create keys** on a plan with a label such as "For Bob", then download the file. If a reseller disputes payment, use **Revoke unclaimed keys** on their batch.
 
-API batches record `api_client_id` and the owner's `reseller_user_id`. Admin batches record `created_by_user_id` and an optional reseller selected in **Create keys**. This attributes distribution; it does not claim keys for the reseller. The final buyer still claims the key on your website.
+`maximum_quantity` is a per-request cap. It is not a cumulative allowance or proof of payment: repeated authorized requests can issue more keys. Only give direct management issuance access to trusted resellers under your payment agreement. LicenseKit does not provide a wallet or prepaid quota.
 
-Trusted local issuance can also attribute a registered reseller:
+**Unclaimed keys may already have been sold.** Buyers can pay before activating. Review affected batches before using **Revoke unclaimed keys**.
 
-```php
-$result = app(IssueLicenses::class)->issue(
-    integration: 'store',
-    planId: $purchase->license_plan_id,
-    quantity: 10,
-    reference: 'purchase:'.$purchase->id,
-    reseller: $reseller,
-);
-```
+### Bot downloads
 
-Admin PHP issuance accepts the same optional argument:
-
-```php
-$batch = app(CreateBatch::class)->createFor(
-    $admin, $plan, 10, $orderId, reseller: $reseller,
-);
-```
-
-For new admin/local batches, the reseller must be an existing available configured host user or issuance throws `invalid_reseller`, HTTP 422. The host decides who qualifies as a reseller. No product entitlement is required. Resolve reseller identity through trusted host code rather than passing arbitrary customer-selected attribution.
-
-Attribution is fixed when a batch is created. Repeating the same issuer/reference returns the original batch and attribution even when a different reseller argument is supplied. Existing plan/quantity conflict checks and caller authorization still apply. `issuer` remains the stable retry namespace, including `api:{id}`, `user:{id}`, `local:{name}`, and historical import identities. Client renames and token rotation do not change it.
-
-The admin can filter batches by client or reseller. Deleted-user relationships become null; batch creation and client retirement audits retain original attribution IDs. Retirement never deletes batches or revokes their keys.
-
-`maximum_quantity` is a per-request cap. It is not a cumulative allowance or proof of payment: repeated authorized requests can issue more keys. Only give direct management issuance access to trusted resellers under your payment agreement. If each purchase must fund issuance, the host verifies payment or debits its own balance before calling `IssueLicenses`. LicenseKit does not provide a wallet or prepaid quota.
-
-**Unclaimed keys may already have been sold.** Buyers can pay before activating. Review affected batches before using **Revoke unclaimed keys**; suspending or retiring a reseller does not perform this action automatically.
-
-## Reseller pages and bot downloads
-
-For a reseller who buys keys through your website, verify payment in host code and issue a batch with `reseller: $reseller`. Their panel or bot can then read that batch regardless of whether staff, a local integration, or another owned client created it. Give ordinary reseller clients only `keys:read` and selected products. Leave `licenses:create` and `batches:read-all` unchecked.
-
-Host pages can use the authenticated account without an admin session or management token:
-
-```php
-use LicenseKit\Core\Actions\ResellerInventory;
-
-$inventory = app(ResellerInventory::class);
-$reseller = $request->user(); // Host-authenticated configured user, never a submitted user ID.
-$batches = $inventory->batches($reseller, perPage: 25, page: 1, planId: null);
-$batch = $inventory->batch($reseller, $batchId);
-$keys = $inventory->keys($reseller, $batchId, perPage: 100, page: 1, status: 'unclaimed');
-```
-
-Every call reloads the account and checks availability. Batch/key reads reject another reseller's batch with not-found. Batch results eagerly load `plan.product` and include `total_count`, `claimed_count`, `unclaimed_count`, and `revoked_count`. They remain server-side models; choose fields explicitly when building a host HTTP response. Ownership is sufficient for these reads and does not grant admin powers. Catalog disablement does not hide purchased batches.
-
-The equivalent bot requests use existing endpoints:
+A reseller's bot reads the batches its client created:
 
 ```text
 GET /batches?per_page=25&page=1
@@ -159,8 +115,8 @@ GET /batches/88
 GET /batches/88/keys?status=unclaimed&per_page=100&page=1
 ```
 
-Batch GET responses include the same counts. Key lists return `data`, `links`, and `meta`; default page size is 25, maximum 100. PHP returns a `LengthAwarePaginator` with the same explicit key fields. Follow every page when downloading a whole batch. Each key contains `id`, `key`, saved `duration_days`, and nullable UTC `claimed_at`/`revoked_at`. Private notes and buyer identities are excluded. Filters are `all` by default, `unclaimed`, `claimed`, and `revoked`. Unclaimed means neither claimed nor revoked. Claimed/revoked filters inspect those timestamps independently. Counts describe current key state, not active entitlements or sales; original `quantity` remains creation history.
+Batch GET responses include the same counts. Key lists return `data`, `links`, and `meta`; default page size is 25, maximum 100. Follow every page when downloading a whole batch. Each key contains `id`, `key`, saved `duration_days`, and nullable UTC `claimed_at`/`revoked_at`. Private notes and buyer identities are excluded. Filters are `all` by default, `unclaimed`, `claimed`, and `revoked`. Unclaimed means neither claimed nor revoked. Claimed/revoked filters inspect those timestamps independently. Counts describe current key state, not active entitlements or sales; original `quantity` remains creation history.
 
-To build a text download, authenticate the host request, read authorized key pages, and emit each row's `key` as a line with `Cache-Control: private, no-store`. Repeating a read/download does not consume keys or record delivery. The existing Filament exports retain their one-click behavior.
+Repeating a read or download does not consume keys or record delivery.
 
 A reseller imports these serials into their store or bot, which tracks sales and prevents duplicate delivery. Fetching the first unclaimed key for each order is unsafe: sold keys can remain unclaimed, and concurrent reads can return the same key. LicenseKit does not reserve, dispatch, or count sold keys. Your sales records own those answers.
