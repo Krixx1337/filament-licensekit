@@ -7,6 +7,7 @@ use Filament\Pages\Dashboard as BaseDashboard;
 use Filament\Pages\Dashboard\Concerns\HasFiltersForm;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Illuminate\Contracts\View\View;
 use LicenseKit\Core\Models\Product;
 use LicenseKit\Filament\AdminAccess;
 use LicenseKit\Filament\Navigation;
@@ -51,6 +52,11 @@ class Dashboard extends BaseDashboard
     public function getWidgets(): array
     {
         return [GetStarted::class, LicenseStats::class, RedemptionsChart::class, LicensesByStatusChart::class, NeedsAttention::class, RecentActivity::class];
+    }
+
+    public function getFooter(): ?View
+    {
+        return view('licensekit::filament.dashboard-credits');
     }
 
     public function getColumns(): int|array
