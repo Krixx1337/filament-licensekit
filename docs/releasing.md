@@ -1,38 +1,14 @@
-# Publishing releases
+# Release checks
 
-Package name: `licensekit/licensekit`.
-Repository: https://github.com/Krixx1337/filament-licensekit.
-First published tag: `v0.1.0-alpha.1`.
+Package: `licensekit/licensekit`. Repository: [filament-licensekit](https://github.com/Krixx1337/filament-licensekit).
 
-The package is published on [Packagist](https://packagist.org/packages/licensekit/licensekit). For the next alpha, use a new version such as `0.1.0-alpha.2`. The steps below use that version as an example.
+1. Run `composer check`, `php vendor/bin/pint --test`, `composer validate --strict` and `composer audit`.
+2. When publishing is requested, push a review branch and wait for every CI job: Laravel/Filament compatibility matrix, lowest-dependency consumers, archive contents and MySQL redemption/issuance races.
+3. Choose an unused release version. Add its date and changes to CHANGELOG.md. Keep pre-release warning and fresh-database requirement while this schema rewrite is unreleased.
+4. Run CI on the exact release commit. Tag that tested commit only after release approval. Never move an existing published tag.
+5. After pushing the approved tag, verify it appears on [Packagist](https://packagist.org/packages/licensekit/licensekit). If needed, check [webhook setup](https://packagist.org/about#how-to-update-packages).
+6. Install that exact version in a supported host and complete [getting started](getting-started.md), including signed loader login, first redemption, heartbeat and device reset.
 
-## Prepare the release
+Composer reads version from Git tag. Do not add a version field to composer.json or relax minimum-stability for consumers.
 
-1. Commit the intended release changes and push them to GitHub.
-2. Wait for every job in the `tests` workflow to pass, including the compatibility matrix, distribution archive check, minimum-runtime issuance/import consumer, fresh-schema rollback/reinstall coverage, and MySQL claim/issuance/import tests.
-3. Add a changelog entry for `0.1.0-alpha.2` with the release date and changes since the previous alpha. Keep the pre-release warning.
-4. Commit and push that changelog update, then wait for CI to pass on that commit.
-5. Create and push the tag on that tested commit:
-
-```sh
-git tag -a v0.1.0-alpha.2 -m "LicenseKit 0.1.0-alpha.2"
-git push origin v0.1.0-alpha.2
-```
-
-Composer reads the version from Git tags. Do not add a `version` field to `composer.json` or lower the package's `minimum-stability`.
-
-## Verify Packagist
-
-1. Confirm `v0.1.0-alpha.2` appears on the package page after pushing the tag. The GitHub push webhook updates Packagist automatically. Follow [Packagist's GitHub hook instructions](https://packagist.org/about#how-to-update-packages) if updates stop working.
-2. Verify installation in a compatible Laravel application:
-
-```sh
-composer require licensekit/licensekit:0.1.0-alpha.2
-php artisan licensekit:install --no-interaction
-```
-
-The exact alpha version allows this package's pre-release without allowing unstable dependencies throughout the application. Complete the panel, policy, user, and migration setup in [installation.md](installation.md).
-
-Update the README and installation guide to name the current published alpha. Keep the pre-release warning. The security policy supports the latest alpha and `main`.
-
-Use a new tag for each subsequent release. Never move a published tag to different code.
+Local SQLite results do not replace MySQL races. Local smoke checks do not replace lowest-dependency CI. Preserve both Filament majors and their minimum supported versions when editing matrix.

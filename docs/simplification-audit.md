@@ -1,6 +1,15 @@
 # LicenseKit simplification audit
 
-Date: 2026-10-16 · Scope: `main` at `73f9644` (plus the untracked `docs/internal/`, since deleted per D9) · Status: recommendations only. Nothing here is implemented yet.
+Date: 2026-10-16 · Scope: `main` at `73f9644` (plus the untracked `docs/internal/`, since deleted per D9) · Status: implemented on `simplify/phase-1`; historical findings below retained for context.
+
+## Implementation progress
+
+- Phase 1 complete: cuts 1-8, License rename, nine-table fresh schema, batch duration snapshots.
+- Phase 2 implemented: signed loader with restricted first-redemption sessions, Livewire/JSON portal, bans, free window, D10 rules, one issuance service, hashed connections and seller admin.
+- Phase 3 implemented: setup page, no runtime readiness checks, narrower locks, one log API, two events, flat config, rewritten guides and Sanctum-free CI.
+- Owner clarifications recorded in `docs/decisions.md`.
+- Local validation: 207 Pest tests passed, 1,559 assertions; Pint, Larastan, 200-character source-line check, strict Composer validation, dependency audit, current-runtime smoke and distribution archive checks passed.
+- Three MySQL race cases and CI compatibility/lowest-dependency jobs remain pending. Current-runtime smoke ran locally on Laravel 13.36.0 / PHP 8.4.26. No push or merge performed.
 
 ---
 
