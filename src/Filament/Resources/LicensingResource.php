@@ -7,6 +7,7 @@ use Filament\Resources\Resource;
 use Illuminate\Auth\Access\Response;
 use Illuminate\Database\Eloquent\Model;
 use LicenseKit\Filament\AdminAccess;
+use LicenseKit\Filament\Navigation;
 use UnitEnum;
 
 abstract class LicensingResource extends Resource
@@ -16,7 +17,7 @@ abstract class LicensingResource extends Resource
     /** Support staff may browse resources marked AdminAccess::SUPPORT; everything else is admin-only. */
     protected static string $access = AdminAccess::ADMIN;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Licensing';
+    protected static string|UnitEnum|null $navigationGroup = Navigation::LICENSING;
 
     protected static bool $isScopedToTenant = false;
 

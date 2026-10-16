@@ -108,6 +108,8 @@ class License extends Model
         match ($status) {
             self::PAUSED => $query->whereNotNull('paused_at'),
             self::ACTIVE => $query->whereNull('paused_at')->where(fn ($q) => $q->where('is_lifetime', true)->orWhere('expires_at', '>', $now)),
+            'expiring' => $query->whereNull('paused_at')->where('is_lifetime', false)->where('expires_at', '>', $now)
+                ->where('expires_at', '<=', now()->utc()->addDays(7)->format('Y-m-d H:i:s')),
             'expired' => $query->whereNull('paused_at')->where('is_lifetime', false)->where('expires_at', '<=', $now),
             default => null,
         };

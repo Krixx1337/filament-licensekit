@@ -16,6 +16,7 @@ use LicenseKit\Core\Actions\ManageApiConnections;
 use LicenseKit\Core\Models\ApiConnection;
 use LicenseKit\Core\Models\Product;
 use LicenseKit\Filament\AdminAccess;
+use LicenseKit\Filament\Navigation;
 use LicenseKit\Filament\Resources\ApiConnections\Pages\ManageApiConnections as ManageConnectionsPage;
 use LicenseKit\Filament\Resources\LicensingResource;
 
@@ -23,15 +24,19 @@ class ApiConnectionResource extends LicensingResource
 {
     protected static ?string $slug = 'licensekit/connections';
 
-    protected static ?string $navigationLabel = 'Store & reseller connections';
+    protected static ?string $navigationLabel = 'Store connections';
 
-    protected static ?string $modelLabel = 'connection';
+    protected static ?string $modelLabel = 'store connection';
 
     protected static ?string $model = ApiConnection::class;
 
     protected static bool $editable = true;
 
-    protected static ?string $navigationParentItem = 'Settings';
+    protected static string|\UnitEnum|null $navigationGroup = Navigation::SETUP;
+
+    protected static ?int $navigationSort = 20;
+
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-building-storefront';
 
     public static function form(Schema $schema): Schema
     {
@@ -59,7 +64,10 @@ class ApiConnectionResource extends LicensingResource
                         $token = app(ManageApiConnections::class)->regenerate($record, AdminAccess::actor());
                         $livewire->replaceMountedAction('result', ['title' => 'Connection token', 'text' => $token, 'token' => true]);
                     }),
-            ])->emptyStateHeading('No connections yet')->defaultSort('id', 'desc');
+            ])->emptyStateHeading('No store connections yet')->emptyStateIcon('heroicon-o-building-storefront')
+            ->emptyStateDescription(fn (): string => 'Let your shop create keys automatically after each sale. Create a connection, copy its token, and give your '
+                .'developer the store endpoint: '.url(is_string($prefix = config('licensekit.store_api_prefix')) ? $prefix : '').'. See docs/selling-keys.md.')
+            ->defaultSort('id', 'desc');
     }
 
     public static function getPages(): array

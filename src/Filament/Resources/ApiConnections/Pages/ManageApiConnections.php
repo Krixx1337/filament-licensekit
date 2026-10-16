@@ -29,7 +29,7 @@ class ManageApiConnections extends ManageRecords
             return null;
         }
 
-        return 'Management API disabled in host configuration.';
+        return 'The store API is turned off. Your developer can turn it on with store_api_enabled in config/licensekit.php.';
     }
 
     protected function getHeaderActions(): array

@@ -15,11 +15,13 @@ use LicenseKit\Filament\Resources\LicensingResource;
 
 class BatchResource extends LicensingResource
 {
-    protected static ?int $navigationSort = 60;
+    protected static ?int $navigationSort = 35;
+
+    protected static ?string $navigationLabel = 'Key batches';
+
+    protected static ?string $modelLabel = 'key batch';
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-rectangle-stack';
-
-    protected static ?string $navigationParentItem = 'Settings';
 
     protected static ?string $slug = 'licensekit/batches';
 

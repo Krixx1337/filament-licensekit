@@ -13,16 +13,17 @@ use Filament\Tables\Table;
 use LicenseKit\Core\Models\ActivityEntry;
 use LicenseKit\Core\Models\Product;
 use LicenseKit\Filament\AdminAccess;
+use LicenseKit\Filament\Navigation;
 use LicenseKit\Filament\Resources\ActivityLog\Pages\ManageActivityLog;
 use LicenseKit\Filament\Resources\LicensingResource;
 
 class ActivityEntryResource extends LicensingResource
 {
-    protected static ?int $navigationSort = 80;
-
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-clock';
 
-    protected static ?string $navigationParentItem = 'Settings';
+    protected static string|\UnitEnum|null $navigationGroup = Navigation::PROTECTION;
+
+    protected static ?int $navigationSort = 20;
 
     protected static ?string $slug = 'licensekit/activity-log';
 
@@ -32,9 +33,9 @@ class ActivityEntryResource extends LicensingResource
 
     protected static ?string $navigationLabel = 'Activity log';
 
-    protected static ?string $modelLabel = 'change';
+    protected static ?string $modelLabel = 'activity';
 
-    protected static ?string $pluralModelLabel = 'Change log';
+    protected static ?string $pluralModelLabel = 'Activity log';
 
     protected static bool $editable = false;
 

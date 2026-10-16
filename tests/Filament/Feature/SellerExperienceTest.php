@@ -44,7 +44,7 @@ test('connect diagnostic shows access without locking device or changing clock',
 test('new admin pages and license detail render', function () {
     adminUser();
     $license = License::factory()->create(['user_id' => User::factory()->create()->id]);
-    foreach (['dashboard', 'settings', 'connect-your-app', 'team-access', 'device-bans', 'licenses/'.$license->id] as $path) {
+    foreach (['dashboard', 'connect-your-app', 'team-access', 'device-bans', 'licenses/'.$license->id] as $path) {
         $this->get('/admin/licensekit/'.$path)->assertOk();
     }
 });

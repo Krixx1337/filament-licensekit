@@ -7,7 +7,6 @@ use Filament\Panel;
 use LicenseKit\Filament\Middleware\EnsurePanelSetup;
 use LicenseKit\Filament\Pages\ConnectYourApp;
 use LicenseKit\Filament\Pages\Dashboard;
-use LicenseKit\Filament\Pages\Settings;
 use LicenseKit\Filament\Pages\SetupNeeded;
 use LicenseKit\Filament\Pages\TeamAccess;
 use LicenseKit\Filament\Resources\ActivityLog\ActivityEntryResource;
@@ -34,8 +33,7 @@ final class LicenseKitPlugin implements Plugin
     {
         $panel->resources([ProductResource::class, LicenseKeyResource::class, BatchResource::class, LicenseResource::class,
             ApiConnectionResource::class, ActivityEntryResource::class, DeviceBanResource::class]);
-        $panel->pages([Dashboard::class, Settings::class,
-            ConnectYourApp::class, SetupNeeded::class, TeamAccess::class]);
+        $panel->pages([Dashboard::class, ConnectYourApp::class, SetupNeeded::class, TeamAccess::class]);
         $panel->authMiddleware([EnsurePanelSetup::class], isPersistent: true);
     }
 

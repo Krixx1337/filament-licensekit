@@ -1,7 +1,7 @@
 <x-filament-panels::page>
     <x-filament::section heading="License">
         <p>{{ $license->user?->getAttribute(config('licensekit.user_label')) ?? 'Deleted customer' }} / {{ $license->product->name }}</p>
-        <p>{{ \LicenseKit\Filament\Resources\Licenses\LicenseResource::statusLabel($license) }}</p>
+        <p>{{ \LicenseKit\Filament\Enums\LicenseState::for($license)->getLabel() }}</p>
         <p>{{ $license->is_lifetime ? 'Lifetime' : $license->expires_at?->setTimezone(config('app.timezone'))->format('Y-m-d H:i T') }}</p>
         <p>Device: {{ $license->device === null ? 'Not locked yet' : \Illuminate\Support\Str::limit($license->device, 24) }}</p>
         @if ($license->note)<p>{{ $license->note }}</p>@endif

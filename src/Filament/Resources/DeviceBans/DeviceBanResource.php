@@ -8,6 +8,7 @@ use Filament\Tables\Table;
 use LicenseKit\Core\Actions\DeviceBans;
 use LicenseKit\Core\Models\DeviceBan;
 use LicenseKit\Filament\AdminAccess;
+use LicenseKit\Filament\Navigation;
 use LicenseKit\Filament\Resources\LicensingResource;
 
 class DeviceBanResource extends LicensingResource
@@ -16,9 +17,11 @@ class DeviceBanResource extends LicensingResource
 
     protected static ?string $slug = 'licensekit/device-bans';
 
-    protected static ?string $navigationParentItem = 'Settings';
+    protected static string|\UnitEnum|null $navigationGroup = Navigation::PROTECTION;
 
-    protected static ?string $navigationLabel = 'Device bans';
+    protected static ?int $navigationSort = 10;
+
+    protected static ?string $navigationLabel = 'Banned PCs';
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-no-symbol';
 

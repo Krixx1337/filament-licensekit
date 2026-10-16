@@ -16,9 +16,11 @@ use Illuminate\Database\Eloquent\Model;
 use LicenseKit\Core\Models\License;
 use LicenseKit\Filament\Actions\LicensingActions;
 use LicenseKit\Filament\AdminAccess;
+use LicenseKit\Filament\Enums\LicenseState;
 use LicenseKit\Filament\Resources\Licenses\Pages\ManageLicenses;
 use LicenseKit\Filament\Resources\Licenses\Pages\ViewLicense;
 use LicenseKit\Filament\Resources\LicensingResource;
+use LicenseKit\Filament\Support\TimeLeft;
 
 class LicenseResource extends LicensingResource
 {
@@ -62,13 +64,8 @@ class LicenseResource extends LicensingResource
             TextColumn::make('remaining_seconds')->label('Banked time')
                 ->formatStateUsing(fn (int $state): string => floor($state / 86400).'d '.floor(($state % 86400) / 3600).'h '.floor(($state % 3600) / 60).'m '.($state % 60).'s')
                 ->placeholder('None')->toggleable(),
-            TextColumn::make('status')->label('Status')->badge()->state(fn (License $record): string => self::statusLabel($record))
-                ->color(fn (License $record): string => match (true) {
-                    $record->isRevoked(), $record->isSuspended() => 'danger',
-                    $record->paused_at !== null => 'warning',
-                    $record->is_lifetime || (bool) $record->expires_at?->isFuture() => 'success',
-                    default => 'gray',
-                })->toggleable(),
+            TextColumn::make('status')->label('Status')->badge()->state(fn (License $record): LicenseState => LicenseState::for($record))
+                ->description(fn (License $record): string => TimeLeft::for($record))->toggleable(),
             IconColumn::make('device_bound')->label('Device locked')->boolean()->toggleable()
                 ->state(fn (License $record): bool => $record->device !== null),
             TextColumn::make('keys_count')->label('Keys redeemed'),
@@ -107,24 +104,38 @@ class LicenseResource extends LicensingResource
                     ['record' => $record]))->defaultSort('id', 'desc');
     }
 
-    public static function statusLabel(License $record): string
-    {
-        return match (true) {
-            $record->isRevoked() => 'Cancelled',
-            $record->isSuspended() => $record->suspended_until === null ? 'Suspended' : 'Suspended until '.$record->suspended_until->setTimezone(config('app.timezone'))->format('M j, H:i'),
-            $record->paused_at !== null => 'Paused ('.intdiv((int) $record->remaining_seconds, 86400).' days left)',
-            $record->is_lifetime => 'Lifetime',
-            $record->product->freeAccessActive() && ! (bool) $record->expires_at?->isFuture() => 'Free access',
-            $record->expires_at?->isFuture() && $record->expires_at->lessThanOrEqualTo(now()->addDays(7)) => 'Expiring soon',
-            (bool) $record->expires_at?->isFuture() => 'Active',
-            $record->expires_at === null => 'No time yet',
-            default => 'Expired',
-        };
-    }
-
     public static function getGloballySearchableAttributes(): array
     {
         return ['user.'.config('licensekit.user_label'), 'keys.key'];
+    }
+
+    /** @return Builder<Model> */
+    public static function getGlobalSearchEloquentQuery(): Builder
+    {
+        return parent::getGlobalSearchEloquentQuery()->with(['user', 'product']);
+    }
+
+    /** @return array<string, string> */
+    public static function getGlobalSearchResultDetails(Model $record): array
+    {
+        return $record instanceof License ? ['Status' => LicenseState::for($record)->getLabel(), 'Time left' => TimeLeft::for($record)] : [];
+    }
+
+    public static function getNavigationBadge(): ?string
+    {
+        $count = License::query()->effectiveStatus('expiring')->count();
+
+        return $count === 0 ? null : (string) $count;
+    }
+
+    public static function getNavigationBadgeColor(): string
+    {
+        return 'warning';
+    }
+
+    public static function getNavigationBadgeTooltip(): string
+    {
+        return 'Expiring in the next '.LicenseState::EXPIRING_DAYS.' days';
     }
 
     public static function getGlobalSearchResultTitle(Model $record): string|Htmlable

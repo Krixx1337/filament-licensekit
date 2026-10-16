@@ -13,13 +13,18 @@ use LicenseKit\Core\Exceptions\LicensingException;
 use LicenseKit\Core\Models\Product;
 use LicenseKit\Core\Users\ConfiguredUserModel;
 use LicenseKit\Filament\Actions\LicensingActions;
+use LicenseKit\Filament\Navigation;
 use Livewire\Attributes\Url;
 
 class ConnectYourApp extends LicenseKitPage
 {
     protected static ?string $slug = 'licensekit/connect-your-app';
 
-    protected static ?string $navigationParentItem = 'Settings';
+    protected static string|\UnitEnum|null $navigationGroup = Navigation::SETUP;
+
+    protected static ?int $navigationSort = 10;
+
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-code-bracket';
 
     protected static ?string $navigationLabel = 'Connect your app';
 
