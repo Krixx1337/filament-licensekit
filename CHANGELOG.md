@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Reseller bots: only a suspended owner blocks the token (email verification no longer does), and deleting the owner's account turns their connections off instead of leaving an unowned working token.
 - Resellers can use normal website accounts. Assign batches manually, link bot connections to an owner, and embed `<livewire:licensekit.reseller-batches />` for purchase counts and unused-key downloads. Suspended owners lose bot access. Admin batches, keys and license pages show reseller attribution. Added `ResellerBatches` host PHP service. Initial migration changed; rebuild disposable databases.
 
 - PC history: the first PC lock is now logged (`device_locked`). Each license page lists every lock, move and reset with who did it, the staff note and a short stable PC name (never the raw fingerprint). Licenses with 3 or more moves or resets in 30 days get a "Changes PC often" warning on their page and in the dashboard's Needs attention list. The activity log has a "PC changes only" switch.
