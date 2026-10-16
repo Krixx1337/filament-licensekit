@@ -6,9 +6,9 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
-use LicenseKit\Core\Events\EntitlementAccessInvalidated;
+use LicenseKit\Core\Events\LicenseAccessInvalidated;
 use LicenseKit\Core\Events\ProductAccessInvalidated;
-use LicenseKit\Core\Models\Entitlement;
+use LicenseKit\Core\Models\License;
 use LicenseKit\Tests\Core\Fixtures\HostDesktopController;
 use LicenseKit\Tests\Core\Fixtures\HostUserSecurityChanged;
 use LicenseKit\Tests\Core\Fixtures\User;
@@ -19,7 +19,7 @@ pest()->extend(TestCase::class)->in('Core/Feature');
 /** @return array{login: string, password: string, hwid: array{value: string}} */
 function lockedDeviceCount(): int
 {
-    return Entitlement::whereNotNull('device')->count();
+    return License::whereNotNull('device')->count();
 }
 
 function desktopRequest(User $user, string $device = 'desktop'): array
@@ -42,7 +42,7 @@ function installHostDesktopProtocol(): void
     Route::middleware(['api', 'licensekit.json'])->post('host/products/{product:slug}/heartbeat', [HostDesktopController::class, 'heartbeat']);
     Event::listen(HostUserSecurityChanged::class, fn (HostUserSecurityChanged $event) => DB::table('host_desktop_sessions')->where('user_id', $event->user->getKey())->delete());
     Event::listen(ProductAccessInvalidated::class, fn (ProductAccessInvalidated $event) => DB::table('host_desktop_sessions')->where('user_id', $event->user->getKey())->when($event->productId !== null, fn ($query) => $query->where('product_id', $event->productId))->delete());
-    Event::listen(EntitlementAccessInvalidated::class, fn (EntitlementAccessInvalidated $event) => DB::table('host_desktop_sessions')->where('user_id', $event->entitlement->user_id)->where('product_id', $event->entitlement->product_id)->delete());
+    Event::listen(LicenseAccessInvalidated::class, fn (LicenseAccessInvalidated $event) => DB::table('host_desktop_sessions')->where('user_id', $event->license->user_id)->where('product_id', $event->license->product_id)->delete());
 }
 
 function testAdminActor(): User

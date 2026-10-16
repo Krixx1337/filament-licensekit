@@ -8,12 +8,12 @@ use LicenseKit\Core\Actions\ClaimLicense;
 use LicenseKit\Core\Actions\CreateBatch;
 use LicenseKit\Core\Actions\IssueLicenses;
 use LicenseKit\Core\Actions\ManageApiClients;
-use LicenseKit\Core\Actions\ManageEntitlements;
+use LicenseKit\Core\Actions\ManageLicenses;
 use LicenseKit\Core\Actions\ManagementOperations;
 use LicenseKit\Core\Exceptions\LicensingException;
 use LicenseKit\Core\Models\ApiClient;
 use LicenseKit\Core\Models\Batch;
-use LicenseKit\Core\Models\Entitlement;
+use LicenseKit\Core\Models\License;
 use LicenseKit\Core\Models\LicensePlan;
 use LicenseKit\Core\Models\Product;
 use LicenseKit\Tests\Core\Fixtures\ClientSessions;
@@ -41,17 +41,17 @@ $hwid = 'pc';
 Gate::define('licensekit.admin', fn ($actor): bool => $actor->getKey() === ($payload['actor_id'] ?? null) || in_array($actor->getKey(), $payload['actor_ids'] ?? [], true));
 $run = fn () => match ($operation) {
     'individual-pause', 'individual-extend' => (function () use ($operation, $payload): int {
-        $entitlement = Entitlement::findOrFail($payload['entitlement_id']);
+        $license = License::findOrFail($payload['license_id']);
         $actor = User::findOrFail($payload['actor_id']);
         if ($operation === 'individual-pause') {
-            app(ManageEntitlements::class)->pause($entitlement, $actor, 'Vacation');
+            app(ManageLicenses::class)->pause($license, $actor, 'Vacation');
         } else {
-            app(ManageEntitlements::class)->extend($entitlement, 3600, $actor, 'Support');
+            app(ManageLicenses::class)->extend($license, 3600, $actor, 'Support');
         }
 
-        return $entitlement->id;
+        return $license->id;
     })(),
-    'batch-revoke' => app(ManageEntitlements::class)->revokeUnclaimedBatch(Batch::findOrFail($payload['batch_id']), User::findOrFail($payload['actor_id']), 'Chargeback'),
+    'batch-revoke' => app(ManageLicenses::class)->revokeUnclaimedBatch(Batch::findOrFail($payload['batch_id']), User::findOrFail($payload['actor_id']), 'Chargeback'),
     'local-issue', 'local-issue-stale' => (function () use ($payload): array {
         config(['licensekit.local_integrations.store' => ['enabled' => true, 'all_products' => true, 'maximum_quantity' => 2, 'disclose_serials' => true]]);
 
@@ -96,10 +96,10 @@ try {
         $result = $run();
     } elseif ($operation === $payload['first_operation']) {
         $result = DB::transaction(function () use ($run, $payload, $waitFor) {
-            if (isset($payload['entitlement_id'])) {
-                $entitlement = Entitlement::findOrFail($payload['entitlement_id']);
-                User::whereKey([$payload['actor_id'], $entitlement->user_id])->orderBy('id')->lockForUpdate()->get();
-                Product::whereKey($entitlement->product_id)->lockForUpdate()->firstOrFail();
+            if (isset($payload['license_id'])) {
+                $license = License::findOrFail($payload['license_id']);
+                User::whereKey([$payload['actor_id'], $license->user_id])->orderBy('id')->lockForUpdate()->get();
+                Product::whereKey($license->product_id)->lockForUpdate()->firstOrFail();
             } elseif ($payload['first_operation'] === 'batch-revoke') {
                 User::whereKey($payload['actor_id'])->sharedLock()->firstOrFail();
                 Product::whereKey($payload['product_id'])->lockForUpdate()->firstOrFail();

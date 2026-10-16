@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Pagination\LengthAwarePaginator;
 use LicenseKit\Core\Contracts\ReadinessCheck;
 use LicenseKit\Core\Exceptions\LicensingException;
-use LicenseKit\Core\Models\Entitlement;
+use LicenseKit\Core\Models\License;
 use LicenseKit\Core\Users\UserAccess;
 
 class CustomerLicenses
@@ -23,7 +23,7 @@ class CustomerLicenses
 
         $page = $this->query($user)->orderBy('id')->paginate($perPage)->appends(['per_page' => $perPage]);
 
-        return $page->through(fn (Entitlement $entitlement): array => $this->summary->for($entitlement));
+        return $page->through(fn (License $license): array => $this->summary->for($license));
     }
 
     /** @return array<string, mixed> */
@@ -32,7 +32,7 @@ class CustomerLicenses
         return $this->summary->for($this->query($user)->whereKey($id)->firstOrFail());
     }
 
-    /** @return Builder<Entitlement> */
+    /** @return Builder<License> */
     private function query(Model $user): Builder
     {
         $this->readiness->assertReady();
@@ -41,6 +41,6 @@ class CustomerLicenses
             throw new LicensingException('user_unavailable');
         }
 
-        return Entitlement::query()->where('user_id', $user->getKey())->with(['product', 'user']);
+        return License::query()->where('user_id', $user->getKey())->with(['product', 'user']);
     }
 }

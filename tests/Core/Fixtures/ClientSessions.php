@@ -10,7 +10,7 @@ use LicenseKit\Core\Actions\LicensedDevices;
 use LicenseKit\Core\Contracts\DeviceMatcher;
 use LicenseKit\Core\Data\AccessAuthorization;
 use LicenseKit\Core\Exceptions\LicensingException;
-use LicenseKit\Core\Models\Entitlement;
+use LicenseKit\Core\Models\License;
 use LicenseKit\Core\Models\Product;
 use LicenseKit\Core\Users\ConfiguredUserModel;
 
@@ -19,7 +19,7 @@ class ClientSessions
     public function __construct(private HostAuthenticateUser $credentials, private ClientSecurity $security, private LicensedDevices $devices, private DeviceMatcher $matcher, private Audit $audit) {}
 
     /**
-     * @return array{token: string, expires_at: string, entitlement: Entitlement|null, access: array{source: string, valid_until: string|null}, heartbeat_seconds: int}
+     * @return array{token: string, expires_at: string, license: License|null, access: array{source: string, valid_until: string|null}, heartbeat_seconds: int}
      */
     public function login(Product $product, string $identity, #[\SensitiveParameter] string $password, #[\SensitiveParameter] string $hwid): array
     {
@@ -39,12 +39,12 @@ class ClientSessions
             $session->update(['personal_access_token_id' => $token->accessToken->id]);
             $this->audit->record('user:'.$user->getKey(), 'client_login', $context->access->product);
 
-            return ['token' => $token->plainTextToken, 'expires_at' => $expiry->toIso8601String(), 'entitlement' => $context->access->entitlement, 'access' => $context->access->summary(), 'heartbeat_seconds' => (int) config('host_client.heartbeat_seconds')];
+            return ['token' => $token->plainTextToken, 'expires_at' => $expiry->toIso8601String(), 'license' => $context->access->license, 'access' => $context->access->summary(), 'heartbeat_seconds' => (int) config('host_client.heartbeat_seconds')];
         });
     }
 
     /**
-     * @return array{expires_at: string, entitlement: Entitlement|null, access: array{source: string, valid_until: string|null}, heartbeat_seconds: int}
+     * @return array{expires_at: string, license: License|null, access: array{source: string, valid_until: string|null}, heartbeat_seconds: int}
      */
     public function heartbeat(Product $product, #[\SensitiveParameter] string $bearer, #[\SensitiveParameter] string $hwid): array
     {
@@ -74,19 +74,19 @@ class ClientSessions
             $expiry = $this->expiry($context->access);
             $token->update(['expires_at' => $expiry, 'last_used_at' => now()]);
 
-            return ['expires_at' => $expiry->toIso8601String(), 'entitlement' => $context->access->entitlement, 'access' => $context->access->summary(), 'heartbeat_seconds' => (int) config('host_client.heartbeat_seconds')];
+            return ['expires_at' => $expiry->toIso8601String(), 'license' => $context->access->license, 'access' => $context->access->summary(), 'heartbeat_seconds' => (int) config('host_client.heartbeat_seconds')];
         });
     }
 
-    public function terminate(Entitlement $entitlement, string $actor, string $reason): void
+    public function terminate(License $license, string $actor, string $reason): void
     {
         if (trim($reason) === '') {
             throw new LicensingException('reason_required', 422);
         }
-        DB::transaction(function () use ($entitlement, $actor, $reason): void {
-            $entitlement = $entitlement->fresh() ?? throw new LicensingException('license_unavailable');
-            app(SessionCleanup::class)->entitlement($entitlement);
-            $this->audit->record($actor, 'desktop_session_terminated', $entitlement, [], [], $reason);
+        DB::transaction(function () use ($license, $actor, $reason): void {
+            $license = $license->fresh() ?? throw new LicensingException('license_unavailable');
+            app(SessionCleanup::class)->license($license);
+            $this->audit->record($actor, 'desktop_session_terminated', $license, [], [], $reason);
         });
     }
 

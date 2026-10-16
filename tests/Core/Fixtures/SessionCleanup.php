@@ -6,9 +6,9 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Laravel\Sanctum\Sanctum;
-use LicenseKit\Core\Events\EntitlementAccessInvalidated;
+use LicenseKit\Core\Events\LicenseAccessInvalidated;
 use LicenseKit\Core\Events\ProductAccessInvalidated;
-use LicenseKit\Core\Models\Entitlement;
+use LicenseKit\Core\Models\License;
 
 class SessionCleanup
 {
@@ -17,15 +17,15 @@ class SessionCleanup
         DB::transaction(fn () => $this->forUser($event->user, $event->productId));
     }
 
-    public function accessInvalidated(EntitlementAccessInvalidated $event): void
+    public function accessInvalidated(LicenseAccessInvalidated $event): void
     {
-        DB::transaction(fn () => $this->entitlement($event->entitlement));
+        DB::transaction(fn () => $this->license($event->license));
     }
 
-    public function entitlement(Entitlement $entitlement): void
+    public function license(License $license): void
     {
-        if ($entitlement->user !== null) {
-            $this->forUser($entitlement->user, $entitlement->product_id);
+        if ($license->user !== null) {
+            $this->forUser($license->user, $license->product_id);
         }
     }
 

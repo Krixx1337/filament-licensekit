@@ -8,9 +8,9 @@ use LicenseKit\Core\Exceptions\LicensingException;
 use LicenseKit\Filament\Resources\ApiClients\ApiClientResource;
 use LicenseKit\Filament\Resources\AuditEvents\AuditEventResource;
 use LicenseKit\Filament\Resources\Batches\BatchResource;
-use LicenseKit\Filament\Resources\Entitlements\EntitlementResource;
 use LicenseKit\Filament\Resources\LicenseKeys\LicenseKeyResource;
 use LicenseKit\Filament\Resources\LicensePlans\LicensePlanResource;
+use LicenseKit\Filament\Resources\Licenses\LicenseResource;
 use LicenseKit\Filament\Resources\Products\ProductResource;
 use LicenseKit\Support\SetupDiagnostics;
 
@@ -32,7 +32,7 @@ final class LicenseKitPlugin implements Plugin
         if ($diagnostics->configurationErrors() !== [] || $diagnostics->panelError($panel) !== null) {
             return;
         }
-        $resources = [ProductResource::class, LicensePlanResource::class, LicenseKeyResource::class, BatchResource::class, EntitlementResource::class, ApiClientResource::class, AuditEventResource::class];
+        $resources = [ProductResource::class, LicensePlanResource::class, LicenseKeyResource::class, BatchResource::class, LicenseResource::class, ApiClientResource::class, AuditEventResource::class];
         $panel->resources($resources);
     }
 

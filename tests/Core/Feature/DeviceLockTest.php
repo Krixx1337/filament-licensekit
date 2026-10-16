@@ -7,7 +7,7 @@ use LicenseKit\Core\Contracts\DeviceMatcher;
 use LicenseKit\Core\Events\ProductAccessInvalidated;
 use LicenseKit\Core\Exceptions\LicensingException;
 use LicenseKit\Core\Models\AuditEvent;
-use LicenseKit\Core\Models\Entitlement;
+use LicenseKit\Core\Models\License;
 use LicenseKit\Core\Models\Product;
 use LicenseKit\Tests\Core\Fixtures\User;
 
@@ -19,9 +19,9 @@ class PrefixDeviceMatcher implements DeviceMatcher
     }
 }
 
-function lockedLicense(array $product = [], array $license = []): Entitlement
+function lockedLicense(array $product = [], array $license = []): License
 {
-    return Entitlement::factory()->create(['user_id' => User::factory()->create()->id,
+    return License::factory()->create(['user_id' => User::factory()->create()->id,
         'product_id' => Product::factory()->create($product)->id, ...$license]);
 }
 
@@ -70,7 +70,7 @@ test('free access logins lock the device on a license row without paid time', fu
 
     $auth = app(LicensedDevices::class)->bind($user, $product, 'pc-a', CarbonImmutable::now()->addHour());
 
-    $license = Entitlement::where('user_id', $user->id)->sole();
+    $license = License::where('user_id', $user->id)->sole();
     expect($auth->access->source)->toBe('host_free')->and($license->device)->toBe('pc-a')->and($license->expires_at)->toBeNull();
     expect(fn () => app(LicensedDevices::class)->verify($user, $product, 'pc-a'))->toThrow(LicensingException::class, 'license unavailable');
 });

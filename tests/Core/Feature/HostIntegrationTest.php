@@ -6,10 +6,10 @@ use Illuminate\Support\Facades\Schema;
 use LicenseKit\Core\Actions\CatalogWrites;
 use LicenseKit\Core\Actions\ClaimLicense;
 use LicenseKit\Core\Actions\IssueLicenses;
-use LicenseKit\Core\Events\EntitlementGranted;
 use LicenseKit\Core\Events\LicenseClaimed;
+use LicenseKit\Core\Events\LicenseGranted;
 use LicenseKit\Core\Exceptions\LicensingException;
-use LicenseKit\Core\Models\Entitlement;
+use LicenseKit\Core\Models\License;
 use LicenseKit\Core\Models\LicenseKey;
 use LicenseKit\Core\Models\LicensePlan;
 use LicenseKit\Core\Models\Product;
@@ -100,15 +100,15 @@ test('claimed event contains linked provenance and waits for the host transactio
     });
 
     DB::beginTransaction();
-    $entitlement = app(ClaimLicense::class)->claim($user, $key->key);
+    $license = app(ClaimLicense::class)->claim($user, $key->key);
     expect($received)->toBe([]);
     DB::commit();
 
     expect($received)->toHaveCount(1);
     expect($received[0]->keyId)->toBe($key->id);
-    expect($received[0]->entitlementId)->toBe($entitlement->id);
+    expect($received[0]->licenseId)->toBe($license->id);
     expect($received[0]->reference)->toBe($key->batch->reference);
-    expect($key->fresh()->entitlement_id)->toBe($entitlement->id);
+    expect($key->fresh()->license_id)->toBe($license->id);
 });
 
 test('host rollback discards claim notification and restores key state', function () {
@@ -125,15 +125,15 @@ test('host rollback discards claim notification and restores key state', functio
 
     expect($received)->toBe([]);
     expect($key->fresh()->claimed_at)->toBeNull();
-    $this->assertDatabaseCount('licensekit_entitlements', 0);
+    $this->assertDatabaseCount('licensekit_licenses', 0);
 });
 
 test('completed claim provenance captures changes saved by synchronous grant listeners', function () {
     $user = User::factory()->create();
     $key = LicenseKey::factory()->create();
     $received = [];
-    Event::listen(EntitlementGranted::class, function (EntitlementGranted $event): void {
-        Entitlement::whereKey($event->entitlement->id)->update(['expires_at' => '2035-01-01 00:00:00']);
+    Event::listen(LicenseGranted::class, function (LicenseGranted $event): void {
+        License::whereKey($event->license->id)->update(['expires_at' => '2035-01-01 00:00:00']);
     });
     Event::listen(LicenseClaimed::class, function (LicenseClaimed $event) use (&$received): void {
         $received[] = $event->claim;
@@ -156,5 +156,5 @@ test('initial schema can roll back and reinstall for fresh licensing', function 
     $key = LicenseKey::factory()->create();
     $user = User::factory()->create();
     app(ClaimLicense::class)->claim($user, $key->key);
-    $this->assertDatabaseCount('licensekit_entitlements', 1);
+    $this->assertDatabaseCount('licensekit_licenses', 1);
 });

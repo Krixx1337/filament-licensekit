@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\SQLiteDatabaseDoesNotExistException;
 use Illuminate\Support\Facades\Schema;
 use Laravel\Sanctum\Sanctum;
-use LicenseKit\Core\Models\Entitlement;
+use LicenseKit\Core\Models\License;
 use LicenseKit\Core\Users\ConfiguredUserModel;
 use LicenseKit\Support\ModuleReadiness;
 use LicenseKit\Support\SetupDiagnostics;
@@ -63,7 +63,7 @@ class CheckInstallation extends Command
 
             return self::FAILURE;
         }
-        $tables = [$user->getTable(), (new Entitlement)->getTable(), (new (Sanctum::personalAccessTokenModel()))->getTable(),
+        $tables = [$user->getTable(), (new License)->getTable(), (new (Sanctum::personalAccessTokenModel()))->getTable(),
             'licensekit_products', 'licensekit_license_plans', 'licensekit_license_keys',
             'licensekit_api_clients', 'licensekit_batches', 'licensekit_audit_events'];
         foreach ($tables as $table) {

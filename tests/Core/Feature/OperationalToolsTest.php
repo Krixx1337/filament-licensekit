@@ -5,7 +5,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Schema;
 use LicenseKit\Core\Actions\ClaimLicense;
 use LicenseKit\Core\Actions\CreateBatch;
-use LicenseKit\Core\Actions\ManageEntitlements;
+use LicenseKit\Core\Actions\ManageLicenses;
 use LicenseKit\Core\Exceptions\LicensingException;
 use LicenseKit\Core\Models\AuditEvent;
 use LicenseKit\Core\Models\LicenseKey;
@@ -20,10 +20,10 @@ test('batch export and revocation isolate unclaimed nonrevoked keys and preserve
     $batch = app(CreateBatch::class)->createFor($actor, $plan, 4, 'batch');
     $other = app(CreateBatch::class)->createFor($actor, $plan, 1, 'other');
     $user = User::factory()->create();
-    $entitlement = app(ClaimLicense::class)->claim($user, $batch->keys[0]->key);
-    app(ManageEntitlements::class)->revokeKey($batch->keys[1], $actor, 'Prior revoke');
-    $before = $entitlement->fresh()->getAttributes();
-    $tools = app(ManageEntitlements::class);
+    $license = app(ClaimLicense::class)->claim($user, $batch->keys[0]->key);
+    app(ManageLicenses::class)->revokeKey($batch->keys[1], $actor, 'Prior revoke');
+    $before = $license->fresh()->getAttributes();
+    $tools = app(ManageLicenses::class);
 
     $values = $tools->exportUnclaimedBatch($batch, $actor);
 
@@ -33,7 +33,7 @@ test('batch export and revocation isolate unclaimed nonrevoked keys and preserve
     expect($tools->revokeUnclaimedBatch($batch, $actor, ' Chargeback '))->toBe(2);
     expect($tools->revokeUnclaimedBatch($batch, $actor, 'Repeated'))->toBe(0);
     expect($tools->exportUnclaimedBatch($batch, $actor))->toBe([]);
-    expect($entitlement->fresh()->getAttributes())->toBe($before);
+    expect($license->fresh()->getAttributes())->toBe($before);
     expect($other->keys->first()->fresh()->revoked_at)->toBeNull();
     $this->assertDatabaseHas('licensekit_audit_events', ['event' => 'batch_unclaimed_revoked', 'reason' => 'Chargeback']);
 });
@@ -41,7 +41,7 @@ test('batch export and revocation isolate unclaimed nonrevoked keys and preserve
 test('key notes are trimmed cleared private and limited', function () {
     $actor = testAdminActor();
     $key = LicenseKey::factory()->create(['claimed_at' => now()]);
-    $tools = app(ManageEntitlements::class);
+    $tools = app(ManageLicenses::class);
 
     $tools->updateNote($key, $actor, '  Support follow-up  ');
 
@@ -58,7 +58,7 @@ test('new writes roll back on audit failure', function (string $operation) {
     $plan = LicensePlan::factory()->create();
     $batch = app(CreateBatch::class)->createFor($actor, $plan, 1, 'batch');
     Event::listen('eloquent.creating: '.AuditEvent::class, fn () => throw new RuntimeException('Audit failed'));
-    $tools = app(ManageEntitlements::class);
+    $tools = app(ManageLicenses::class);
 
     expect(fn () => match ($operation) {
         'revoke' => $tools->revokeUnclaimedBatch($batch, $actor, 'Reason'),
@@ -75,7 +75,7 @@ test('invalid batch reasons do not revoke keys or create audit', function (strin
     $plan = LicensePlan::factory()->create();
     $batch = app(CreateBatch::class)->createFor($actor, $plan, 1, 'batch');
 
-    expect(fn () => app(ManageEntitlements::class)->revokeUnclaimedBatch($batch, $actor, $reason))->toThrow(LicensingException::class, 'invalid revocation reason');
+    expect(fn () => app(ManageLicenses::class)->revokeUnclaimedBatch($batch, $actor, $reason))->toThrow(LicensingException::class, 'invalid revocation reason');
 
     expect($batch->keys->first()->fresh()->revoked_at)->toBeNull();
     expect(AuditEvent::where('event', 'batch_unclaimed_revoked')->count())->toBe(0);
@@ -87,10 +87,10 @@ test('generated lifetime batch remains lifetime after plan edits', function () {
     $plan = LicensePlan::factory()->lifetime()->create();
     $batch = app(CreateBatch::class)->createFor($actor, $plan, 1, 'lifetime');
     $plan->update(['duration_days' => 30]);
-    $entitlement = app(ClaimLicense::class)->claim($user, $batch->keys[0]->key);
+    $license = app(ClaimLicense::class)->claim($user, $batch->keys[0]->key);
     expect($batch->duration_days)->toBeNull();
     expect($batch->keys[0]->fresh()->duration_days)->toBeNull();
-    expect($entitlement->is_lifetime)->toBeTrue()->and($entitlement->expires_at)->toBeNull();
+    expect($license->is_lifetime)->toBeTrue()->and($license->expires_at)->toBeNull();
 });
 
 test('schema diagnostics detect old databases missing private key notes', function () {

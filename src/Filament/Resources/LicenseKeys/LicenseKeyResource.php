@@ -42,7 +42,7 @@ class LicenseKeyResource extends LicensingResource
             TextColumn::make('batch_id')->label('Batch')->formatStateUsing(fn ($state, LicenseKey $record): string => 'Batch #'.$state.($record->batch->label !== null ? ' · '.$record->batch->label : ''))->toggleable(),
             TextColumn::make('batch.label')->label('Batch label')->searchable()->toggleable(isToggledHiddenByDefault: true),
             TextColumn::make('note')->limit(30)->wrap()->toggleable(),
-            TextColumn::make('entitlement_id')->label('License')->toggleable(isToggledHiddenByDefault: true),
+            TextColumn::make('license_id')->label('License')->toggleable(isToggledHiddenByDefault: true),
             TextColumn::make('claimed_at')->label('Given at')->dateTime()->toggleable(),
             TextColumn::make('revoked_at')->label('Revoked at')->dateTime()->toggleable()])->filters([
                 SelectFilter::make('batch_id')->label('Batch')->relationship('batch', 'id')->getOptionLabelFromRecordUsing(fn (Batch $record): string => 'Batch #'.$record->id.($record->label !== null ? ' · '.$record->label : ''))->searchable(),

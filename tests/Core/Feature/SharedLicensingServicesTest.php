@@ -8,7 +8,7 @@ use Illuminate\Validation\ValidationException;
 use LicenseKit\Core\Actions\AccessPolicy;
 use LicenseKit\Core\Actions\LicensedDevices;
 use LicenseKit\Core\Exceptions\LicensingException;
-use LicenseKit\Core\Models\Entitlement;
+use LicenseKit\Core\Models\License;
 use LicenseKit\Core\Models\Product;
 use LicenseKit\Filament\CatalogWrites;
 use LicenseKit\Tests\Core\Fixtures\User;
@@ -26,12 +26,12 @@ beforeEach(fn () => bootMinimalLicensingHost());
 
 test('minimal host uses licensing services without client routes or session storage', function () {
     $user = User::factory()->create();
-    $entitlement = Entitlement::factory()->create(['user_id' => $user->id]);
+    $license = License::factory()->create(['user_id' => $user->id]);
     $hwid = 'pc';
 
-    expect(app(AccessPolicy::class)->authorize($user, $entitlement->product)->source)->toBe('paid');
-    $context = app(LicensedDevices::class)->bind($user, $entitlement->product, $hwid);
-    expect(app(LicensedDevices::class)->verify($user, $entitlement->product, $hwid)->device)->toBe($context->device);
+    expect(app(AccessPolicy::class)->authorize($user, $license->product)->source)->toBe('paid');
+    $context = app(LicensedDevices::class)->bind($user, $license->product, $hwid);
+    expect(app(LicensedDevices::class)->verify($user, $license->product, $hwid)->device)->toBe($context->device);
     expect(Route::has('licensekit.desktop.login'))->toBeFalse();
     expect(Route::has('licensekit.desktop.heartbeat'))->toBeFalse();
     expect(Schema::hasTable('licensekit_desktop_sessions'))->toBeFalse();
@@ -43,21 +43,21 @@ test('minimal host uses licensing services without client routes or session stor
 
 test('device verification never saves a device', function () {
     $user = User::factory()->create();
-    $entitlement = Entitlement::factory()->create(['user_id' => $user->id]);
+    $license = License::factory()->create(['user_id' => $user->id]);
     $hwid = 'pc';
-    expect(fn () => app(LicensedDevices::class)->verify($user, $entitlement->product, $hwid))->toThrow(LicensingException::class, 'device not bound');
+    expect(fn () => app(LicensedDevices::class)->verify($user, $license->product, $hwid))->toThrow(LicensingException::class, 'device not bound');
     expect(lockedDeviceCount())->toBe(0);
-    $entitlement->update(['device_reset_at' => now()]);
-    $before = $entitlement->fresh()->getAttributes();
-    expect(fn () => app(LicensedDevices::class)->verify($user, $entitlement->product, $hwid))->toThrow(LicensingException::class);
-    expect($entitlement->fresh()->getAttributes())->toBe($before);
+    $license->update(['device_reset_at' => now()]);
+    $before = $license->fresh()->getAttributes();
+    expect(fn () => app(LicensedDevices::class)->verify($user, $license->product, $hwid))->toThrow(LicensingException::class);
+    expect($license->fresh()->getAttributes())->toBe($before);
 });
 
 test('denied binding has neutral reason without protocol response or credential fields', function () {
     $user = User::factory()->create();
-    $entitlement = Entitlement::factory()->create(['user_id' => $user->id, 'status' => 'revoked']);
+    $license = License::factory()->create(['user_id' => $user->id, 'status' => 'revoked']);
     try {
-        app(LicensedDevices::class)->bind($user, $entitlement->product, 'pc');
+        app(LicensedDevices::class)->bind($user, $license->product, 'pc');
         $this->fail('Revoked access must deny binding.');
     } catch (LicensingException $exception) {
         expect($exception->error)->toBe('license_unavailable');
@@ -69,8 +69,8 @@ test('denied binding has neutral reason without protocol response or credential 
 
 test('standalone binding refreshes stale user and product state', function () {
     $user = User::factory()->create();
-    $entitlement = Entitlement::factory()->create(['user_id' => $user->id]);
-    $product = $entitlement->product;
+    $license = License::factory()->create(['user_id' => $user->id]);
+    $product = $license->product;
     Product::whereKey($product->id)->update(['status' => 'maintenance']);
 
     expect(fn () => app(LicensedDevices::class)->bind($user, $product, 'pc'))->toThrow(LicensingException::class, 'service unavailable');
@@ -79,10 +79,10 @@ test('standalone binding refreshes stale user and product state', function () {
 
 test('host database failure rolls back explicit binding inside licensing transaction', function () {
     $user = User::factory()->create();
-    $entitlement = Entitlement::factory()->create(['user_id' => $user->id]);
+    $license = License::factory()->create(['user_id' => $user->id]);
 
-    expect(fn () => DB::transaction(function () use ($user, $entitlement): void {
-        app(LicensedDevices::class)->bind($user, $entitlement->product, 'pc');
+    expect(fn () => DB::transaction(function () use ($user, $license): void {
+        app(LicensedDevices::class)->bind($user, $license->product, 'pc');
         DB::table('users')->where('id', $user->id)->update(['email' => 'changed@example.test']);
         throw new RuntimeException('host write failed');
     }))->toThrow(RuntimeException::class, 'host write failed');
@@ -92,7 +92,7 @@ test('host database failure rolls back explicit binding inside licensing transac
 
 test('client binding rejects unsupported user models even when their IDs collide', function () {
     $user = User::factory()->create();
-    $entitlement = Entitlement::factory()->create(['user_id' => $user->id]);
+    $license = License::factory()->create(['user_id' => $user->id]);
     $other = new class extends Model
     {
         protected $table = 'users';
@@ -100,25 +100,25 @@ test('client binding rejects unsupported user models even when their IDs collide
     $other->setRawAttributes($user->getAttributes(), true);
     $other->exists = true;
 
-    expect(fn () => app(LicensedDevices::class)->bind($other, $entitlement->product, 'pc'))->toThrow(LicensingException::class, 'user unavailable');
+    expect(fn () => app(LicensedDevices::class)->bind($other, $license->product, 'pc'))->toThrow(LicensingException::class, 'user unavailable');
     expect(lockedDeviceCount())->toBe(0);
 });
 
 test('minimal licensing host does not require a password column', function () {
     $user = User::factory()->create();
-    $entitlement = Entitlement::factory()->create(['user_id' => $user->id]);
+    $license = License::factory()->create(['user_id' => $user->id]);
     Schema::table('users', fn ($table) => $table->dropColumn('password'));
 
-    expect(app(AccessPolicy::class)->authorize($user, $entitlement->product)->source)->toBe('paid');
+    expect(app(AccessPolicy::class)->authorize($user, $license->product)->source)->toBe('paid');
     $this->artisan('licensekit:check')->assertSuccessful();
 });
 
 test('host can choose its own HTTP mapping for neutral device denials', function () {
     $user = User::factory()->create();
-    $entitlement = Entitlement::factory()->create(['user_id' => $user->id]);
-    Route::get('host/device-check', function () use ($user, $entitlement) {
+    $license = License::factory()->create(['user_id' => $user->id]);
+    Route::get('host/device-check', function () use ($user, $license) {
         try {
-            app(LicensedDevices::class)->verify($user, $entitlement->product, 'pc');
+            app(LicensedDevices::class)->verify($user, $license->product, 'pc');
         } catch (LicensingException $exception) {
             return response()->json(['host_reason' => $exception->error], 412);
         }

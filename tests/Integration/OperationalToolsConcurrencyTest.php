@@ -30,12 +30,12 @@ test('batch revocation serializes against customer claims in both transaction or
     if ($revokeFirst) {
         expect($results)->toBe([1, 'invalid_key']);
         expect($key->claimed_at)->toBeNull()->and($key->revoked_at)->not->toBeNull();
-        $this->assertDatabaseCount('licensekit_entitlements', 0);
+        $this->assertDatabaseCount('licensekit_licenses', 0);
     } else {
         expect($results[0])->toBe(0);
         expect($results[1])->toBeInt();
         expect($key->claimed_at)->not->toBeNull()->and($key->revoked_at)->toBeNull();
-        $this->assertDatabaseCount('licensekit_entitlements', 1);
+        $this->assertDatabaseCount('licensekit_licenses', 1);
     }
 })->with([true, false]);
 

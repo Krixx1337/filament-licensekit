@@ -7,17 +7,17 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
 use LicenseKit\Core\Actions\AccessPolicy;
 use LicenseKit\Core\Actions\LicensedDevices;
-use LicenseKit\Core\Actions\ManageEntitlements;
+use LicenseKit\Core\Actions\ManageLicenses;
 use LicenseKit\Core\Contracts\AccessRestriction;
 use LicenseKit\Core\Exceptions\LicensingException;
-use LicenseKit\Core\Models\Entitlement;
+use LicenseKit\Core\Models\License;
 use LicenseKit\Core\Models\Product;
 use LicenseKit\Tests\Core\Fixtures\ClientSessions;
 use LicenseKit\Tests\Core\Fixtures\User;
 
 class HostFreeRestriction implements AccessRestriction
 {
-    public function assertAllowed(Model $user, Product $product, ?Entitlement $entitlement): void
+    public function assertAllowed(Model $user, Product $product, ?License $license): void
     {
         throw new LicensingException('service_unavailable');
     }
@@ -33,10 +33,10 @@ test('host free authorization works without module schema HTTP routes or panel',
     $product = Product::factory()->create();
     $deadline = CarbonImmutable::now('UTC')->addHour();
     $result = app(LicensedDevices::class)->bind($user, $product, desktopRequest($user)['hwid'], $deadline);
-    expect($result->access->source)->toBe('host_free')->and($result->access->entitlement)->toBeNull()
+    expect($result->access->source)->toBe('host_free')->and($result->access->license)->toBeNull()
         ->and($result->access->validUntil->equalTo($deadline))->toBeTrue();
     app(LicensedDevices::class)->verify($user, $product, desktopRequest($user)['hwid'], $deadline);
-    expect(Entitlement::sole()->expires_at)->toBeNull()->and(Entitlement::sole()->is_lifetime)->toBeFalse();
+    expect(License::sole()->expires_at)->toBeNull()->and(License::sole()->is_lifetime)->toBeFalse();
     expect(Schema::hasTable('licensekit_free_access_windows'))->toBeFalse();
     expect(fn () => app(LicensedDevices::class)->verify($user, $product, desktopRequest($user, 'other')['hwid'], $deadline))->toThrow(LicensingException::class, 'hwid mismatch');
     expect(lockedDeviceCount())->toBe(1);
@@ -53,20 +53,20 @@ test('null expired and exact-boundary host deadlines grant nothing', function (?
 
 test('paid grant takes precedence and paid-only denial never uses free access implicitly', function () {
     $this->travelTo(now()->startOfSecond());
-    $entitlement = Entitlement::factory()->create(['user_id' => User::factory()->create()->id]);
-    $result = app(AccessPolicy::class)->authorize($entitlement->user, $entitlement->product, CarbonImmutable::now()->addDay());
-    expect($result->source)->toBe('paid')->and($result->entitlement->id)->toBe($entitlement->id);
-    $entitlement->update(['expires_at' => now()->subDay()]);
-    expect(fn () => app(AccessPolicy::class)->authorize($entitlement->user, $entitlement->product))->toThrow(LicensingException::class, 'license expired');
+    $license = License::factory()->create(['user_id' => User::factory()->create()->id]);
+    $result = app(AccessPolicy::class)->authorize($license->user, $license->product, CarbonImmutable::now()->addDay());
+    expect($result->source)->toBe('paid')->and($result->license->id)->toBe($license->id);
+    $license->update(['expires_at' => now()->subDay()]);
+    expect(fn () => app(AccessPolicy::class)->authorize($license->user, $license->product))->toThrow(LicensingException::class, 'license expired');
 });
 
 test('cancellation invalidates the paid grant but allows host-approved free access', function () {
     $this->travelTo(now()->startOfSecond());
-    $entitlement = Entitlement::factory()->create(['user_id' => User::factory()->create()->id, 'status' => 'revoked']);
-    expect(fn () => app(AccessPolicy::class)->authorize($entitlement->user, $entitlement->product))->toThrow(LicensingException::class);
-    $result = app(AccessPolicy::class)->authorize($entitlement->user, $entitlement->product, CarbonImmutable::now()->addHour());
-    expect($result->source)->toBe('host_free')->and($result->entitlement)->toBeNull();
-    expect($entitlement->fresh()->isRevoked())->toBeTrue();
+    $license = License::factory()->create(['user_id' => User::factory()->create()->id, 'status' => 'revoked']);
+    expect(fn () => app(AccessPolicy::class)->authorize($license->user, $license->product))->toThrow(LicensingException::class);
+    $result = app(AccessPolicy::class)->authorize($license->user, $license->product, CarbonImmutable::now()->addHour());
+    expect($result->source)->toBe('host_free')->and($result->license)->toBeNull();
+    expect($license->fresh()->isRevoked())->toBeTrue();
 });
 
 test('universal restrictions deny host-approved free access without binding writes', function (string $restriction, string $error) {
@@ -91,7 +91,7 @@ test('suspension denies free access before any purchase and invalidates host ses
     $product = Product::factory()->create();
     config(['host_client.free_until' => now()->addHour()->toIso8601String()]);
     app(ClientSessions::class)->login($product, $user->email, 'password', desktopRequest($user)['hwid']);
-    app(ManageEntitlements::class)->suspendCustomer($user, $product, $admin, 'Abuse');
+    app(ManageLicenses::class)->suspendCustomer($user, $product, $admin, 'Abuse');
     $this->assertDatabaseCount('client_sessions', 0);
     expect(fn () => app(AccessPolicy::class)->authorize($user, $product, CarbonImmutable::now()->addDay()))->toThrow(LicensingException::class, 'license suspended');
 });
@@ -114,7 +114,7 @@ test('restriction-only checks do not create a paid or free grant', function () {
     expect(app(AccessPolicy::class)->assertAllowed($user, $product))->toBeNull();
     expect(fn () => app(LicensedDevices::class)->bind($user, $product, desktopRequest($user)['hwid']))->toThrow(LicensingException::class, 'license unavailable');
     expect(fn () => app(AccessPolicy::class)->authorize($user, $product))->toThrow(LicensingException::class);
-    $this->assertDatabaseCount('licensekit_entitlements', 0);
+    $this->assertDatabaseCount('licensekit_licenses', 0);
 });
 
 test('host credential write failure rolls back first free binding in outer transaction', function () {

@@ -8,15 +8,15 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\Expression;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
-use LicenseKit\Core\Events\EntitlementAccessInvalidated;
+use LicenseKit\Core\Events\LicenseAccessInvalidated;
 use LicenseKit\Core\Events\ProductAccessInvalidated;
 use LicenseKit\Core\Exceptions\LicensingException;
 use LicenseKit\Core\Models\Batch;
-use LicenseKit\Core\Models\Entitlement;
+use LicenseKit\Core\Models\License;
 use LicenseKit\Core\Models\LicenseKey;
 use LicenseKit\Core\Models\Product;
 
-class ManageEntitlements
+class ManageLicenses
 {
     public const MAXIMUM_ADDED_SECONDS = 315360000;
 
@@ -56,11 +56,11 @@ class ManageEntitlements
         return $this->addTimeTargets($product, $this->addTimeCutoff($since))->count();
     }
 
-    /** @return Builder<Entitlement> */
+    /** @return Builder<License> */
     private function addTimeTargets(Product $product, CarbonImmutable $since): Builder
     {
-        return Entitlement::query()->where('product_id', $product->id)->whereNotNull('user_id')
-            ->where('is_lifetime', false)->where('status', '!=', Entitlement::REVOKED)
+        return License::query()->where('product_id', $product->id)->whereNotNull('user_id')
+            ->where('is_lifetime', false)->where('status', '!=', License::REVOKED)
             ->where(fn ($query) => $query->whereNotNull('paused_at')->orWhere('expires_at', '>', $since->format('Y-m-d H:i:s')));
     }
 
@@ -84,119 +84,119 @@ class ManageEntitlements
         return $reason === '' ? null : $reason;
     }
 
-    public function extend(Entitlement $entitlement, int $seconds, Model $actor, string $reason): void
+    public function extend(License $license, int $seconds, Model $actor, string $reason): void
     {
         if ($seconds < 1 || $seconds > 315360000) {
             throw new LicensingException('invalid_duration', 422);
         }
-        $this->changeClock($entitlement, 'extend', $actor, $reason, $seconds);
+        $this->changeClock($license, 'extend', $actor, $reason, $seconds);
     }
 
-    public function pause(Entitlement $entitlement, Model $actor, string $reason): void
+    public function pause(License $license, Model $actor, string $reason): void
     {
-        $this->changeClock($entitlement, 'pause', $actor, $reason);
+        $this->changeClock($license, 'pause', $actor, $reason);
     }
 
-    public function resume(Entitlement $entitlement, Model $actor, string $reason): void
+    public function resume(License $license, Model $actor, string $reason): void
     {
-        $this->changeClock($entitlement, 'resume', $actor, $reason);
+        $this->changeClock($license, 'resume', $actor, $reason);
     }
 
     /** @param 'extend'|'pause'|'resume' $ability */
-    private function changeClock(Entitlement $entitlement, string $ability, Model $actor, string $reason, ?int $seconds = null): void
+    private function changeClock(License $license, string $ability, Model $actor, string $reason, ?int $seconds = null): void
     {
         $reason = trim($reason);
         if ($reason === '' || mb_strlen($reason) > 2000) {
             throw new LicensingException('invalid_reason', 422);
         }
 
-        DB::transaction(function () use ($entitlement, $ability, $actor, $reason, $seconds): void {
-            $users = $actor->newQuery()->whereKey(array_filter([$actor->getKey(), $entitlement->user_id], fn ($id): bool => $id !== null))
+        DB::transaction(function () use ($license, $ability, $actor, $reason, $seconds): void {
+            $users = $actor->newQuery()->whereKey(array_filter([$actor->getKey(), $license->user_id], fn ($id): bool => $id !== null))
                 ->orderBy($actor->getKeyName())->lockForUpdate()->get();
             $actor = $users->first(fn (Model $user): bool => (string) $user->getKey() === (string) $actor->getKey()) ?? throw new LicensingException('admin_forbidden');
-            Product::whereKey($entitlement->product_id)->lockForUpdate()->firstOrFail();
-            $entitlement = Entitlement::whereKey($entitlement->id)->lockForUpdate()->first() ?? throw new LicensingException('license_unavailable');
-            if ($entitlement->user_id === null || $entitlement->is_lifetime || $entitlement->isRevoked()
-                || $entitlement->isSuspended()) {
-                throw new LicensingException('cannot_'.$ability.'_entitlement', 409);
+            Product::whereKey($license->product_id)->lockForUpdate()->firstOrFail();
+            $license = License::whereKey($license->id)->lockForUpdate()->first() ?? throw new LicensingException('license_unavailable');
+            if ($license->user_id === null || $license->is_lifetime || $license->isRevoked()
+                || $license->isSuspended()) {
+                throw new LicensingException('cannot_'.$ability.'_license', 409);
             }
-            $before = $entitlement->only(['expires_at', 'paused_at', 'remaining_seconds']);
-            $clock = app(EntitlementClock::class);
+            $before = $license->only(['expires_at', 'paused_at', 'remaining_seconds']);
+            $clock = app(LicenseClock::class);
             match ($ability) {
-                'extend' => $clock->extend($entitlement, $seconds ?? throw new LicensingException('invalid_duration', 422)),
-                'pause' => $clock->pause($entitlement),
-                'resume' => $clock->resume($entitlement),
+                'extend' => $clock->extend($license, $seconds ?? throw new LicensingException('invalid_duration', 422)),
+                'pause' => $clock->pause($license),
+                'resume' => $clock->resume($license),
             };
             if ($ability === 'pause') {
-                Event::dispatch(new EntitlementAccessInvalidated($entitlement));
+                Event::dispatch(new LicenseAccessInvalidated($license));
             }
-            $after = $entitlement->only(['expires_at', 'paused_at', 'remaining_seconds']);
+            $after = $license->only(['expires_at', 'paused_at', 'remaining_seconds']);
             if ($seconds !== null) {
                 $after['added_seconds'] = $seconds;
             }
             $event = match ($ability) {
-                'extend' => 'entitlement_extended',
-                'pause' => 'entitlement_paused',
-                'resume' => 'entitlement_resumed',
+                'extend' => 'license_extended',
+                'pause' => 'license_paused',
+                'resume' => 'license_resumed',
             };
-            $this->audit->record('user:'.$actor->getKey(), $event, $entitlement, $before, $after, $reason);
+            $this->audit->record('user:'.$actor->getKey(), $event, $license, $before, $after, $reason);
         }, 3);
     }
 
     /** Stops all access to the product, including free access and key redemption, until lifted or $until passes. */
-    public function suspend(Entitlement $entitlement, Model $actor, ?string $reason = null, ?CarbonImmutable $until = null): void
+    public function suspend(License $license, Model $actor, ?string $reason = null, ?CarbonImmutable $until = null): void
     {
-        $this->changeStatus($entitlement, $actor, $reason, Entitlement::SUSPENDED, $until);
+        $this->changeStatus($license, $actor, $reason, License::SUSPENDED, $until);
     }
 
-    public function unsuspend(Entitlement $entitlement, Model $actor, ?string $reason = null): void
+    public function unsuspend(License $license, Model $actor, ?string $reason = null): void
     {
-        $this->changeStatus($entitlement, $actor, $reason);
+        $this->changeStatus($license, $actor, $reason);
     }
 
     /** Cancels paid access, for example after a refund. Another key cannot renew a cancelled license. */
-    public function revoke(Entitlement $entitlement, Model $actor, ?string $reason = null): void
+    public function revoke(License $license, Model $actor, ?string $reason = null): void
     {
-        $this->changeStatus($entitlement, $actor, $reason, Entitlement::REVOKED);
+        $this->changeStatus($license, $actor, $reason, License::REVOKED);
     }
 
-    public function restore(Entitlement $entitlement, Model $actor, ?string $reason = null): void
+    public function restore(License $license, Model $actor, ?string $reason = null): void
     {
-        $this->changeStatus($entitlement, $actor, $reason);
+        $this->changeStatus($license, $actor, $reason);
     }
 
     /** Suspends a customer for a product, creating their license record if they have none yet. */
-    public function suspendCustomer(Model $user, Product $product, Model $actor, ?string $reason = null, ?CarbonImmutable $until = null): Entitlement
+    public function suspendCustomer(Model $user, Product $product, Model $actor, ?string $reason = null, ?CarbonImmutable $until = null): License
     {
-        return DB::transaction(function () use ($user, $product, $actor, $reason, $until): Entitlement {
+        return DB::transaction(function () use ($user, $product, $actor, $reason, $until): License {
             $user = $user->newQuery()->whereKey($user->getKey())->lockForUpdate()->first() ?? throw new LicensingException('user_unavailable');
-            $entitlement = Entitlement::firstOrCreate(['user_id' => $user->getKey(), 'product_id' => $product->id]);
-            $this->suspend($entitlement, $actor, $reason, $until);
+            $license = License::firstOrCreate(['user_id' => $user->getKey(), 'product_id' => $product->id]);
+            $this->suspend($license, $actor, $reason, $until);
 
-            return $entitlement->fresh() ?? $entitlement;
+            return $license->fresh() ?? $license;
         }, 3);
     }
 
-    private function changeStatus(Entitlement $entitlement, Model $actor, ?string $reason, ?string $status = null, ?CarbonImmutable $until = null): void
+    private function changeStatus(License $license, Model $actor, ?string $reason, ?string $status = null, ?CarbonImmutable $until = null): void
     {
         $reason = $this->optionalReason($reason);
         if ($until !== null && ! $until->isFuture()) {
             throw new LicensingException('invalid_suspension_end', 422);
         }
-        DB::transaction(function () use ($entitlement, $actor, $reason, $status, $until): void {
-            $actor->newQuery()->whereKey(array_filter([$actor->getKey(), $entitlement->user_id], fn ($id): bool => $id !== null))->orderBy($actor->getKeyName())->lockForUpdate()->get();
-            Product::whereKey($entitlement->product_id)->lockForUpdate()->firstOrFail();
-            $entitlement = Entitlement::whereKey($entitlement->id)->lockForUpdate()->first() ?? throw new LicensingException('license_unavailable');
-            $before = $entitlement->only(['status', 'suspended_until']);
-            $entitlement->update([
-                'status' => $status ?? $entitlement->restingStatus(),
-                'suspended_until' => $status === Entitlement::SUSPENDED ? $until?->utc()->startOfSecond() : null,
+        DB::transaction(function () use ($license, $actor, $reason, $status, $until): void {
+            $actor->newQuery()->whereKey(array_filter([$actor->getKey(), $license->user_id], fn ($id): bool => $id !== null))->orderBy($actor->getKeyName())->lockForUpdate()->get();
+            Product::whereKey($license->product_id)->lockForUpdate()->firstOrFail();
+            $license = License::whereKey($license->id)->lockForUpdate()->first() ?? throw new LicensingException('license_unavailable');
+            $before = $license->only(['status', 'suspended_until']);
+            $license->update([
+                'status' => $status ?? $license->restingStatus(),
+                'suspended_until' => $status === License::SUSPENDED ? $until?->utc()->startOfSecond() : null,
             ]);
-            if ($status !== null && $entitlement->user !== null) {
-                Event::dispatch(new EntitlementAccessInvalidated($entitlement));
-                Event::dispatch(new ProductAccessInvalidated($entitlement->user, $entitlement->product_id));
+            if ($status !== null && $license->user !== null) {
+                Event::dispatch(new LicenseAccessInvalidated($license));
+                Event::dispatch(new ProductAccessInvalidated($license->user, $license->product_id));
             }
-            $this->audit->record('user:'.$actor->getKey(), 'license_status_changed', $entitlement, $before, $entitlement->only(['status', 'suspended_until']), $reason);
+            $this->audit->record('user:'.$actor->getKey(), 'license_status_changed', $license, $before, $license->only(['status', 'suspended_until']), $reason);
         });
     }
 

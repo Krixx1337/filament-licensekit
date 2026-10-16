@@ -76,7 +76,7 @@ test('management authenticates before lookup and rejects absent malformed and wr
 test('management token cannot authenticate customer fulfillment or desktop requests', function () {
     [$client, $token] = managementCredential();
     $plan = LicensePlan::factory()->create();
-    $this->withToken($token)->getJson('/api/licensekit/v1/entitlements')->assertNotFound();
+    $this->withToken($token)->getJson('/api/licensekit/v1/licenses')->assertNotFound();
     $this->postJson('/api/licensekit/v1/licenses/issue', ['plan_id' => $plan->id, 'quantity' => 1, 'reference' => 'wrong'])->assertNotFound();
     $this->postJson('/api/licensekit/v1/products/'.$plan->product->slug.'/heartbeat', ['hwid' => 'pc'])->assertUnauthorized();
     $this->assertDatabaseCount('licensekit_license_keys', 0);
@@ -171,7 +171,7 @@ test('issue fifty keys workflow retries same batch after plan edits and retrieve
     $this->getJson('/api/licensekit/v1/manage/batches/'.$id.'/keys?per_page=100')->assertOk()->assertJsonCount(50, 'data')->assertJsonPath('data.0.key', $created->json('data.keys.0.key'));
     $this->getJson('/api/licensekit/v1/manage/batches?reference=giveaway-october')->assertOk()->assertJsonCount(1, 'data')->assertJsonMissingPath('data.0.keys');
     $this->assertDatabaseCount('licensekit_license_keys', 50);
-    $this->assertDatabaseCount('licensekit_entitlements', 0);
+    $this->assertDatabaseCount('licensekit_licenses', 0);
     expect(AuditEvent::get()->toJson())->not->toContain($created->json('data.keys.0.key'));
 });
 
@@ -200,14 +200,14 @@ test('batch visibility defaults to own issuer and all issuer permission never cr
     $this->getJson('/api/licensekit/v1/manage/batches/'.$outside->id)->assertNotFound();
 });
 
-test('created keys redeem immediately and no entitlement exists before claim', function () {
+test('created keys redeem immediately and no license exists before claim', function () {
     [$client, $token] = managementCredential();
     $plan = LicensePlan::factory()->create();
     $created = $this->withToken($token)->postJson('/api/licensekit/v1/manage/batches', ['plan_id' => $plan->id, 'quantity' => 2, 'reference' => 'purchase'])->assertCreated();
-    $this->assertDatabaseCount('licensekit_entitlements', 0);
+    $this->assertDatabaseCount('licensekit_licenses', 0);
     $user = User::factory()->create();
-    $entitlement = app(ClaimLicense::class)->claim($user, $created->json('data.keys.0.key'));
-    expect($entitlement->user_id)->toBe($user->id);
+    $license = app(ClaimLicense::class)->claim($user, $created->json('data.keys.0.key'));
+    expect($license->user_id)->toBe($user->id);
     $this->assertDatabaseCount('licensekit_license_keys', 2);
 });
 
@@ -377,7 +377,7 @@ test('read only HTTP clients see their own batches within allowed products', fun
     $this->getJson('/api/licensekit/v1/manage/batches/'.$staffBatch->id.'/keys?status=unclaimed&per_page=1')
         ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('meta.total', 1)
         ->assertJsonPath('data.0.id', $staffBatch->keys[1]->id)->assertJsonPath('data.0.claimed_at', null)
-        ->assertHeader('Cache-Control', 'no-store, private')->assertJsonMissingPath('data.0.entitlement_id');
+        ->assertHeader('Cache-Control', 'no-store, private')->assertJsonMissingPath('data.0.license_id');
     foreach ([$outside, $unrelated, $ownOutside] as $hidden) {
         $this->getJson('/api/licensekit/v1/manage/batches/'.$hidden->id)->assertNotFound();
         $this->getJson('/api/licensekit/v1/manage/batches/'.$hidden->id.'/keys')->assertNotFound();

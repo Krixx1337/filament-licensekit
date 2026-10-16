@@ -3,7 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use LicenseKit\Core\Actions\CustomerLicenses;
 use LicenseKit\Core\Models\ApiClient;
-use LicenseKit\Core\Models\Entitlement;
+use LicenseKit\Core\Models\License;
 use LicenseKit\Tests\Core\Fixtures\User;
 
 function bootRouting(array $settings): void
@@ -31,8 +31,8 @@ test('customer PHP services work with package HTTP disabled and no panel', funct
     bootRouting(['licensekit.management.enabled' => false]);
     expect(Route::has('licensekit.management.products.index'))->toBeFalse();
     $user = User::factory()->create();
-    $entitlement = Entitlement::factory()->create(['user_id' => $user->id]);
-    expect(app(CustomerLicenses::class)->find($user, $entitlement->id)['id'])->toBe($entitlement->id);
+    $license = License::factory()->create(['user_id' => $user->id]);
+    expect(app(CustomerLicenses::class)->find($user, $license->id)['id'])->toBe($license->id);
 });
 
 test('obsolete routing overrides do not change management registration', function () {

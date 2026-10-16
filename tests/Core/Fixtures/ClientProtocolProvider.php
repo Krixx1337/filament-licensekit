@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
-use LicenseKit\Core\Events\EntitlementAccessInvalidated;
+use LicenseKit\Core\Events\LicenseAccessInvalidated;
 use LicenseKit\Core\Events\ProductAccessInvalidated;
 use LicenseKit\Core\Users\ConfiguredUserModel;
 
@@ -26,7 +26,7 @@ class ClientProtocolProvider extends ServiceProvider
         ConfiguredUserModel::className()::observe(ClientUserObserver::class);
         Event::listen(HostUserSecurityChanged::class, fn (HostUserSecurityChanged $event) => DB::transaction(fn () => app(SessionCleanup::class)->forUser($event->user)));
         Event::listen(ProductAccessInvalidated::class, [SessionCleanup::class, 'productInvalidated']);
-        Event::listen(EntitlementAccessInvalidated::class, [SessionCleanup::class, 'accessInvalidated']);
+        Event::listen(LicenseAccessInvalidated::class, [SessionCleanup::class, 'accessInvalidated']);
         if (config('host_client.enabled', true) && ! $this->app->routesAreCached()) {
             Route::middleware(['api', 'licensekit.json'])->prefix('api/licensekit/v1')->group(function (): void {
                 Route::post('products/{product:slug}/login', [ClientSessionController::class, 'login'])->name('licensekit.desktop.login')->middleware('throttle:client-login');

@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use LicenseKit\Core\Casts\UtcDateTime;
 use LicenseKit\Core\Users\ConfiguredUserModel;
-use LicenseKit\Database\Factories\Core\EntitlementFactory;
+use LicenseKit\Database\Factories\Core\LicenseFactory;
 
 /**
  * @property int $id
@@ -27,7 +27,7 @@ use LicenseKit\Database\Factories\Core\EntitlementFactory;
  * @property CarbonImmutable|null $device_bound_at
  * @property CarbonImmutable|null $device_reset_at
  */
-class Entitlement extends Model
+class License extends Model
 {
     public const ACTIVE = 'active';
 
@@ -41,14 +41,14 @@ class Entitlement extends Model
 
     protected $hidden = ['device'];
 
-    protected $table = 'licensekit_entitlements';
+    protected $table = 'licensekit_licenses';
 
-    protected static function newFactory(): EntitlementFactory
+    protected static function newFactory(): LicenseFactory
     {
-        return EntitlementFactory::new();
+        return LicenseFactory::new();
     }
 
-    /** @use HasFactory<EntitlementFactory> */
+    /** @use HasFactory<LicenseFactory> */
     use HasFactory;
 
     protected $attributes = ['is_lifetime' => false, 'status' => self::ACTIVE];

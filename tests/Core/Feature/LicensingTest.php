@@ -8,11 +8,11 @@ use Illuminate\Validation\ValidationException;
 use LicenseKit\Core\Actions\ClaimLicense;
 use LicenseKit\Core\Actions\CreateBatch;
 use LicenseKit\Core\Actions\SerialKey;
-use LicenseKit\Core\Events\EntitlementGranted;
+use LicenseKit\Core\Events\LicenseGranted;
 use LicenseKit\Core\Exceptions\LicensingException;
 use LicenseKit\Core\Models\ApiClient;
 use LicenseKit\Core\Models\AuditEvent;
-use LicenseKit\Core\Models\Entitlement;
+use LicenseKit\Core\Models\License;
 use LicenseKit\Core\Models\LicenseKey;
 use LicenseKit\Core\Models\LicensePlan;
 use LicenseKit\Core\Models\Product;
@@ -87,13 +87,13 @@ test('admin claims use locked actors and keys without serial lookup', function (
     DB::enableQueryLog();
     DB::flushQueryLog();
 
-    $entitlement = app(ClaimLicense::class)->claimFor($actor, $user, $key);
+    $license = app(ClaimLicense::class)->claimFor($actor, $user, $key);
     $queries = collect(DB::getQueryLog())->filter(fn (array $query): bool => str_starts_with($query['query'], 'select'));
     DB::disableQueryLog();
 
     expect($queries->filter(fn (array $query): bool => str_contains($query['query'], 'from "users"')))->toHaveCount(1);
     expect($queries->filter(fn (array $query): bool => str_contains($query['query'], 'from "licensekit_license_keys"')))->toHaveCount(1);
-    $this->assertDatabaseHas('licensekit_license_keys', ['id' => $key->id, 'entitlement_id' => $entitlement->id]);
+    $this->assertDatabaseHas('licensekit_license_keys', ['id' => $key->id, 'license_id' => $license->id]);
     $this->assertDatabaseHas('licensekit_audit_events', ['event' => 'key_claimed', 'actor' => 'user:'.$actor->id]);
 })->with([true, false]);
 
@@ -102,7 +102,7 @@ test('claim listener or audit failure rolls back customer and administrative cla
     $user = User::factory()->create();
     $key = app(CreateBatch::class)->create(LicensePlan::factory()->create(), 1, 'rollback', 'test')->keys->first();
     if ($failure === 'listener') {
-        Event::listen(EntitlementGranted::class, fn () => throw new RuntimeException('claim failed'));
+        Event::listen(LicenseGranted::class, fn () => throw new RuntimeException('claim failed'));
     } else {
         AuditEvent::creating(fn () => throw new RuntimeException('claim failed'));
     }
@@ -111,7 +111,7 @@ test('claim listener or audit failure rolls back customer and administrative cla
         ->toThrow(RuntimeException::class, 'claim failed');
 
     expect($key->fresh()->claimed_at)->toBeNull();
-    $this->assertDatabaseCount('licensekit_entitlements', 0);
+    $this->assertDatabaseCount('licensekit_licenses', 0);
     $this->assertDatabaseMissing('licensekit_audit_events', ['event' => 'key_claimed']);
 })->with([true, false])->with(['listener', 'audit']);
 
@@ -130,7 +130,7 @@ test('administrative claim rechecks target and key eligibility without partial w
     expect(fn () => app(ClaimLicense::class)->claimFor($actor, $user, $key))->toThrow(LicensingException::class, $error);
 
     expect($key->fresh()->claimed_at)->toBeNull();
-    $this->assertDatabaseCount('licensekit_entitlements', 0);
+    $this->assertDatabaseCount('licensekit_licenses', 0);
     $this->assertDatabaseMissing('licensekit_audit_events', ['event' => 'key_claimed']);
 })->with([
     ['suspended', 'user unavailable'], ['unverified', 'user unavailable'], ['deleted', 'user unavailable'],
@@ -146,23 +146,23 @@ test('claim normalizes ungrouped lowercase key and starts timer once', function 
     $result = app(ClaimLicense::class)->claim($user, ' '.strtolower(str_replace('-', '', $key->key)).' ');
 
     expect($result->expires_at->toIso8601String())->toBe('2026-01-31T00:00:00+00:00');
-    $this->assertDatabaseHas('licensekit_license_keys', ['id' => $key->id, 'entitlement_id' => $result->id]);
+    $this->assertDatabaseHas('licensekit_license_keys', ['id' => $key->id, 'license_id' => $result->id]);
     expect(fn () => app(ClaimLicense::class)->claim($user, $key->key))->toThrow(LicensingException::class, 'key already claimed');
-    $this->assertDatabaseCount('licensekit_entitlements', 1);
+    $this->assertDatabaseCount('licensekit_licenses', 1);
 });
 
 test('renewal adds time while expired access restarts at claim time', function (bool $expired, string $expected) {
     $this->travelTo(now()->setDate(2026, 1, 1)->startOfDay());
     $user = User::factory()->create();
     $plan = LicensePlan::factory()->create();
-    $entitlement = Entitlement::factory()->create(['user_id' => $user->id, 'product_id' => $plan->product_id, 'expires_at' => $expired ? now()->subDay() : now()->addDays(10)]);
+    $license = License::factory()->create(['user_id' => $user->id, 'product_id' => $plan->product_id, 'expires_at' => $expired ? now()->subDay() : now()->addDays(10)]);
     $key = app(CreateBatch::class)->create($plan, 1, 'sale', 'admin:1')->keys->first();
 
     $result = app(ClaimLicense::class)->claim($user, $key->key);
 
-    expect($result->id)->toBe($entitlement->id);
+    expect($result->id)->toBe($license->id);
     expect($result->expires_at->toDateString())->toBe($expected);
-    $this->assertDatabaseCount('licensekit_entitlements', 1);
+    $this->assertDatabaseCount('licensekit_licenses', 1);
 })->with(['active' => [false, '2026-02-10'], 'expired' => [true, '2026-01-31']]);
 
 test('lifetime upgrade clears expiry and rejects another key without consuming it', function () {
@@ -204,18 +204,18 @@ test('generated keys are immediately claimable without export or allocation', fu
     $user = User::factory()->create();
     $plan = LicensePlan::factory()->create();
     $batch = app(CreateBatch::class)->create($plan, 1, 'created', 'admin:1');
-    $entitlement = app(ClaimLicense::class)->claim($user, $batch->keys[0]->key);
-    expect($entitlement->user_id)->toBe($user->id);
+    $license = app(ClaimLicense::class)->claim($user, $batch->keys[0]->key);
+    expect($license->user_id)->toBe($user->id);
     expect($batch->keys[0]->fresh()->claimed_at)->not->toBeNull();
 });
 
 test('revoked access cannot be restored by claiming another key', function () {
     $user = User::factory()->create();
     $plan = LicensePlan::factory()->create();
-    Entitlement::factory()->create(['user_id' => $user->id, 'product_id' => $plan->product_id, 'status' => 'revoked']);
+    License::factory()->create(['user_id' => $user->id, 'product_id' => $plan->product_id, 'status' => 'revoked']);
     $key = app(CreateBatch::class)->create($plan, 1, 'sale', 'admin:1')->keys->first();
 
-    expect(fn () => app(ClaimLicense::class)->claim($user, $key->key))->toThrow(LicensingException::class, 'entitlement revoked');
+    expect(fn () => app(ClaimLicense::class)->claim($user, $key->key))->toThrow(LicensingException::class, 'license revoked');
 
     expect($key->fresh()->claimed_at)->toBeNull();
 });
@@ -266,9 +266,9 @@ test('issued key retains purchased duration after plan edit and cannot move prod
     $key = app(CreateBatch::class)->create($plan, 1, 'sale', 'admin:1')->keys->first();
     $plan->update(['duration_days' => 1]);
 
-    $entitlement = app(ClaimLicense::class)->claim($user, $key->key);
+    $license = app(ClaimLicense::class)->claim($user, $key->key);
 
-    expect($entitlement->expires_at->toDateString())->toBe('2026-01-31');
+    expect($license->expires_at->toDateString())->toBe('2026-01-31');
     $other = Product::factory()->create();
     expect(fn () => $plan->update(['product_id' => $other->id]))->toThrow(LicensingException::class, 'plan product is immutable');
 });
@@ -296,7 +296,7 @@ test('generated batches preserve finite and lifetime snapshots and normalized la
     expect($batch->keys[0]->batch_id)->toBe($batch->id);
     expect($batch->label)->toBe('October giveaway');
     expect($blank->label)->toBeNull();
-    $this->assertDatabaseCount('licensekit_entitlements', 0);
+    $this->assertDatabaseCount('licensekit_licenses', 0);
 })->with(['finite' => 30, 'lifetime' => null]);
 
 test('issuance replay retains original metadata and conflicts on plan or quantity', function () {

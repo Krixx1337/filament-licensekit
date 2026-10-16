@@ -6,7 +6,7 @@ use LicenseKit\Core\Actions\ManageApiClients;
 use LicenseKit\Core\Exceptions\LicensingException;
 use LicenseKit\Core\Models\ApiClient;
 use LicenseKit\Core\Models\AuditEvent;
-use LicenseKit\Core\Models\Entitlement;
+use LicenseKit\Core\Models\License;
 use LicenseKit\Core\Models\Product;
 use LicenseKit\Tests\Core\Fixtures\ClientSessions;
 use LicenseKit\Tests\Core\Fixtures\User;
@@ -36,11 +36,11 @@ test('invalid expiry preserves existing integration token', function () {
 test('session termination keeps device binding and requires reason', function () {
     $user = User::factory()->create();
     $product = Product::factory()->create();
-    $entitlement = Entitlement::factory()->create(['user_id' => $user->id, 'product_id' => $product->id]);
+    $license = License::factory()->create(['user_id' => $user->id, 'product_id' => $product->id]);
     $devices = app(ClientSessions::class);
     $token = $devices->login($product, $user->email, 'password', 'pc')['token'];
-    expect(fn () => $devices->terminate($entitlement, testAdminActor(), ''))->toThrow(LicensingException::class);
-    $devices->terminate($entitlement, testAdminActor(), 'Support');
+    expect(fn () => $devices->terminate($license, testAdminActor(), ''))->toThrow(LicensingException::class);
+    $devices->terminate($license, testAdminActor(), 'Support');
     expect(PersonalAccessToken::findToken($token))->toBeNull();
     expect(lockedDeviceCount())->toBe(1);
     $this->assertDatabaseHas('licensekit_audit_events', ['event' => 'desktop_session_terminated', 'reason' => 'Support']);

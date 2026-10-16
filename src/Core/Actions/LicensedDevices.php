@@ -11,7 +11,7 @@ use LicenseKit\Core\Contracts\DeviceMatcher;
 use LicenseKit\Core\Data\DeviceAuthorization;
 use LicenseKit\Core\Events\ProductAccessInvalidated;
 use LicenseKit\Core\Exceptions\LicensingException;
-use LicenseKit\Core\Models\Entitlement;
+use LicenseKit\Core\Models\License;
 use LicenseKit\Core\Models\Product;
 use LicenseKit\Core\Users\UserAccess;
 
@@ -89,7 +89,7 @@ class LicensedDevices
     }
 
     /** @return array{allowed: bool, available_at: string|null, reason: string|null} */
-    public function eligibility(Entitlement $license): array
+    public function eligibility(License $license): array
     {
         $cooldown = $license->product->device_move_cooldown_days;
         if ($cooldown === null) {
@@ -114,7 +114,7 @@ class LicensedDevices
             return new DeviceAuthorization($access->user, $access, $device);
         }
         $license = $bind ? $this->license($access->user, $access->product)
-            : Entitlement::where('user_id', $access->user->getKey())->where('product_id', $access->product->id)->first();
+            : License::where('user_id', $access->user->getKey())->where('product_id', $access->product->id)->first();
         if ($license?->device !== null) {
             if (! $this->matcher->matches($access->product, $license->device, $device)) {
                 throw new LicensingException('hwid_mismatch');
@@ -128,7 +128,7 @@ class LicensedDevices
         return new DeviceAuthorization($access->user, $access, $device);
     }
 
-    private function assertCustomerMayChange(Entitlement $license, Product $product): void
+    private function assertCustomerMayChange(License $license, Product $product): void
     {
         $license->setRelation('product', $product);
         $failure = $this->eligibility($license)['reason'];
@@ -141,24 +141,24 @@ class LicensedDevices
         }
     }
 
-    private function clear(Model $user, Product $product, Entitlement $license, Model $actor, string $performedBy, ?string $reason): void
+    private function clear(Model $user, Product $product, License $license, Model $actor, string $performedBy, ?string $reason): void
     {
         $before = $license->device;
         $license->update(['device' => null, 'device_bound_at' => null, 'device_reset_at' => now()]);
         $this->changed($user, $product, $license, $actor, 'device_reset', $performedBy, $before, $reason);
     }
 
-    private function changed(Model $user, Product $product, Entitlement $license, Model $actor, string $event, string $performedBy, ?string $before, ?string $reason): void
+    private function changed(Model $user, Product $product, License $license, Model $actor, string $event, string $performedBy, ?string $before, ?string $reason): void
     {
         Event::dispatch(new ProductAccessInvalidated($user, $product->id));
         $this->audit->record('user:'.$actor->getKey(), $event, $license, ['device' => $before], ['device' => $license->device, 'performed_by' => $performedBy], $reason);
     }
 
     /** The customer's license row for the product, created without paid time if needed (for example during a free weekend). */
-    private function license(Model $user, Product $product): Entitlement
+    private function license(Model $user, Product $product): License
     {
-        $license = Entitlement::where('user_id', $user->getKey())->where('product_id', $product->id)->lockForUpdate()->first()
-            ?? Entitlement::create(['user_id' => $user->getKey(), 'product_id' => $product->id]);
+        $license = License::where('user_id', $user->getKey())->where('product_id', $product->id)->lockForUpdate()->first()
+            ?? License::create(['user_id' => $user->getKey(), 'product_id' => $product->id]);
         $license->setRelation('product', $product);
 
         return $license;

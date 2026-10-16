@@ -18,9 +18,9 @@ use Illuminate\Support\Str;
 use LicenseKit\Core\Actions\ClaimLicense;
 use LicenseKit\Core\Actions\CreateBatch;
 use LicenseKit\Core\Actions\LicensedDevices;
-use LicenseKit\Core\Actions\ManageEntitlements;
+use LicenseKit\Core\Actions\ManageLicenses;
 use LicenseKit\Core\Models\Batch;
-use LicenseKit\Core\Models\Entitlement;
+use LicenseKit\Core\Models\License;
 use LicenseKit\Core\Models\LicenseKey;
 use LicenseKit\Core\Models\LicensePlan;
 use LicenseKit\Core\Models\Product;
@@ -39,14 +39,14 @@ class LicensingActions
     {
         return Action::make('edit_note')->label('Edit note')->authorize(fn (): bool => AdminAccess::isAdmin())
             ->fillForm(fn (LicenseKey $record): array => ['note' => $record->getAttribute('note')])->schema([TextInput::make('note')->maxLength(255)])
-            ->action(fn (LicenseKey $record, array $data) => app(ManageEntitlements::class)->updateNote($record, self::actor(), $data['note'] ?? null));
+            ->action(fn (LicenseKey $record, array $data) => app(ManageLicenses::class)->updateNote($record, self::actor(), $data['note'] ?? null));
     }
 
     public static function exportBatch(): Action
     {
         return Action::make('export_unclaimed')->label('Export unclaimed keys')->authorize(fn (): bool => AdminAccess::isAdmin())
             ->action(function (Batch $record): ?StreamedResponse {
-                $keys = app(ManageEntitlements::class)->exportUnclaimedBatch($record);
+                $keys = app(ManageLicenses::class)->exportUnclaimedBatch($record);
                 if ($keys === []) {
                     Notification::make()->title('No unclaimed keys to export')->warning()->send();
 
@@ -67,7 +67,7 @@ class LicensingActions
             ->authorize(fn (): bool => AdminAccess::isAdmin())
             ->schema([Textarea::make('reason')->required()->maxLength(2000)])
             ->action(function (Batch $record, array $data): void {
-                $count = app(ManageEntitlements::class)->revokeUnclaimedBatch($record, self::actor(), $data['reason']);
+                $count = app(ManageLicenses::class)->revokeUnclaimedBatch($record, self::actor(), $data['reason']);
                 Notification::make()->title('Revoked '.$count.' unclaimed keys in this batch')->success()->send();
             });
     }
@@ -112,45 +112,45 @@ class LicensingActions
     {
         return Action::make('revoke_key')->authorize(fn (): bool => AdminAccess::isAdmin())->color('danger')->visible(fn (LicenseKey $record): bool => $record->claimed_at === null && $record->revoked_at === null)
             ->schema([Textarea::make('reason')->required()->maxLength(2000)])
-            ->action(fn (LicenseKey $record, array $data) => app(ManageEntitlements::class)->revokeKey($record, self::actor(), $data['reason']));
+            ->action(fn (LicenseKey $record, array $data) => app(ManageLicenses::class)->revokeKey($record, self::actor(), $data['reason']));
     }
 
     public static function suspend(): Action
     {
         return Action::make('suspend')->label('Suspend')->color('danger')
             ->authorize(fn (): bool => AdminAccess::isSupport())
-            ->visible(fn (Entitlement $record): bool => ! $record->isSuspended() && ! $record->isRevoked())
+            ->visible(fn (License $record): bool => ! $record->isSuspended() && ! $record->isRevoked())
             ->modalDescription('The customer can no longer use this product or redeem keys for it. Their time keeps running.')
             ->schema(self::suspensionFields())
-            ->action(fn (Entitlement $record, array $data) => app(ManageEntitlements::class)->suspend($record, self::actor(), $data['reason'] ?? null, self::suspensionEnd($data)));
+            ->action(fn (License $record, array $data) => app(ManageLicenses::class)->suspend($record, self::actor(), $data['reason'] ?? null, self::suspensionEnd($data)));
     }
 
     public static function unsuspend(): Action
     {
         return Action::make('unsuspend')->label('Unsuspend')
             ->authorize(fn (): bool => AdminAccess::isSupport())
-            ->visible(fn (Entitlement $record): bool => $record->isSuspended())
+            ->visible(fn (License $record): bool => $record->isSuspended())
             ->schema([Textarea::make('reason')->label('Note (optional)')->maxLength(2000)])
-            ->action(fn (Entitlement $record, array $data) => app(ManageEntitlements::class)->unsuspend($record, self::actor(), $data['reason'] ?? null));
+            ->action(fn (License $record, array $data) => app(ManageLicenses::class)->unsuspend($record, self::actor(), $data['reason'] ?? null));
     }
 
     public static function cancelLicense(): Action
     {
         return Action::make('cancel')->label('Cancel license')->color('danger')->requiresConfirmation()
             ->authorize(fn (): bool => AdminAccess::isAdmin())
-            ->visible(fn (Entitlement $record): bool => ! $record->isRevoked())
+            ->visible(fn (License $record): bool => ! $record->isRevoked())
             ->modalDescription('Use this after a refund. Paid access stops and new keys cannot renew this license.')
             ->schema([Textarea::make('reason')->label('Note (optional)')->maxLength(2000)])
-            ->action(fn (Entitlement $record, array $data) => app(ManageEntitlements::class)->revoke($record, self::actor(), $data['reason'] ?? null));
+            ->action(fn (License $record, array $data) => app(ManageLicenses::class)->revoke($record, self::actor(), $data['reason'] ?? null));
     }
 
     public static function restoreLicense(): Action
     {
         return Action::make('restore')->label('Restore license')
             ->authorize(fn (): bool => AdminAccess::isAdmin())
-            ->visible(fn (Entitlement $record): bool => $record->isRevoked())
+            ->visible(fn (License $record): bool => $record->isRevoked())
             ->schema([Textarea::make('reason')->label('Note (optional)')->maxLength(2000)])
-            ->action(fn (Entitlement $record, array $data) => app(ManageEntitlements::class)->restore($record, self::actor(), $data['reason'] ?? null));
+            ->action(fn (License $record, array $data) => app(ManageLicenses::class)->restore($record, self::actor(), $data['reason'] ?? null));
     }
 
     /** Header action for customers who may not have a license yet, such as a ban before first purchase. */
@@ -161,7 +161,7 @@ class LicensingActions
             ->modalDescription('Blocks one customer from one product, even if they have not bought it yet.')
             ->schema([self::userSelect()->label('Customer'), Select::make('product_id')->label('Product')->required()
                 ->options(fn (): array => Product::query()->orderBy('name')->pluck('name', 'id')->all())->searchable(), ...self::suspensionFields()])
-            ->action(fn (array $data) => app(ManageEntitlements::class)->suspendCustomer(ConfiguredUserModel::className()::findOrFail($data['user_id']),
+            ->action(fn (array $data) => app(ManageLicenses::class)->suspendCustomer(ConfiguredUserModel::className()::findOrFail($data['user_id']),
                 Product::query()->whereKey($data['product_id'])->firstOrFail(), self::actor(), $data['reason'] ?? null, self::suspensionEnd($data)));
     }
 
@@ -181,60 +181,60 @@ class LicensingActions
         return empty($data['until']) ? null : CarbonImmutable::parse($data['until'], config('app.timezone'))->utc();
     }
 
-    public static function extendEntitlement(): Action
+    public static function extendLicense(): Action
     {
         return Action::make('extend')->label('Extend time')
             ->authorize(fn (): bool => AdminAccess::isSupport())
-            ->visible(fn (Entitlement $record): bool => $record->user_id !== null && ! $record->is_lifetime && ! $record->isRevoked())
+            ->visible(fn (License $record): bool => $record->user_id !== null && ! $record->is_lifetime && ! $record->isRevoked())
             ->modalDescription('Adds time from the current expiry, or from now if expired. Paused licenses keep the added time banked.')
             ->schema([
                 TextInput::make('duration')->integer()->minValue(1)->maxValue(fn (Get $get): int => $get('unit') === 'days' ? 3650 : 87600)->default(1)->required(),
                 Select::make('unit')->options(['hours' => 'Hours', 'days' => 'Days'])->default('days')->live()->required(),
                 Textarea::make('reason')->required()->maxLength(2000),
             ])
-            ->action(function (Entitlement $record, array $data): void {
+            ->action(function (License $record, array $data): void {
                 $seconds = (int) $data['duration'] * ($data['unit'] === 'days' ? 86400 : 3600);
-                app(ManageEntitlements::class)->extend($record, $seconds, self::actor(), $data['reason']);
+                app(ManageLicenses::class)->extend($record, $seconds, self::actor(), $data['reason']);
             });
     }
 
-    public static function pauseEntitlement(): Action
+    public static function pauseLicense(): Action
     {
         return Action::make('pause')->label('Pause')
             ->authorize(fn (): bool => AdminAccess::isSupport())
-            ->visible(fn (Entitlement $record): bool => $record->user_id !== null && ! $record->is_lifetime && $record->status === Entitlement::ACTIVE && $record->paused_at === null && (bool) $record->expires_at?->isFuture())
+            ->visible(fn (License $record): bool => $record->user_id !== null && ! $record->is_lifetime && $record->status === License::ACTIVE && $record->paused_at === null && (bool) $record->expires_at?->isFuture())
             ->modalDescription('Preserves remaining time and stops access until staff resume this license.')
             ->schema([Textarea::make('reason')->required()->maxLength(2000)])
-            ->action(fn (Entitlement $record, array $data) => app(ManageEntitlements::class)->pause($record, self::actor(), $data['reason']));
+            ->action(fn (License $record, array $data) => app(ManageLicenses::class)->pause($record, self::actor(), $data['reason']));
     }
 
-    public static function resumeEntitlement(): Action
+    public static function resumeLicense(): Action
     {
         return Action::make('resume')->label('Resume')
             ->authorize(fn (): bool => AdminAccess::isSupport())
-            ->visible(fn (Entitlement $record): bool => $record->user_id !== null && ! $record->is_lifetime && $record->status === Entitlement::PAUSED)
+            ->visible(fn (License $record): bool => $record->user_id !== null && ! $record->is_lifetime && $record->status === License::PAUSED)
             ->modalDescription('Starts the banked time from now. Other access restrictions still apply.')
             ->schema([Textarea::make('reason')->required()->maxLength(2000)])
-            ->action(fn (Entitlement $record, array $data) => app(ManageEntitlements::class)->resume($record, self::actor(), $data['reason']));
+            ->action(fn (License $record, array $data) => app(ManageLicenses::class)->resume($record, self::actor(), $data['reason']));
     }
 
     public static function reset(): Action
     {
         return Action::make('reset_hwid')->label('Reset device')
-            ->authorize(fn (Entitlement $record): bool => $record->user !== null && AdminAccess::isSupport())
-            ->visible(fn (Entitlement $record): bool => $record->device !== null)
+            ->authorize(fn (License $record): bool => $record->user !== null && AdminAccess::isSupport())
+            ->visible(fn (License $record): bool => $record->device !== null)
             ->modalDescription('Clears the locked device now, ignoring the waiting period. The customer\'s next login locks their new PC.')
             ->schema([Textarea::make('reason')->label('Note')->required()->maxLength(2000)])
-            ->action(fn (Entitlement $record, array $data) => app(LicensedDevices::class)->adminReset($record->user, $record->product, self::actor(), $data['reason']));
+            ->action(fn (License $record, array $data) => app(LicensedDevices::class)->adminReset($record->user, $record->product, self::actor(), $data['reason']));
     }
 
     public static function inspectDevice(): Action
     {
         return Action::make('inspect_device')->label('Show device')
-            ->authorize(fn (Entitlement $record): bool => $record->user !== null && AdminAccess::isSupport())
-            ->visible(fn (Entitlement $record): bool => $record->device !== null)
+            ->authorize(fn (License $record): bool => $record->user !== null && AdminAccess::isSupport())
+            ->visible(fn (License $record): bool => $record->device !== null)
             ->schema([
-                Textarea::make('device')->label('Locked device fingerprint')->default(function (Entitlement $record): ?string {
+                Textarea::make('device')->label('Locked device fingerprint')->default(function (License $record): ?string {
                     abort_unless(AdminAccess::isSupport(), 403);
 
                     return $record->device;
@@ -260,7 +260,7 @@ class LicensingActions
                     if ($since === false) {
                         return 'Pick when the downtime started to see how many licenses this affects.';
                     }
-                    $count = app(ManageEntitlements::class)->previewAddTimeToProduct($record, $since);
+                    $count = app(ManageLicenses::class)->previewAddTimeToProduct($record, $since);
 
                     return 'This will add time to '.$count.' '.($count === 1 ? 'license' : 'licenses').'.';
                 }),
@@ -269,7 +269,7 @@ class LicensingActions
             ->action(function (Product $record, array $data): void {
                 $since = self::addTimeSince($data['include_expired'] ?? false, $data['since'] ?? null);
                 $seconds = (int) $data['duration'] * (int) $data['unit'];
-                $count = app(ManageEntitlements::class)->addTimeToProduct($record, $seconds, self::actor(), $data['reason'] ?? null, $since ?: null);
+                $count = app(ManageLicenses::class)->addTimeToProduct($record, $seconds, self::actor(), $data['reason'] ?? null, $since ?: null);
                 Notification::make()->title('Added time to '.$count.' '.($count === 1 ? 'license' : 'licenses'))->success()->send();
             });
     }

@@ -29,7 +29,7 @@ test('invalid setup still boots Artisan and diagnostics while APIs fail closed w
         $issuance->assertNotFound();
     }
     $this->postJson('/api/licensekit/v1/products/missing/login', ['login' => 'user@example.test', 'password' => 'password'])->assertNotFound();
-    $this->getJson('/api/licensekit/v1/entitlements')->assertNotFound();
+    $this->getJson('/api/licensekit/v1/licenses')->assertNotFound();
     expect($connection->getQueryLog())->toBe([]);
 })->with([
     'missing guard' => [['licensekit.user.guard' => 'missing'], 'LicenseKit guard must have a Laravel user provider.'],
@@ -113,5 +113,5 @@ test('invalid management limits are diagnosed and prevent route registration', f
     $this->bootWithSettings(['licensekit.management.rate_limits.writes' => '60', 'licensekit.management.enabled' => true]);
     $this->artisan('licensekit:check')->expectsOutputToContain('Invalid licensekit.management.rate_limits.')->assertFailed();
     $this->postJson('/api/licensekit/v1/manage/batches', [])->assertNotFound();
-    $this->getJson('/api/licensekit/v1/entitlements')->assertNotFound();
+    $this->getJson('/api/licensekit/v1/licenses')->assertNotFound();
 });

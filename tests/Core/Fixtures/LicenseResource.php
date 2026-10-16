@@ -1,13 +1,13 @@
 <?php
 
-namespace LicenseKit\Core\Http\Resources;
+namespace LicenseKit\Tests\Core\Fixtures;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
-use LicenseKit\Core\Models\Entitlement;
+use LicenseKit\Core\Models\License;
 
-/** @mixin Entitlement */
-class EntitlementResource extends JsonResource
+/** @mixin License */
+class LicenseResource extends JsonResource
 {
     /** @return array<string, mixed> */
     public function toArray(Request $request): array

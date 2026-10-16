@@ -8,11 +8,11 @@ use LicenseKit\Core\Models\Batch;
 use LicenseKit\Core\Models\LicensePlan;
 use LicenseKit\Filament\Resources\ApiClients\ApiClientResource;
 use LicenseKit\Filament\Resources\AuditEvents\AuditEventResource;
-use LicenseKit\Filament\Resources\Entitlements\EntitlementResource;
 use LicenseKit\Filament\Resources\LicenseKeys\LicenseKeyResource;
 use LicenseKit\Filament\Resources\LicenseKeys\Pages\ManageLicenseKeys;
 use LicenseKit\Filament\Resources\LicensePlans\LicensePlanResource;
 use LicenseKit\Filament\Resources\LicensePlans\Pages\ManageLicensePlans;
+use LicenseKit\Filament\Resources\Licenses\LicenseResource;
 use LicenseKit\Filament\Resources\Products\Pages\ManageProducts;
 use LicenseKit\LicenseKitPlugin;
 use LicenseKit\Tests\Filament\Fixtures\User;
@@ -24,7 +24,7 @@ test('core resources require panel registration and host gate', function () {
     $this->actingAs($user, 'staff')->get('/admin/licensekit/products')->assertForbidden();
     adminUser();
     $this->get('/admin/licensekit/products')->assertOk();
-    foreach (['license-plans', 'license-keys', 'entitlements', 'api-clients', 'audit-events'] as $slug) {
+    foreach (['license-plans', 'license-keys', 'licenses', 'api-clients', 'audit-events'] as $slug) {
         $this->get('/admin/licensekit/'.$slug)->assertOk();
     }
 });
@@ -61,7 +61,7 @@ test('resources register on non-tenant panels and unsupported tenancy is rejecte
     $tenant = Panel::make()->id('tenant')->tenant(User::class)->plugin(LicenseKitPlugin::make());
     expect($tenant->getResources())->toBe([]);
     expect(fn () => $tenant->getPlugin('licensekit')->boot($tenant))->toThrow(LicensingException::class, 'licensing unavailable');
-    expect(EntitlementResource::getNavigationLabel())->toBe('Licenses')
+    expect(LicenseResource::getNavigationLabel())->toBe('Licenses')
         ->and(LicensePlanResource::getNavigationLabel())->toBe('Plans')
         ->and(LicenseKeyResource::getNavigationLabel())->toBe('Keys')
         ->and(ApiClientResource::getNavigationLabel())->toBe('API clients')

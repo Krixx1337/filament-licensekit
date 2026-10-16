@@ -4,7 +4,6 @@ namespace LicenseKit\Tests\Core\Fixtures;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
-use LicenseKit\Core\Http\Resources\EntitlementResource;
 use LicenseKit\Core\Models\Product;
 
 class ClientSessionController extends Controller
@@ -13,7 +12,7 @@ class ClientSessionController extends Controller
     {
         $data = $request->validated();
         $result = $devices->login($product, $data['login'], $data['password'], $data['hwid']);
-        $result['entitlement'] = $result['entitlement'] === null ? null : new EntitlementResource($result['entitlement']);
+        $result['license'] = $result['license'] === null ? null : new LicenseResource($result['license']);
 
         return response()->json(['data' => $result])->header('Cache-Control', 'no-store');
     }
@@ -22,7 +21,7 @@ class ClientSessionController extends Controller
     {
         $data = $request->validated();
         $result = $devices->heartbeat($product, $request->bearerToken() ?? '', $data['hwid']);
-        $result['entitlement'] = $result['entitlement'] === null ? null : new EntitlementResource($result['entitlement']);
+        $result['license'] = $result['license'] === null ? null : new LicenseResource($result['license']);
 
         return response()->json(['data' => $result])->header('Cache-Control', 'no-store');
     }

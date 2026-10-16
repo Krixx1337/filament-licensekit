@@ -50,7 +50,7 @@ return new class extends Migration
             $table->unique(['issuer', 'reference']);
             $table->index(['api_client_id', 'id']);
         });
-        Schema::create('licensekit_entitlements', function (Blueprint $table): void {
+        Schema::create('licensekit_licenses', function (Blueprint $table): void {
             $table->id();
             $table->foreignIdFor(ConfiguredUserModel::className(), 'user_id')->nullable()->constrained()->nullOnDelete();
             $table->foreignId('product_id')->constrained('licensekit_products')->restrictOnDelete();
@@ -70,7 +70,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('license_plan_id')->constrained('licensekit_license_plans')->restrictOnDelete();
             $table->foreignId('batch_id')->constrained('licensekit_batches')->restrictOnDelete();
-            $table->foreignId('entitlement_id')->nullable()->constrained('licensekit_entitlements')->restrictOnDelete();
+            $table->foreignId('license_id')->nullable()->constrained('licensekit_licenses')->restrictOnDelete();
             $table->string('key', 29)->unique();
             $table->string('note')->nullable();
             $table->unsignedInteger('duration_days')->nullable();
@@ -94,7 +94,7 @@ return new class extends Migration
 
     public function down(): void
     {
-        foreach (['licensekit_audit_events', 'licensekit_license_keys', 'licensekit_entitlements', 'licensekit_batches', 'licensekit_api_clients', 'licensekit_license_plans', 'licensekit_products'] as $table) {
+        foreach (['licensekit_audit_events', 'licensekit_license_keys', 'licensekit_licenses', 'licensekit_batches', 'licensekit_api_clients', 'licensekit_license_plans', 'licensekit_products'] as $table) {
             Schema::dropIfExists($table);
         }
     }

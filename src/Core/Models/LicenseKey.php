@@ -14,7 +14,7 @@ use LicenseKit\Database\Factories\Core\LicenseKeyFactory;
  * @property int $id
  * @property int $license_plan_id
  * @property int $batch_id
- * @property int|null $entitlement_id
+ * @property int|null $license_id
  * @property string $key
  * @property string|null $note
  * @property int|null $duration_days
@@ -25,7 +25,7 @@ use LicenseKit\Database\Factories\Core\LicenseKeyFactory;
  */
 class LicenseKey extends Model
 {
-    protected $fillable = ['license_plan_id', 'batch_id', 'entitlement_id', 'key', 'note', 'duration_days', 'claimed_at', 'revoked_at'];
+    protected $fillable = ['license_plan_id', 'batch_id', 'license_id', 'key', 'note', 'duration_days', 'claimed_at', 'revoked_at'];
 
     protected $hidden = ['key', 'note'];
 
@@ -49,7 +49,7 @@ class LicenseKey extends Model
     /** @return array<string, string> */
     protected function casts(): array
     {
-        return ['license_plan_id' => 'integer', 'batch_id' => 'integer', 'entitlement_id' => 'integer', 'duration_days' => 'integer', 'claimed_at' => UtcDateTime::class, 'revoked_at' => UtcDateTime::class];
+        return ['license_plan_id' => 'integer', 'batch_id' => 'integer', 'license_id' => 'integer', 'duration_days' => 'integer', 'claimed_at' => UtcDateTime::class, 'revoked_at' => UtcDateTime::class];
     }
 
     /** @return BelongsTo<LicensePlan, $this> */

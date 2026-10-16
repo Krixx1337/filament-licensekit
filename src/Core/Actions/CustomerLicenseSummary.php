@@ -2,29 +2,29 @@
 
 namespace LicenseKit\Core\Actions;
 
-use LicenseKit\Core\Models\Entitlement;
+use LicenseKit\Core\Models\License;
 
 class CustomerLicenseSummary
 {
-    public function __construct(private EntitlementClock $clock, private LicensedDevices $devices) {}
+    public function __construct(private LicenseClock $clock, private LicensedDevices $devices) {}
 
     /** @return array<string, mixed> */
-    public function for(Entitlement $entitlement): array
+    public function for(License $license): array
     {
-        $entitlement->loadMissing(['product', 'user']);
+        $license->loadMissing(['product', 'user']);
         $status = match (true) {
-            $entitlement->isRevoked() => 'revoked',
-            $entitlement->isSuspended() => 'suspended',
-            $entitlement->paused_at !== null => 'paused',
-            ! $this->clock->active($entitlement) => 'expired',
+            $license->isRevoked() => 'revoked',
+            $license->isSuspended() => 'suspended',
+            $license->paused_at !== null => 'paused',
+            ! $this->clock->active($license) => 'expired',
             default => 'active',
         };
 
-        return ['id' => $entitlement->id, 'product_id' => $entitlement->product_id,
-            'lifetime' => $entitlement->is_lifetime, 'expires_at' => $entitlement->expires_at?->toIso8601String(),
-            'paused_at' => $entitlement->paused_at?->toIso8601String(), 'remaining_seconds' => $entitlement->remaining_seconds,
-            'product' => $entitlement->product->only(['id', 'name', 'slug']), 'status' => $status,
-            'device' => ['bound' => $entitlement->device !== null, 'bound_at' => $entitlement->device_bound_at?->toIso8601String()],
-            'reset' => $this->devices->eligibility($entitlement)];
+        return ['id' => $license->id, 'product_id' => $license->product_id,
+            'lifetime' => $license->is_lifetime, 'expires_at' => $license->expires_at?->toIso8601String(),
+            'paused_at' => $license->paused_at?->toIso8601String(), 'remaining_seconds' => $license->remaining_seconds,
+            'product' => $license->product->only(['id', 'name', 'slug']), 'status' => $status,
+            'device' => ['bound' => $license->device !== null, 'bound_at' => $license->device_bound_at?->toIso8601String()],
+            'reset' => $this->devices->eligibility($license)];
     }
 }

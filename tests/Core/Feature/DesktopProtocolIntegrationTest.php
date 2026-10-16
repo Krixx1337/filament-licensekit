@@ -4,10 +4,10 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use LicenseKit\Core\Actions\LicensedDevices;
-use LicenseKit\Core\Actions\ManageEntitlements;
+use LicenseKit\Core\Actions\ManageLicenses;
 use LicenseKit\Core\Exceptions\LicensingException;
 use LicenseKit\Core\Models\ApiClient;
-use LicenseKit\Core\Models\Entitlement;
+use LicenseKit\Core\Models\License;
 use LicenseKit\Core\Models\Product;
 use LicenseKit\Tests\Core\Fixtures\ClientSecurity;
 use LicenseKit\Tests\Core\Fixtures\ClientSession;
@@ -26,7 +26,7 @@ function bootWithoutDefaultDesktop(): void
 test('host can disable its client example while preserving package APIs', function () {
     bootWithoutDefaultDesktop();
     expect(Route::has('licensekit.desktop.login'))->toBeFalse()->and(Route::has('licensekit.desktop.heartbeat'))->toBeFalse();
-    foreach (['licensekit.entitlements.index', 'licensekit.license-claims.store', 'licensekit.hwid-reset.store'] as $name) {
+    foreach (['licensekit.licenses.index', 'licensekit.license-claims.store', 'licensekit.hwid-reset.store'] as $name) {
         expect(Route::has($name))->toBeFalse();
     }
     $user = User::factory()->create();
@@ -44,7 +44,7 @@ test('host controller grants and validates without default desktop tokens and re
     installHostDesktopProtocol();
     $user = User::factory()->create();
     $product = Product::factory()->create();
-    $entitlement = Entitlement::factory()->create(['user_id' => $user->id, 'product_id' => $product->id]);
+    $license = License::factory()->create(['user_id' => $user->id, 'product_id' => $product->id]);
     $token = $this->postJson('host/products/'.$product->slug.'/login', desktopRequest($user))->assertOk()->json('host_token');
     expect(lockedDeviceCount())->toBe(1);
     $this->assertDatabaseCount('host_desktop_sessions', 1);
@@ -54,17 +54,17 @@ test('host controller grants and validates without default desktop tokens and re
     $expiry = DB::table('host_desktop_sessions')->value('expires_at');
     $this->withToken($token)->postJson('host/products/'.$product->slug.'/heartbeat', desktopRequest($user, 'other'))->assertForbidden()->assertJsonPath('error', 'hwid_mismatch');
     expect(DB::table('host_desktop_sessions')->value('expires_at'))->toBe($expiry);
-    app(LicensedDevices::class)->reset($entitlement->user, $entitlement->product);
+    app(LicensedDevices::class)->reset($license->user, $license->product);
     $this->assertDatabaseCount('host_desktop_sessions', 0);
     $this->withToken($token)->postJson('host/products/'.$product->slug.'/heartbeat', desktopRequest($user))->assertUnauthorized();
 });
 
-test('custom protocol access denies revoked entitlements without creating bindings or credentials', function () {
+test('custom protocol access denies revoked licenses without creating bindings or credentials', function () {
     bootWithoutDefaultDesktop();
     installHostDesktopProtocol();
     $user = User::factory()->create();
     $product = Product::factory()->create();
-    Entitlement::factory()->create(['user_id' => $user->id, 'product_id' => $product->id, 'status' => 'revoked']);
+    License::factory()->create(['user_id' => $user->id, 'product_id' => $product->id, 'status' => 'revoked']);
     $this->postJson('host/products/'.$product->slug.'/login', desktopRequest($user))->assertForbidden()->assertJsonPath('error', 'license_unavailable');
     expect(lockedDeviceCount())->toBe(0);
     $this->assertDatabaseCount('host_desktop_sessions', 0);
@@ -75,7 +75,7 @@ test('host protocol session cleanup remains active when default desktop is disab
     installHostDesktopProtocol();
     $user = User::factory()->create();
     $product = Product::factory()->create();
-    Entitlement::factory()->create(['user_id' => $user->id, 'product_id' => $product->id]);
+    License::factory()->create(['user_id' => $user->id, 'product_id' => $product->id]);
     $this->postJson('host/products/'.$product->slug.'/login', desktopRequest($user))->assertOk();
     $user->update(['password' => 'new-password']);
     $this->assertDatabaseCount('host_desktop_sessions', 0);
@@ -85,7 +85,7 @@ test('session continuation failure rolls back binding and host credential writes
     installHostDesktopProtocol();
     $user = User::factory()->create();
     $product = Product::factory()->create();
-    Entitlement::factory()->create(['user_id' => $user->id, 'product_id' => $product->id]);
+    License::factory()->create(['user_id' => $user->id, 'product_id' => $product->id]);
     expect(fn () => DB::transaction(function () use ($user, $product): void {
         $context = app(LicensedDevices::class)->bind($user, $product, desktopRequest($user)['hwid']);
         DB::table('host_desktop_sessions')->insert(['user_id' => $user->getKey(), 'product_id' => $context->access->product->id, 'token_hash' => 'hash',
@@ -99,7 +99,7 @@ test('session continuation failure rolls back binding and host credential writes
 test('host tokens use host session namespace and remain isolated from integration tokens', function () {
     $user = User::factory()->create();
     $product = Product::factory()->create();
-    Entitlement::factory()->create(['user_id' => $user->id, 'product_id' => $product->id]);
+    License::factory()->create(['user_id' => $user->id, 'product_id' => $product->id]);
     $token = app(ClientSessions::class)->login($product, $user->email, 'password', desktopRequest($user)['hwid'])['token'];
     $integration = ApiClient::factory()->state(['all_products' => true, 'permissions' => ['licenses:create', 'keys:read']])->create();
     $unrelated = $integration->createToken('unrelated', ['custom:purpose'])->accessToken;
@@ -112,7 +112,7 @@ test('host tokens use host session namespace and remain isolated from integratio
 test('default session cleanup and termination work after disabling desktop routes', function () {
     $user = User::factory()->create();
     $product = Product::factory()->create();
-    $entitlement = Entitlement::factory()->create(['user_id' => $user->id, 'product_id' => $product->id]);
+    $license = License::factory()->create(['user_id' => $user->id, 'product_id' => $product->id]);
     app(ClientSessions::class)->login($product, $user->email, 'password', desktopRequest($user)['hwid']);
     config(['host_client.enabled' => false]);
     $user->update(['password' => 'new-password']);
@@ -121,7 +121,7 @@ test('default session cleanup and termination work after disabling desktop route
     config(['host_client.enabled' => true]);
     app(ClientSessions::class)->login($product, $user->email, 'new-password', desktopRequest($user)['hwid']);
     config(['host_client.enabled' => false, 'licensekit.modules.downloads' => true]);
-    app(ClientSessions::class)->terminate($entitlement, 'test', 'Terminate inactive protocol');
+    app(ClientSessions::class)->terminate($license, 'test', 'Terminate inactive protocol');
     $this->assertDatabaseCount('client_sessions', 0);
     $this->assertDatabaseCount('personal_access_tokens', 0);
     expect(lockedDeviceCount())->toBe(1);
@@ -132,13 +132,13 @@ test('custom protocol rechecks restrictions and credential fingerprints without 
     installHostDesktopProtocol();
     $user = User::factory()->create();
     $product = Product::factory()->create();
-    $entitlement = Entitlement::factory()->create(['user_id' => $user->id, 'product_id' => $product->id]);
+    $license = License::factory()->create(['user_id' => $user->id, 'product_id' => $product->id]);
     $token = $this->postJson('host/products/'.$product->slug.'/login', desktopRequest($user))->assertOk()->json('host_token');
     $expiry = DB::table('host_desktop_sessions')->value('expires_at');
-    $entitlement->update(['status' => 'suspended']);
+    $license->update(['status' => 'suspended']);
     $this->withToken($token)->postJson('host/products/'.$product->slug.'/heartbeat', desktopRequest($user))->assertForbidden()->assertJsonPath('error', 'license_suspended');
     expect(DB::table('host_desktop_sessions')->value('expires_at'))->toBe($expiry);
-    $entitlement->update(['status' => 'active']);
+    $license->update(['status' => 'active']);
     User::whereKey($user->id)->update(['password' => password_hash('changed-password', PASSWORD_BCRYPT)]);
     $this->withToken($token)->postJson('host/products/'.$product->slug.'/heartbeat', desktopRequest($user))->assertUnauthorized();
     expect(DB::table('host_desktop_sessions')->value('expires_at'))->toBe($expiry);
@@ -151,35 +151,35 @@ test('suspension invalidates all participating custom sessions including multipl
     Gate::define('licensekit.admin', fn ($actor): bool => $actor->getKey() === $admin->id);
     $user = User::factory()->create();
     $other = User::factory()->create();
-    $entitlement = Entitlement::factory()->create(['user_id' => $user->id]);
-    $unrelated = Entitlement::factory()->create(['user_id' => $other->id]);
-    $token = $this->postJson('host/products/'.$entitlement->product->slug.'/login', desktopRequest($user))->assertOk()->json('host_token');
+    $license = License::factory()->create(['user_id' => $user->id]);
+    $unrelated = License::factory()->create(['user_id' => $other->id]);
+    $token = $this->postJson('host/products/'.$license->product->slug.'/login', desktopRequest($user))->assertOk()->json('host_token');
     $session = (array) DB::table('host_desktop_sessions')->first();
     unset($session['id']);
     DB::table('host_desktop_sessions')->insert([...$session, 'token_hash' => hash('sha256', 'second-instance')]);
     $otherToken = $this->postJson('host/products/'.$unrelated->product->slug.'/login', desktopRequest($other))->assertOk()->json('host_token');
-    $before = $entitlement->fresh()->getAttributes();
-    app(ManageEntitlements::class)->suspend($entitlement, $admin, 'Abuse');
+    $before = $license->fresh()->getAttributes();
+    app(ManageLicenses::class)->suspend($license, $admin, 'Abuse');
     $this->assertDatabaseCount('host_desktop_sessions', 1);
-    expect($entitlement->fresh()->expires_at->equalTo($before['expires_at']))->toBeTrue();
+    expect($license->fresh()->expires_at->equalTo($before['expires_at']))->toBeTrue();
     expect(lockedDeviceCount())->toBe(2);
-    $this->postJson('host/products/'.$entitlement->product->slug.'/login', desktopRequest($user))->assertForbidden()->assertJsonPath('error', 'license_suspended');
-    $this->withToken($token)->postJson('host/products/'.$entitlement->product->slug.'/heartbeat', desktopRequest($user))->assertUnauthorized();
+    $this->postJson('host/products/'.$license->product->slug.'/login', desktopRequest($user))->assertForbidden()->assertJsonPath('error', 'license_suspended');
+    $this->withToken($token)->postJson('host/products/'.$license->product->slug.'/heartbeat', desktopRequest($user))->assertUnauthorized();
     $this->withToken($otherToken)->postJson('host/products/'.$unrelated->product->slug.'/heartbeat', desktopRequest($other))->assertOk();
-    app(ManageEntitlements::class)->unsuspend($entitlement, $admin, 'Appeal');
-    $this->postJson('host/products/'.$entitlement->product->slug.'/login', desktopRequest($user))->assertOk();
+    app(ManageLicenses::class)->unsuspend($license, $admin, 'Appeal');
+    $this->postJson('host/products/'.$license->product->slug.'/login', desktopRequest($user))->assertOk();
 });
 
 test('shared verification denies suspensions before custom renewal', function () {
     bootWithoutDefaultDesktop();
     installHostDesktopProtocol();
     $user = User::factory()->create();
-    $entitlement = Entitlement::factory()->create(['user_id' => $user->id]);
-    $token = $this->postJson('host/products/'.$entitlement->product->slug.'/login', desktopRequest($user))->assertOk()->json('host_token');
+    $license = License::factory()->create(['user_id' => $user->id]);
+    $token = $this->postJson('host/products/'.$license->product->slug.'/login', desktopRequest($user))->assertOk()->json('host_token');
     $expiry = DB::table('host_desktop_sessions')->value('expires_at');
-    $entitlement->update(['status' => 'suspended']);
+    $license->update(['status' => 'suspended']);
     $this->travel(1)->minutes();
-    $this->withToken($token)->postJson('host/products/'.$entitlement->product->slug.'/heartbeat', desktopRequest($user))->assertForbidden()
+    $this->withToken($token)->postJson('host/products/'.$license->product->slug.'/heartbeat', desktopRequest($user))->assertForbidden()
         ->assertExactJson(['error' => 'license_suspended', 'message' => 'license suspended']);
     expect(DB::table('host_desktop_sessions')->value('expires_at'))->toBe($expiry);
 });

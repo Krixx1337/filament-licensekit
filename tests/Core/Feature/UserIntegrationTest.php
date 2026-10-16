@@ -5,7 +5,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\Schema;
 use LicenseKit\Core\Actions\ClaimLicense;
 use LicenseKit\Core\Actions\CreateBatch;
-use LicenseKit\Core\Models\Entitlement;
+use LicenseKit\Core\Models\License;
 use LicenseKit\Core\Models\LicensePlan;
 use LicenseKit\Core\Models\Product;
 use LicenseKit\Core\Users\ConfiguredUserModel;
@@ -61,9 +61,9 @@ test('custom guard provider and user table own claimed license', function () {
     $user = CustomUser::factory()->create();
     $plan = LicensePlan::factory()->create();
     $key = app(CreateBatch::class)->create($plan, 1, 'sale', 'test')->keys->first();
-    $entitlement = app(ClaimLicense::class)->claim($user, $key->key);
-    expect($entitlement->user)->toBeInstanceOf(CustomUser::class);
-    expect($entitlement->user_id)->toBe($user->id);
+    $license = app(ClaimLicense::class)->claim($user, $key->key);
+    expect($license->user)->toBeInstanceOf(CustomUser::class);
+    expect($license->user_id)->toBe($user->id);
     expect(Schema::hasTable('members'))->toBeTrue();
     expect(app(HostAuthenticateUser::class)->authenticate($user->email, 'password'))->toBeInstanceOf(CustomUser::class);
     $this->artisan('licensekit:check')->assertSuccessful();
@@ -105,7 +105,7 @@ test('display configuration does not control host credentials or security invali
     Schema::table('users', fn ($table) => $table->string('username')->nullable());
     $user = User::factory()->create(['username' => 'player']);
     $product = Product::factory()->create();
-    $entitlement = Entitlement::factory()->create(['user_id' => $user->id, 'product_id' => $product->id]);
+    $license = License::factory()->create(['user_id' => $user->id, 'product_id' => $product->id]);
     $sessions = app(ClientSessions::class);
     $token = $sessions->login($product, $user->email, 'password', 'pc')['token'];
     $fingerprint = app(ClientSecurity::class)->fingerprint($user);
@@ -121,8 +121,8 @@ test('display configuration does not control host credentials or security invali
     }
     $this->withToken($token)->postJson(route('licensekit.desktop.heartbeat', $product->slug), desktopRequest($user, 'pc'))->assertUnauthorized();
     $this->assertDatabaseCount('client_sessions', $bulk ? 1 : 0);
-    expect($entitlement->fresh()->user_id)->toBe($user->id);
-    $this->assertDatabaseHas('licensekit_entitlements', ['user_id' => $user->id, 'product_id' => $product->id, 'device' => 'pc']);
+    expect($license->fresh()->user_id)->toBe($user->id);
+    $this->assertDatabaseHas('licensekit_licenses', ['user_id' => $user->id, 'product_id' => $product->id, 'device' => 'pc']);
 })->with([
     'email observer' => ['email', 'changed@example.com', false],
     'username observer' => ['username', 'renamed-player', false],
