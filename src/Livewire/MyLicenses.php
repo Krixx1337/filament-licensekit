@@ -40,7 +40,8 @@ class MyLicenses extends Component
     public function resetDevice(int $licenseId): void
     {
         $user = $this->user();
-        $license = License::where('user_id', $user->getKey())->findOrFail($licenseId);
+        // abort() rather than findOrFail() so another customer's ID is a plain 404 on every Livewire version.
+        $license = License::where('user_id', $user->getKey())->whereKey($licenseId)->first() ?? abort(404);
         try {
             app(LicensedDevices::class)->reset($user, $license->product);
             $this->message = 'Device reset. Your next app login will lock your new PC.';
