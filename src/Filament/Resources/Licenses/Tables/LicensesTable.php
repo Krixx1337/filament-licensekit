@@ -31,7 +31,7 @@ class LicensesTable
             ->columns([
                 TextColumn::make('user.'.config('licensekit.user_label'))->label('Customer')->placeholder('Deleted user')->weight(FontWeight::Medium)
                     ->description(fn (License $record): string => $record->product->name)->searchable(),
-                TextColumn::make('product.name')->label('Product')->searchable()->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('product.name')->label('Product')->searchable()->toggleable(isToggledHiddenByDefault: true)->visibleFrom('lg'),
                 TextColumn::make('status')->label('Status')->badge()->state(fn (License $record): LicenseState => LicenseState::for($record)),
                 TextColumn::make('expires_at')->label('Time left')->state(fn (License $record): string => TimeLeft::for($record))
                     ->tooltip(fn (License $record): ?string => $record->expires_at === null ? null : 'Ends '.TimeLeft::date($record->expires_at))
