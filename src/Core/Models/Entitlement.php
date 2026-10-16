@@ -18,8 +18,8 @@ use LicenseKit\Database\Factories\Core\EntitlementFactory;
  * @property int|string|null $user_id
  * @property int $product_id
  * @property bool $is_lifetime
- * @property bool $is_revoked
- * @property bool $is_blocked
+ * @property string $status active, paused, suspended or revoked
+ * @property CarbonImmutable|null $suspended_until
  * @property CarbonImmutable|null $expires_at
  * @property CarbonImmutable|null $paused_at
  * @property int|null $remaining_seconds
@@ -29,7 +29,15 @@ use LicenseKit\Database\Factories\Core\EntitlementFactory;
  */
 class Entitlement extends Model
 {
-    protected $fillable = ['user_id', 'product_id', 'is_lifetime', 'is_revoked', 'is_blocked', 'expires_at', 'paused_at', 'remaining_seconds'];
+    public const ACTIVE = 'active';
+
+    public const PAUSED = 'paused';
+
+    public const SUSPENDED = 'suspended';
+
+    public const REVOKED = 'revoked';
+
+    protected $fillable = ['user_id', 'product_id', 'is_lifetime', 'status', 'suspended_until', 'expires_at', 'paused_at', 'remaining_seconds'];
 
     protected $table = 'licensekit_entitlements';
 
@@ -41,12 +49,29 @@ class Entitlement extends Model
     /** @use HasFactory<EntitlementFactory> */
     use HasFactory;
 
-    protected $attributes = ['is_lifetime' => false, 'is_revoked' => false, 'is_blocked' => false];
+    protected $attributes = ['is_lifetime' => false, 'status' => self::ACTIVE];
 
     /** @return array<string, string> */
     protected function casts(): array
     {
-        return ['created_at' => UtcDateTime::class, 'updated_at' => UtcDateTime::class, 'product_id' => 'integer', 'is_lifetime' => 'boolean', 'is_revoked' => 'boolean', 'is_blocked' => 'boolean', 'expires_at' => UtcDateTime::class, 'paused_at' => UtcDateTime::class, 'remaining_seconds' => 'integer'];
+        return ['created_at' => UtcDateTime::class, 'updated_at' => UtcDateTime::class, 'product_id' => 'integer', 'is_lifetime' => 'boolean', 'suspended_until' => UtcDateTime::class, 'expires_at' => UtcDateTime::class, 'paused_at' => UtcDateTime::class, 'remaining_seconds' => 'integer'];
+    }
+
+    /** Suspension ends by itself once suspended_until has passed. */
+    public function isSuspended(): bool
+    {
+        return $this->status === self::SUSPENDED && ($this->suspended_until === null || $this->suspended_until->isFuture());
+    }
+
+    public function isRevoked(): bool
+    {
+        return $this->status === self::REVOKED;
+    }
+
+    /** The status to return to when a suspension or cancellation is lifted. */
+    public function restingStatus(): string
+    {
+        return $this->paused_at === null ? self::ACTIVE : self::PAUSED;
     }
 
     /** @return BelongsTo<Product, $this> */

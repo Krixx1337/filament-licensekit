@@ -74,7 +74,7 @@ class CheckInstallation extends Command
             return self::FAILURE;
         }
         $tables = [$user->getTable(), (new Entitlement)->getTable(), (new (Sanctum::personalAccessTokenModel()))->getTable(),
-            'licensekit_licensing_bans', 'licensekit_products', 'licensekit_license_plans', 'licensekit_license_keys',
+            'licensekit_products', 'licensekit_license_plans', 'licensekit_license_keys',
             'licensekit_api_clients', 'licensekit_batches', 'licensekit_device_bindings', 'licensekit_device_reset_history', 'licensekit_audit_events'];
         foreach ($tables as $table) {
             if (! Schema::hasTable($table)) {

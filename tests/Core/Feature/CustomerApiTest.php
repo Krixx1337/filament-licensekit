@@ -13,7 +13,6 @@ use LicenseKit\Core\Exceptions\LicensingException;
 use LicenseKit\Core\Models\DeviceBinding;
 use LicenseKit\Core\Models\Entitlement;
 use LicenseKit\Core\Models\LicensePlan;
-use LicenseKit\Core\Models\LicensingBan;
 use LicenseKit\Tests\Core\Fixtures\User;
 
 test('removed customer endpoints stay absent even with stale configuration', function (bool $management) {
@@ -73,11 +72,10 @@ test('customer reset cannot mutate another owners device', function () {
     $this->assertDatabaseCount('licensekit_device_reset_history', 0);
 });
 
-test('customer summaries remain informational during software bans and product blocks', function () {
+test('customer summaries remain informational during product maintenance', function () {
     $user = User::factory()->create();
     $entitlement = Entitlement::factory()->create(['user_id' => $user->id]);
-    $entitlement->product->update(['is_blocked' => true]);
-    LicensingBan::factory()->create(['user_id' => $user->id, 'product_id' => $entitlement->product_id]);
+    $entitlement->product->update(['status' => 'maintenance']);
     expect(app(CustomerLicenses::class)->find($user, $entitlement->id)['status'])->toBe('active');
 });
 
@@ -101,8 +99,8 @@ test('license summary status follows intrinsic precedence', function (array $att
     expect($summary['status'])->toBe($status);
     expect($summary)->not->toHaveKey('timer_paused');
 })->with([
-    [[], 'active'], [['is_revoked' => true, 'is_blocked' => true], 'revoked'],
-    [['is_blocked' => true, 'expires_at' => '2020-01-01'], 'blocked'],
+    [[], 'active'], [['status' => 'revoked'], 'revoked'],
+    [['status' => 'suspended', 'expires_at' => '2020-01-01'], 'suspended'],
     [['expires_at' => '2020-01-01'], 'expired'], [['is_lifetime' => true, 'expires_at' => null], 'active'],
 ]);
 
@@ -130,7 +128,7 @@ test('customer pages have stable order and independent ownership', function () {
 test('reset summary agrees with mutation at cooldown boundary for expired licenses', function (bool $ready) {
     $this->freezeTime();
     $user = User::factory()->create();
-    $entitlement = Entitlement::factory()->expired()->create(['user_id' => $user->id, 'is_blocked' => true]);
+    $entitlement = Entitlement::factory()->expired()->create(['user_id' => $user->id, 'status' => 'suspended']);
     $binding = DeviceBinding::factory()->forEntitlement($entitlement)->create(['last_hwid_reset_at' => now()->subDays(config('licensekit.device_binding.customer_reset.cooldown_days'))->addSeconds($ready ? 0 : 1)]);
     expect(app(CustomerLicenses::class)->find($user, $entitlement->id)['reset']['allowed'])->toBe($ready);
     if ($ready) {

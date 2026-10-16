@@ -8,7 +8,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use LicenseKit\Core\Actions\AdminAuthorization;
 use LicenseKit\Core\Users\UserAccess;
-use LicenseKit\Filament\Resources\LicensingBans\LicensingBanResource;
 use LicenseKit\LicenseKitPlugin;
 
 class AdminAccess
@@ -25,8 +24,7 @@ class AdminAccess
             return null;
         }
         $plugin = $panel->getPlugin('licensekit');
-        if (! $plugin instanceof LicenseKitPlugin
-            || ($resource === LicensingBanResource::class && config('licensekit.features.licensing_bans') !== true)) {
+        if (! $plugin instanceof LicenseKitPlugin) {
             return null;
         }
         $user = Filament::auth()->user();

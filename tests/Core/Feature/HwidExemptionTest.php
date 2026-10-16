@@ -134,7 +134,7 @@ test('exemption does not grant licensed access or override universal restriction
     if ($restriction === 'suspended') {
         $user->update(['is_suspended' => true]);
     } elseif ($restriction === 'blocked') {
-        $product->update(['is_blocked' => true]);
+        $product->update(['status' => 'maintenance']);
     }
 
     expect(fn () => app(LicensedDevices::class)->bind($user, $product, ['value' => 'pc']))->toThrow(LicensingException::class, match ($restriction) {

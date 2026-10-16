@@ -77,7 +77,7 @@ class CreateBatch
 
     private function validatePlan(LicensePlan $plan, int $quantity): void
     {
-        if (! $plan->is_enabled || ! $plan->product->is_enabled) {
+        if (! $plan->is_enabled || $plan->product->status === Product::DISCONTINUED) {
             throw new LicensingException('plan_unavailable');
         }
         LicenseDuration::days($plan->getRawOriginal('duration_days'));

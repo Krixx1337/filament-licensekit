@@ -17,7 +17,7 @@ use LicenseKit\Core\Users\UserAccess;
 
 class ClaimLicense
 {
-    public function __construct(private SerialKey $serial, private EntitlementClock $clock, private UserAccess $users, private Audit $audit, private LicensingBans $bans, private AccessRestrictions $restrictions) {}
+    public function __construct(private SerialKey $serial, private EntitlementClock $clock, private UserAccess $users, private Audit $audit, private AccessRestrictions $restrictions) {}
 
     public function claimFor(Model $actor, Model $user, LicenseKey $key): Entitlement
     {
@@ -68,15 +68,17 @@ class ClaimLicense
         if ($key->claimed_at !== null) {
             throw new LicensingException('key_already_claimed', 409);
         }
-        $this->bans->assertAllowed($user, $key->plan->product);
         $ownership = ['user_id' => $user->getKey(), 'product_id' => $key->plan->product_id];
         $entitlement = Entitlement::where($ownership)->lockForUpdate()->first();
         $this->restrictions->assertAllowed($user, $key->plan->product, $entitlement);
+        if ($entitlement?->isSuspended()) {
+            throw new LicensingException('license_suspended');
+        }
         $entitlement ??= Entitlement::create($ownership);
         if ($entitlement->paused_at !== null) {
             throw new LicensingException('subscription_paused');
         }
-        if ($entitlement->is_revoked) {
+        if ($entitlement->isRevoked()) {
             throw new LicensingException('entitlement_revoked');
         }
         if ($entitlement->is_lifetime) {

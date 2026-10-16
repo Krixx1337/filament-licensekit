@@ -86,7 +86,7 @@ test('staff clock actions reauthorize after mounting', function () {
 test('unmanageable licenses hide clock actions and expired licenses can only extend', function () {
     adminUser();
     $lifetime = Entitlement::factory()->lifetime()->create(['user_id' => User::factory()->create()->id]);
-    $revoked = Entitlement::factory()->create(['user_id' => User::factory()->create()->id, 'is_revoked' => true]);
+    $revoked = Entitlement::factory()->create(['user_id' => User::factory()->create()->id, 'status' => 'revoked']);
     $orphan = Entitlement::factory()->create();
     $expired = Entitlement::factory()->expired()->create(['user_id' => User::factory()->create()->id]);
     $page = Livewire::test(ManageEntitlements::class);

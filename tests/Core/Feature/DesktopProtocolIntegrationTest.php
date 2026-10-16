@@ -4,11 +4,10 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use LicenseKit\Core\Actions\LicensedDevices;
-use LicenseKit\Core\Actions\ManageLicensingBans;
+use LicenseKit\Core\Actions\ManageEntitlements;
 use LicenseKit\Core\Exceptions\LicensingException;
 use LicenseKit\Core\Models\ApiClient;
 use LicenseKit\Core\Models\Entitlement;
-use LicenseKit\Core\Models\LicensingBan;
 use LicenseKit\Core\Models\Product;
 use LicenseKit\Tests\Core\Fixtures\ClientSecurity;
 use LicenseKit\Tests\Core\Fixtures\ClientSession;
@@ -65,7 +64,7 @@ test('custom protocol access denies revoked entitlements without creating bindin
     installHostDesktopProtocol();
     $user = User::factory()->create();
     $product = Product::factory()->create();
-    Entitlement::factory()->create(['user_id' => $user->id, 'product_id' => $product->id, 'is_revoked' => true]);
+    Entitlement::factory()->create(['user_id' => $user->id, 'product_id' => $product->id, 'status' => 'revoked']);
     $this->postJson('host/products/'.$product->slug.'/login', desktopRequest($user))->assertForbidden()->assertJsonPath('error', 'license_unavailable');
     $this->assertDatabaseCount('licensekit_device_bindings', 0);
     $this->assertDatabaseCount('host_desktop_sessions', 0);
@@ -136,16 +135,16 @@ test('custom protocol rechecks restrictions and credential fingerprints without 
     $entitlement = Entitlement::factory()->create(['user_id' => $user->id, 'product_id' => $product->id]);
     $token = $this->postJson('host/products/'.$product->slug.'/login', desktopRequest($user))->assertOk()->json('host_token');
     $expiry = DB::table('host_desktop_sessions')->value('expires_at');
-    $entitlement->update(['is_blocked' => true]);
-    $this->withToken($token)->postJson('host/products/'.$product->slug.'/heartbeat', desktopRequest($user))->assertForbidden()->assertJsonPath('error', 'service_unavailable');
+    $entitlement->update(['status' => 'suspended']);
+    $this->withToken($token)->postJson('host/products/'.$product->slug.'/heartbeat', desktopRequest($user))->assertForbidden()->assertJsonPath('error', 'license_suspended');
     expect(DB::table('host_desktop_sessions')->value('expires_at'))->toBe($expiry);
-    $entitlement->update(['is_blocked' => false]);
+    $entitlement->update(['status' => 'active']);
     User::whereKey($user->id)->update(['password' => password_hash('changed-password', PASSWORD_BCRYPT)]);
     $this->withToken($token)->postJson('host/products/'.$product->slug.'/heartbeat', desktopRequest($user))->assertUnauthorized();
     expect(DB::table('host_desktop_sessions')->value('expires_at'))->toBe($expiry);
 });
 
-test('ban invalidates all participating custom sessions including multiple instances without changing device or clocks', function () {
+test('suspension invalidates all participating custom sessions including multiple instances without changing device or clocks', function () {
     bootWithoutDefaultDesktop();
     installHostDesktopProtocol();
     $admin = User::factory()->create();
@@ -160,27 +159,27 @@ test('ban invalidates all participating custom sessions including multiple insta
     DB::table('host_desktop_sessions')->insert([...$session, 'token_hash' => hash('sha256', 'second-instance')]);
     $otherToken = $this->postJson('host/products/'.$unrelated->product->slug.'/login', desktopRequest($other))->assertOk()->json('host_token');
     $before = $entitlement->fresh()->getAttributes();
-    $ban = app(ManageLicensingBans::class)->create($user, $entitlement->product, 'Abuse', $admin);
+    app(ManageEntitlements::class)->suspend($entitlement, $admin, 'Abuse');
     $this->assertDatabaseCount('host_desktop_sessions', 1);
-    expect($entitlement->fresh()->getAttributes())->toBe($before);
+    expect($entitlement->fresh()->expires_at->equalTo($before['expires_at']))->toBeTrue();
     $this->assertDatabaseCount('licensekit_device_bindings', 2);
-    $this->postJson('host/products/'.$entitlement->product->slug.'/login', desktopRequest($user))->assertForbidden()->assertJsonPath('error', 'license_banned');
+    $this->postJson('host/products/'.$entitlement->product->slug.'/login', desktopRequest($user))->assertForbidden()->assertJsonPath('error', 'license_suspended');
     $this->withToken($token)->postJson('host/products/'.$entitlement->product->slug.'/heartbeat', desktopRequest($user))->assertUnauthorized();
     $this->withToken($otherToken)->postJson('host/products/'.$unrelated->product->slug.'/heartbeat', desktopRequest($other))->assertOk();
-    app(ManageLicensingBans::class)->lift($ban, 'Appeal', $admin);
+    app(ManageEntitlements::class)->unsuspend($entitlement, $admin, 'Appeal');
     $this->postJson('host/products/'.$entitlement->product->slug.'/login', desktopRequest($user))->assertOk();
 });
 
-test('shared verification denies bans before custom renewal', function () {
+test('shared verification denies suspensions before custom renewal', function () {
     bootWithoutDefaultDesktop();
     installHostDesktopProtocol();
     $user = User::factory()->create();
     $entitlement = Entitlement::factory()->create(['user_id' => $user->id]);
     $token = $this->postJson('host/products/'.$entitlement->product->slug.'/login', desktopRequest($user))->assertOk()->json('host_token');
     $expiry = DB::table('host_desktop_sessions')->value('expires_at');
-    LicensingBan::factory()->create(['user_id' => $user->id, 'product_id' => $entitlement->product_id]);
+    $entitlement->update(['status' => 'suspended']);
     $this->travel(1)->minutes();
     $this->withToken($token)->postJson('host/products/'.$entitlement->product->slug.'/heartbeat', desktopRequest($user))->assertForbidden()
-        ->assertExactJson(['error' => 'license_banned', 'message' => 'license banned']);
+        ->assertExactJson(['error' => 'license_suspended', 'message' => 'license suspended']);
     expect(DB::table('host_desktop_sessions')->value('expires_at'))->toBe($expiry);
 });

@@ -11,7 +11,6 @@ use LicenseKit\Core\Actions\CreateBatch;
 use LicenseKit\Core\Actions\DeviceBindings;
 use LicenseKit\Core\Actions\ManageApiClients;
 use LicenseKit\Core\Actions\ManageEntitlements;
-use LicenseKit\Core\Actions\ManageLicensingBans;
 use LicenseKit\Core\Exceptions\LicensingException;
 use LicenseKit\Core\Models\ApiClient;
 use LicenseKit\Core\Models\AuditEvent;
@@ -20,7 +19,6 @@ use LicenseKit\Core\Models\DeviceResetHistory;
 use LicenseKit\Core\Models\Entitlement;
 use LicenseKit\Core\Models\LicenseKey;
 use LicenseKit\Core\Models\LicensePlan;
-use LicenseKit\Core\Models\LicensingBan;
 use LicenseKit\Core\Models\Product;
 use LicenseKit\Filament\AdminAccess;
 use LicenseKit\Filament\CatalogWrites;
@@ -39,16 +37,16 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 function registerAdminPolicies(array $abilities): void
 {
     foreach ([Product::class, Provider::class, LicensePlan::class, LicenseKey::class, Entitlement::class,
-        LicensingBan::class, ApiClient::class, AuditEvent::class, DeviceResetHistory::class] as $model) {
+        ApiClient::class, AuditEvent::class, DeviceResetHistory::class] as $model) {
         Gate::policy($model, AdminPolicy::class);
     }
     config(['testing.admin_abilities' => $abilities]);
 }
 
-test('policy moderator browses licenses resets paid and free devices and manages bans without master gate', function () {
+test('policy moderator browses licenses resets paid and free devices and suspends without master gate', function () {
     $actor = adminUser();
     Gate::define('licensekit.manage', fn () => false);
-    registerAdminPolicies(['viewAny', 'view', 'resetHwid', 'inspectDevice', 'create', 'lift']);
+    registerAdminPolicies(['viewAny', 'view', 'resetHwid', 'inspectDevice', 'block', 'unblock']);
     $user = User::factory()->create();
     $product = Product::factory()->create();
     $entitlement = Entitlement::factory()->create(['user_id' => $user->id, 'product_id' => $product->id]);
@@ -61,11 +59,11 @@ test('policy moderator browses licenses resets paid and free devices and manages
     config(['testing.admin_target_id' => $free->id]);
     app(DeviceBindings::class)->adminReset($free, $product, $actor, 'Free user support');
     expect($binding->fresh()->hwid)->toBeNull();
-    $ban = app(ManageLicensingBans::class)->create($user, $product, 'Abuse', $actor);
-    app(ManageLicensingBans::class)->lift($ban, 'Appeal', $actor);
-    expect($ban->fresh()->lifted_at)->not->toBeNull();
+    app(ManageEntitlements::class)->suspend($entitlement, $actor, 'Abuse');
+    app(ManageEntitlements::class)->unsuspend($entitlement, $actor, 'Appeal');
+    expect($entitlement->fresh()->status)->toBe('active');
     $this->assertDatabaseCount('licensekit_device_reset_history', 2);
-    Livewire::test(EntitlementsPage::class)->assertTableActionHidden('is_revoked', $entitlement)->assertTableActionHidden('is_blocked', $entitlement);
+    Livewire::test(EntitlementsPage::class)->assertTableActionHidden('cancel', $entitlement)->assertTableActionVisible('suspend', $entitlement);
     // Browse rights are configured per model in real host policies.
     Gate::policy(LicenseKey::class, DeniedStaffPolicy::class);
     Gate::policy(ApiClient::class, DeniedStaffPolicy::class);
@@ -91,20 +89,18 @@ test('all admin mutations deny policy refusal even when master gate allows', fun
     $key = app(CreateBatch::class)->createFor($actor, $plan, 1, 'fixture')->keys->first();
     $client = ApiClient::factory()->create();
     $token = $client->createToken('existing')->accessToken;
-    $ban = app(ManageLicensingBans::class)->create($user, $product, 'Fixture', $actor);
     registerAdminPolicies([]);
     $audits = AuditEvent::count();
     $call = match ($operation) {
         'createKeys' => fn () => app(CreateBatch::class)->createFor($actor, $plan, 1, 'denied'),
         'claim' => fn () => app(ClaimLicense::class)->claimFor($actor, $user, $key),
         'revoke_key' => fn () => app(ManageEntitlements::class)->revokeKey($key, $actor, 'Denied'),
-        'revoke' => fn () => app(ManageEntitlements::class)->status($entitlement, 'is_revoked', true, $actor, 'Denied'),
-        'restoreAccess' => fn () => app(ManageEntitlements::class)->status($entitlement, 'is_revoked', false, $actor, 'Denied'),
-        'block' => fn () => app(ManageEntitlements::class)->status($entitlement, 'is_blocked', true, $actor, 'Denied'),
-        'unblock' => fn () => app(ManageEntitlements::class)->status($entitlement, 'is_blocked', false, $actor, 'Denied'),
+        'revoke' => fn () => app(ManageEntitlements::class)->revoke($entitlement, $actor, 'Denied'),
+        'restoreAccess' => fn () => app(ManageEntitlements::class)->restore($entitlement, $actor, 'Denied'),
+        'block' => fn () => app(ManageEntitlements::class)->suspend($entitlement, $actor, 'Denied'),
+        'unblock' => fn () => app(ManageEntitlements::class)->unsuspend($entitlement, $actor, 'Denied'),
+        'suspend_customer' => fn () => app(ManageEntitlements::class)->suspendCustomer($user, $product, $actor, 'Denied'),
         'reset' => fn () => app(DeviceBindings::class)->adminReset($user, $product, $actor, 'Denied'),
-        'create_ban' => fn () => app(ManageLicensingBans::class)->create($user, $product, 'Denied', $actor),
-        'lift_ban' => fn () => app(ManageLicensingBans::class)->lift($ban, 'Denied', $actor),
         'create_client' => fn () => app(ManageApiClients::class)->save(null, ['name' => 'Denied'], $actor),
         'update_client' => fn () => app(ManageApiClients::class)->save($client, ['name' => 'Denied'], $actor),
         'rotate_token' => fn () => app(ManageApiClients::class)->rotate($client, CarbonImmutable::now()->addYear(), $actor),
@@ -117,13 +113,12 @@ test('all admin mutations deny policy refusal even when master gate allows', fun
     expect(AuditEvent::count())->toBe($audits)
         ->and($key->fresh()->claimed_at)->toBeNull()->and($key->fresh()->revoked_at)->toBeNull()
         ->and($binding->fresh()->hwid)->not->toBeNull()
-        ->and($ban->fresh()->lifted_at)->toBeNull()
         ->and($token->fresh())->not->toBeNull()
-        ->and($entitlement->fresh()->is_revoked)->toBeFalse()->and($entitlement->fresh()->is_blocked)->toBeFalse();
+        ->and($entitlement->fresh()->status)->toBe('active');
     $this->assertDatabaseCount('licensekit_license_keys', 1);
     $this->assertDatabaseCount('licensekit_api_clients', 1);
 })->with(['createKeys', 'claim', 'revoke_key', 'revoke', 'restoreAccess', 'block', 'unblock', 'reset',
-    'create_ban', 'lift_ban', 'create_client', 'update_client',
+    'suspend_customer', 'create_client', 'update_client',
     'rotate_token', 'revoke_tokens', 'add_time',
     'create_catalog', 'update_catalog']);
 
@@ -182,16 +177,16 @@ test('exact abilities independently permit key creation and administrative claim
     expect($key->fresh()->revoked_at)->not->toBeNull();
 });
 
-test('entitlement status changes use distinct exact abilities', function (string $field, bool $value, string $ability) {
+test('license status changes use distinct exact abilities', function (string $from, string $method, string $ability, string $to) {
     $actor = adminUser();
     registerAdminPolicies([$ability]);
     Gate::define('licensekit.manage', fn () => false);
-    $entitlement = Entitlement::factory()->create([$field => ! $value]);
-    app(ManageEntitlements::class)->status($entitlement, $field, $value, $actor, 'Support');
-    expect($entitlement->fresh()->getAttribute($field))->toBe($value);
+    $entitlement = Entitlement::factory()->create(['status' => $from]);
+    app(ManageEntitlements::class)->{$method}($entitlement, $actor, 'Support');
+    expect($entitlement->fresh()->status)->toBe($to);
 })->with([
-    ['is_revoked', true, 'revoke'], ['is_revoked', false, 'restoreAccess'],
-    ['is_blocked', true, 'block'], ['is_blocked', false, 'unblock'],
+    ['active', 'revoke', 'revoke', 'revoked'], ['revoked', 'restore', 'restoreAccess', 'active'],
+    ['active', 'suspend', 'block', 'suspended'], ['suspended', 'unsuspend', 'unblock', 'active'],
 ]);
 
 test('credential create update rotate and revoke use separate exact abilities', function () {

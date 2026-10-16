@@ -57,7 +57,7 @@ test('device verification never creates or changes binding including reset histo
 
 test('denied binding has neutral reason without protocol response or credential fields', function () {
     $user = User::factory()->create();
-    $entitlement = Entitlement::factory()->create(['user_id' => $user->id, 'is_revoked' => true]);
+    $entitlement = Entitlement::factory()->create(['user_id' => $user->id, 'status' => 'revoked']);
     try {
         app(LicensedDevices::class)->bind($user, $entitlement->product, ['value' => 'pc']);
         $this->fail('Revoked access must deny binding.');
@@ -73,7 +73,7 @@ test('standalone binding refreshes stale user and product state', function () {
     $user = User::factory()->create();
     $entitlement = Entitlement::factory()->create(['user_id' => $user->id]);
     $product = $entitlement->product;
-    Product::whereKey($product->id)->update(['is_blocked' => true]);
+    Product::whereKey($product->id)->update(['status' => 'maintenance']);
 
     expect(fn () => app(LicensedDevices::class)->bind($user, $product, ['value' => 'pc']))->toThrow(LicensingException::class, 'service unavailable');
     $this->assertDatabaseCount('licensekit_device_bindings', 0);

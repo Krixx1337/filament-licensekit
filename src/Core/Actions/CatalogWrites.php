@@ -64,7 +64,7 @@ class CatalogWrites
             Validator::make($record->getAttributes(), [
                 'name' => ['required', 'string', 'max:255'],
                 'slug' => ['required', 'string', 'max:255', Rule::unique('licensekit_products', 'slug')->ignore($record->getKey())],
-                'is_enabled' => ['required', 'boolean'], 'is_blocked' => ['required', 'boolean'],
+                'status' => ['required', Rule::in(Product::STATUSES)],
                 'requires_hwid' => ['required', 'boolean'],
             ])->validate();
         } elseif ($record instanceof LicensePlan) {

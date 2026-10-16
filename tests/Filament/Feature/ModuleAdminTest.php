@@ -23,10 +23,10 @@ use Livewire\Livewire;
 test('entitlement status uses audited actions without package session termination', function () {
     adminUser();
     $entitlement = Entitlement::factory()->create(['user_id' => User::factory()->create()->id]);
-    Livewire::test(ManageEntitlements::class)->callTableAction('is_blocked', $entitlement, data: ['reason' => 'Support'])->assertHasNoActionErrors();
-    expect($entitlement->fresh()->is_blocked)->toBeTrue();
+    Livewire::test(ManageEntitlements::class)->callTableAction('suspend', $entitlement, data: ['reason' => 'Support'])->assertHasNoActionErrors();
+    expect($entitlement->fresh()->isSuspended())->toBeTrue();
     Livewire::test(ManageEntitlements::class)->assertTableActionDoesNotExist('terminate_session');
-    $this->assertDatabaseHas('licensekit_audit_events', ['event' => 'entitlement_status_changed', 'reason' => 'Support']);
+    $this->assertDatabaseHas('licensekit_audit_events', ['event' => 'license_status_changed', 'reason' => 'Support']);
 });
 
 test('claim and key revocation use existing backend rules', function () {

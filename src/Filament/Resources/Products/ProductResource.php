@@ -3,10 +3,10 @@
 namespace LicenseKit\Filament\Resources\Products;
 
 use Filament\Actions\EditAction;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Schema;
-use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -29,8 +29,8 @@ class ProductResource extends LicensingResource
     {
         return $schema->components([TextInput::make('name')->required()->maxLength(255),
             TextInput::make('slug')->required()->maxLength(100)->regex('/^[a-z0-9-]+$/')->unique(ignoreRecord: true),
-            Toggle::make('is_enabled')->default(true),
-            Toggle::make('is_blocked')->label('Maintenance mode')->helperText('The software stops working for everyone until you turn this off. Licenses keep their time.'),
+            Select::make('status')->options(['active' => 'Active', 'maintenance' => 'Maintenance', 'discontinued' => 'Discontinued'])->default('active')->required()->selectablePlaceholder(false)
+                ->helperText('Maintenance: the software stops working for everyone and licenses keep their time. Discontinued: no new keys, existing licenses keep working.'),
             Toggle::make('requires_hwid')->label('Require device binding (HWID)')->default(true)
                 ->helperText('Disable to allow different devices. Valid HWID payloads and host device checks still apply.'),
         ]);
@@ -40,9 +40,11 @@ class ProductResource extends LicensingResource
     {
         return $table->columns([TextColumn::make('name')->searchable()->toggleable(),
             TextColumn::make('slug')->searchable()->toggleable(isToggledHiddenByDefault: true),
-            IconColumn::make('is_enabled')->label('Enabled')->boolean()->toggleable(),
-            IconColumn::make('is_blocked')->label('Maintenance')->boolean()->toggleable()])->recordActions([EditAction::make()->using(fn (Model $record, array $data) => CatalogWrites::update($record, $data)),
-                LicensingActions::addTime()])->defaultSort('id', 'desc');
+            TextColumn::make('status')->badge()->formatStateUsing(fn (string $state): string => ucfirst($state))
+                ->color(fn (string $state): string => match ($state) {
+                    'active' => 'success', 'maintenance' => 'warning', default => 'gray'
+                })->toggleable()])->recordActions([EditAction::make()->using(fn (Model $record, array $data) => CatalogWrites::update($record, $data)),
+                    LicensingActions::addTime()])->defaultSort('id', 'desc');
     }
 
     /** @return Builder<Product> */

@@ -13,23 +13,9 @@ return new class extends Migration
             $table->id();
             $table->string('name');
             $table->string('slug')->unique();
-            $table->boolean('is_enabled')->default(true);
-            $table->boolean('is_blocked')->default(false);
+            $table->string('status', 16)->default('active');
             $table->boolean('requires_hwid')->default(true);
             $table->timestamps();
-        });
-        Schema::create('licensekit_licensing_bans', function (Blueprint $table): void {
-            $table->id();
-            $table->foreignIdFor(ConfiguredUserModel::className(), 'user_id')->nullable()->constrained()->nullOnDelete();
-            $table->foreignId('product_id')->constrained('licensekit_products')->restrictOnDelete();
-            $table->text('reason');
-            $table->string('created_by');
-            $table->dateTime('expires_at')->nullable();
-            $table->timestamp('lifted_at')->nullable();
-            $table->string('lifted_by')->nullable();
-            $table->text('lift_reason')->nullable();
-            $table->timestamps();
-            $table->index(['user_id', 'product_id', 'lifted_at', 'expires_at'], 'licensing_ban_scope');
         });
         Schema::create('licensekit_license_plans', function (Blueprint $table): void {
             $table->id();
@@ -73,8 +59,8 @@ return new class extends Migration
             $table->foreignIdFor(ConfiguredUserModel::className(), 'user_id')->nullable()->constrained()->nullOnDelete();
             $table->foreignId('product_id')->constrained('licensekit_products')->restrictOnDelete();
             $table->boolean('is_lifetime')->default(false);
-            $table->boolean('is_revoked')->default(false);
-            $table->boolean('is_blocked')->default(false);
+            $table->string('status', 16)->default('active');
+            $table->dateTime('suspended_until')->nullable();
             $table->dateTime('expires_at')->nullable();
             $table->dateTime('paused_at')->nullable();
             $table->unsignedBigInteger('remaining_seconds')->nullable();
@@ -132,7 +118,7 @@ return new class extends Migration
 
     public function down(): void
     {
-        foreach (['licensekit_audit_events', 'licensekit_device_reset_history', 'licensekit_device_bindings', 'licensekit_license_keys', 'licensekit_entitlements', 'licensekit_batches', 'licensekit_api_clients', 'licensekit_license_plans', 'licensekit_licensing_bans', 'licensekit_products'] as $table) {
+        foreach (['licensekit_audit_events', 'licensekit_device_reset_history', 'licensekit_device_bindings', 'licensekit_license_keys', 'licensekit_entitlements', 'licensekit_batches', 'licensekit_api_clients', 'licensekit_license_plans', 'licensekit_products'] as $table) {
             Schema::dropIfExists($table);
         }
     }

@@ -212,7 +212,7 @@ test('generated keys are immediately claimable without export or allocation', fu
 test('revoked access cannot be restored by claiming another key', function () {
     $user = User::factory()->create();
     $plan = LicensePlan::factory()->create();
-    Entitlement::factory()->create(['user_id' => $user->id, 'product_id' => $plan->product_id, 'is_revoked' => true]);
+    Entitlement::factory()->create(['user_id' => $user->id, 'product_id' => $plan->product_id, 'status' => 'revoked']);
     $key = app(CreateBatch::class)->create($plan, 1, 'sale', 'admin:1')->keys->first();
 
     expect(fn () => app(ClaimLicense::class)->claim($user, $key->key))->toThrow(LicensingException::class, 'entitlement revoked');

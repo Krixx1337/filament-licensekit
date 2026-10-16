@@ -8,7 +8,7 @@ use Illuminate\Foundation\Bootstrap\LoadConfiguration;
 use Illuminate\Support\Facades\Schema;
 use LicenseKit\Core\Models\AuditEvent;
 use LicenseKit\Core\Models\DeviceBinding;
-use LicenseKit\Core\Models\LicensingBan;
+use LicenseKit\Core\Models\Entitlement;
 use LicenseKit\Core\Models\Product;
 use LicenseKit\LicenseKitServiceProvider;
 
@@ -81,12 +81,15 @@ try {
         throw new RuntimeException('Device binding storage or serialization privacy failed.');
     }
 
-    $active = LicensingBan::create(['user_id' => $user->id, 'product_id' => $product->id, 'reason' => 'Active', 'created_by' => 'console']);
-    LicensingBan::create(['user_id' => $user->id, 'product_id' => $product->id, 'reason' => 'Expired', 'created_by' => 'console', 'expires_at' => now()->subDay()]);
-    LicensingBan::create(['user_id' => $user->id, 'product_id' => $product->id, 'reason' => 'Lifted', 'created_by' => 'console', 'lifted_at' => now()]);
-    if (LicensingBan::query()->active()->pluck('id')->all() !== [$active->id]) {
-        throw new RuntimeException('Active ban scope included expired or lifted bans.');
+    $suspended = Entitlement::create(['user_id' => $user->id, 'product_id' => $product->id, 'status' => Entitlement::SUSPENDED, 'suspended_until' => now()->addDay()]);
+    if (! $suspended->fresh()->isSuspended() || $suspended->fresh()->restingStatus() !== Entitlement::ACTIVE) {
+        throw new RuntimeException('License suspension state failed.');
     }
+    $suspended->update(['suspended_until' => now()->subMinute()]);
+    if ($suspended->fresh()->isSuspended()) {
+        throw new RuntimeException('Expired suspension still applied.');
+    }
+    $suspended->delete();
 
 
     $plan = \LicenseKit\Core\Models\LicensePlan::create(['product_id' => $product->id, 'name' => '30 days', 'duration_days' => 30]);

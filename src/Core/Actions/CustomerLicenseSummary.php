@@ -13,8 +13,8 @@ class CustomerLicenseSummary
     {
         $entitlement->loadMissing(['product', 'user']);
         $status = match (true) {
-            $entitlement->is_revoked => 'revoked',
-            $entitlement->is_blocked => 'blocked',
+            $entitlement->isRevoked() => 'revoked',
+            $entitlement->isSuspended() => 'suspended',
             $entitlement->paused_at !== null => 'paused',
             ! $this->clock->active($entitlement) => 'expired',
             default => 'active',

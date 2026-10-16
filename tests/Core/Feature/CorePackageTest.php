@@ -224,9 +224,9 @@ test('administrative revocation invalidates only affected desktop session and re
     $product = Product::factory()->create();
     $entitlement = Entitlement::factory()->create(['user_id' => $user->id, 'product_id' => $product->id]);
     app(ClientSessions::class)->login($product, $user->email, 'password', desktopRequest($user)['hwid']);
-    app(ManageEntitlements::class)->status($entitlement, 'is_revoked', true, testAdminActor(), 'Refund');
-    expect($entitlement->fresh()->is_revoked)->toBeTrue();
+    app(ManageEntitlements::class)->revoke($entitlement, testAdminActor(), 'Refund');
+    expect($entitlement->fresh()->isRevoked())->toBeTrue();
     $this->assertDatabaseCount('client_sessions', 0);
     $this->assertDatabaseCount('personal_access_tokens', 0);
-    $this->assertDatabaseHas('licensekit_audit_events', ['event' => 'entitlement_status_changed', 'reason' => 'Refund']);
+    $this->assertDatabaseHas('licensekit_audit_events', ['event' => 'license_status_changed', 'reason' => 'Refund']);
 });

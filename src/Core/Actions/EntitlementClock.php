@@ -45,7 +45,7 @@ class EntitlementClock
         if ($entitlement->paused_at !== null || $remaining <= 0) {
             throw new LicensingException('cannot_pause_entitlement', 409);
         }
-        $entitlement->update(['paused_at' => $at, 'remaining_seconds' => $remaining, 'expires_at' => null]);
+        $entitlement->update(['status' => Entitlement::PAUSED, 'paused_at' => $at, 'remaining_seconds' => $remaining, 'expires_at' => null]);
     }
 
     public function resume(Entitlement $entitlement): void
@@ -55,6 +55,7 @@ class EntitlementClock
         }
         $entitlement->update([
             'expires_at' => CarbonImmutable::now('UTC')->startOfSecond()->addSeconds($entitlement->remaining_seconds),
+            'status' => Entitlement::ACTIVE,
             'paused_at' => null,
             'remaining_seconds' => null,
         ]);

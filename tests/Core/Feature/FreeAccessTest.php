@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Schema;
 use LicenseKit\Core\Actions\AccessPolicy;
 use LicenseKit\Core\Actions\DeviceBindings;
 use LicenseKit\Core\Actions\LicensedDevices;
-use LicenseKit\Core\Actions\ManageLicensingBans;
+use LicenseKit\Core\Actions\ManageEntitlements;
 use LicenseKit\Core\Contracts\AccessRestriction;
 use LicenseKit\Core\Exceptions\LicensingException;
 use LicenseKit\Core\Models\Entitlement;
@@ -61,31 +61,30 @@ test('paid grant takes precedence and paid-only denial never uses free access im
     expect(fn () => app(AccessPolicy::class)->authorize($entitlement->user, $entitlement->product))->toThrow(LicensingException::class, 'license expired');
 });
 
-test('revocation and entitlement blocks invalidate paid grant but allow host-approved free access', function (string $field) {
+test('cancellation invalidates the paid grant but allows host-approved free access', function () {
     $this->travelTo(now()->startOfSecond());
-    $entitlement = Entitlement::factory()->create(['user_id' => User::factory()->create()->id, $field => true]);
+    $entitlement = Entitlement::factory()->create(['user_id' => User::factory()->create()->id, 'status' => 'revoked']);
     expect(fn () => app(AccessPolicy::class)->authorize($entitlement->user, $entitlement->product))->toThrow(LicensingException::class);
     $result = app(AccessPolicy::class)->authorize($entitlement->user, $entitlement->product, CarbonImmutable::now()->addHour());
     expect($result->source)->toBe('host_free')->and($result->entitlement)->toBeNull();
-    expect($entitlement->fresh()->getAttribute($field))->toBeTrue();
-})->with(['is_revoked', 'is_blocked']);
+    expect($entitlement->fresh()->isRevoked())->toBeTrue();
+});
 
 test('universal restrictions deny host-approved free access without binding writes', function (string $restriction, string $error) {
     $this->travelTo(now()->startOfSecond());
     $user = User::factory()->create();
     $product = Product::factory()->create();
     match ($restriction) {
-        'disabled' => $product->update(['is_enabled' => false]),
-        'blocked' => $product->update(['is_blocked' => true]),
+        'maintenance' => $product->update(['status' => 'maintenance']),
         'suspended' => $user->update(['is_suspended' => true]),
         'unverified' => $user->update(['email_verified_at' => null]),
         'custom' => config(['licensekit.access_restrictions' => [HostFreeRestriction::class]]),
     };
     expect(fn () => app(LicensedDevices::class)->bind($user, $product, desktopRequest($user)['hwid'], CarbonImmutable::now()->addHour()))->toThrow(LicensingException::class, str_replace('_', ' ', $error));
     $this->assertDatabaseCount('licensekit_device_bindings', 0);
-})->with([['disabled', 'service_unavailable'], ['blocked', 'service_unavailable'], ['suspended', 'user_unavailable'], ['unverified', 'user_unavailable'], ['custom', 'service_unavailable']]);
+})->with([['maintenance', 'service_unavailable'], ['suspended', 'user_unavailable'], ['unverified', 'user_unavailable'], ['custom', 'service_unavailable']]);
 
-test('product ban denies free access before any entitlement and invalidates host sessions', function () {
+test('suspension denies free access before any purchase and invalidates host sessions', function () {
     $this->travelTo(now()->startOfSecond());
     $user = User::factory()->create();
     $admin = User::factory()->create();
@@ -93,9 +92,9 @@ test('product ban denies free access before any entitlement and invalidates host
     $product = Product::factory()->create();
     config(['host_client.free_until' => now()->addHour()->toIso8601String()]);
     app(ClientSessions::class)->login($product, $user->email, 'password', desktopRequest($user)['hwid']);
-    app(ManageLicensingBans::class)->create($user, $product, 'Abuse', $admin);
+    app(ManageEntitlements::class)->suspendCustomer($user, $product, $admin, 'Abuse');
     $this->assertDatabaseCount('client_sessions', 0);
-    expect(fn () => app(AccessPolicy::class)->authorize($user, $product, CarbonImmutable::now()->addDay()))->toThrow(LicensingException::class, 'license banned');
+    expect(fn () => app(AccessPolicy::class)->authorize($user, $product, CarbonImmutable::now()->addDay()))->toThrow(LicensingException::class, 'license suspended');
 });
 
 test('host session is deadline capped and heartbeat rechecks withdrawn free eligibility', function () {

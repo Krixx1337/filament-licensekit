@@ -39,7 +39,7 @@ test('individual extensions preserve future time and reactivate expired licenses
 test('pause banks seconds and resume starts extended balance from now without removing blocks', function () {
     $this->travelTo(CarbonImmutable::parse('2026-01-01T02:00:00.500000+02:00'));
     $actor = testAdminActor();
-    $entitlement = Entitlement::factory()->create(['user_id' => User::factory()->create()->id, 'expires_at' => '2026-01-01 01:00:01', 'is_blocked' => true]);
+    $entitlement = Entitlement::factory()->create(['user_id' => User::factory()->create()->id, 'expires_at' => '2026-01-01 01:00:01']);
     $tools = app(ManageEntitlements::class);
     Event::fake([EntitlementAccessInvalidated::class]);
 
@@ -60,7 +60,6 @@ test('pause banks seconds and resume starts extended balance from now without re
     expect($entitlement->fresh()->expires_at->toIso8601String())->toBe('2026-02-01T02:00:01+00:00');
     expect($entitlement->fresh()->paused_at)->toBeNull();
     expect($entitlement->fresh()->remaining_seconds)->toBeNull();
-    expect($entitlement->fresh()->is_blocked)->toBeTrue();
     expect(AuditEvent::where('event', 'like', 'entitlement_%')->pluck('event')->all())->toBe(['entitlement_paused', 'entitlement_extended', 'entitlement_resumed']);
 });
 
@@ -109,7 +108,8 @@ test('clock changes reject unavailable licenses', function (string $operation, a
     expect(AuditEvent::where('event', 'like', 'entitlement_%')->count())->toBe(0);
 })->with(['extend', 'pause', 'resume'])->with([
     'lifetime' => [['is_lifetime' => true, 'expires_at' => null]],
-    'revoked' => [['is_revoked' => true]],
+    'revoked' => [['status' => 'revoked']],
+    'suspended' => [['status' => 'suspended']],
     'deleted owner' => [['user_id' => null]],
 ]);
 
@@ -198,7 +198,7 @@ test('paused summaries expose balance and preserve restriction precedence', func
     expect($resource['paused_at'])->toBe($summary['paused_at']);
     expect($resource['remaining_seconds'])->toBe(3601);
     expect($resource['lifetime'])->toBeFalse();
-})->with([[[], 'paused'], [['is_blocked' => true], 'blocked'], [['is_revoked' => true], 'revoked']]);
+})->with([[[], 'paused'], [['status' => 'suspended'], 'suspended'], [['status' => 'revoked'], 'revoked']]);
 
 test('clock mutations roll back on audit failure', function (string $operation) {
     $actor = testAdminActor();

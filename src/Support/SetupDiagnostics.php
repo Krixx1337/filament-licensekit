@@ -17,9 +17,6 @@ final class SetupDiagnostics
     public function configurationErrors(): array
     {
         $errors = [];
-        if (! is_bool(config('licensekit.features.licensing_bans'))) {
-            $errors[] = 'licensekit.features.licensing_bans must be true or false.';
-        }
         try {
             ConfiguredUserModel::className();
             if ($this->auth->createUserProvider(ConfiguredUserModel::provider()) === null) {

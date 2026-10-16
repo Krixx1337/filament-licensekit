@@ -14,15 +14,25 @@ use LicenseKit\Database\Factories\Core\ProductFactory;
  * @property int $id
  * @property string $name
  * @property string $slug
- * @property bool $is_enabled
- * @property bool $is_blocked
+ * @property string $status active, maintenance or discontinued
  * @property bool $requires_hwid
  * @property Collection<int, LicensePlan> $plans
  */
 #[ObservedBy([LicensingConfigurationObserver::class])]
 class Product extends Model
 {
-    protected $fillable = ['name', 'slug', 'is_enabled', 'is_blocked', 'requires_hwid'];
+    /** Sold and usable. */
+    public const ACTIVE = 'active';
+
+    /** The software stops working for everyone; licenses keep their time. */
+    public const MAINTENANCE = 'maintenance';
+
+    /** No new keys; existing licenses keep working. */
+    public const DISCONTINUED = 'discontinued';
+
+    public const STATUSES = [self::ACTIVE, self::MAINTENANCE, self::DISCONTINUED];
+
+    protected $fillable = ['name', 'slug', 'status', 'requires_hwid'];
 
     /** @internal Actor supplied by supported catalog operations for synchronous auditing. */
     public ?string $auditActor = null;
@@ -37,12 +47,12 @@ class Product extends Model
     /** @use HasFactory<ProductFactory> */
     use HasFactory;
 
-    protected $attributes = ['is_enabled' => true, 'is_blocked' => false, 'requires_hwid' => true];
+    protected $attributes = ['status' => self::ACTIVE, 'requires_hwid' => true];
 
     /** @return array<string, string> */
     protected function casts(): array
     {
-        return ['is_enabled' => 'boolean', 'is_blocked' => 'boolean', 'requires_hwid' => 'boolean'];
+        return ['requires_hwid' => 'boolean'];
     }
 
     /** @return HasMany<LicensePlan, $this> */

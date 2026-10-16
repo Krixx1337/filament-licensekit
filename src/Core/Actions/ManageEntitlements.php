@@ -9,6 +9,7 @@ use Illuminate\Database\Query\Expression;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use LicenseKit\Core\Events\EntitlementAccessInvalidated;
+use LicenseKit\Core\Events\ProductAccessInvalidated;
 use LicenseKit\Core\Exceptions\LicensingException;
 use LicenseKit\Core\Models\Batch;
 use LicenseKit\Core\Models\Entitlement;
@@ -60,7 +61,7 @@ class ManageEntitlements
     private function addTimeTargets(Product $product, CarbonImmutable $since): Builder
     {
         return Entitlement::query()->where('product_id', $product->id)->whereNotNull('user_id')
-            ->where('is_lifetime', false)->where('is_revoked', false)
+            ->where('is_lifetime', false)->where('status', '!=', Entitlement::REVOKED)
             ->where(fn ($query) => $query->whereNotNull('paused_at')->orWhere('expires_at', '>', $since->format('Y-m-d H:i:s')));
     }
 
@@ -117,7 +118,8 @@ class ManageEntitlements
             Product::whereKey($entitlement->product_id)->lockForUpdate()->firstOrFail();
             $entitlement = Entitlement::whereKey($entitlement->id)->lockForUpdate()->first() ?? throw new LicensingException('license_unavailable');
             $this->authorize($actor, $ability, $entitlement);
-            if ($entitlement->user_id === null || $entitlement->is_lifetime || $entitlement->is_revoked) {
+            if ($entitlement->user_id === null || $entitlement->is_lifetime || $entitlement->isRevoked()
+                || $entitlement->isSuspended()) {
                 throw new LicensingException('cannot_'.$ability.'_entitlement', 409);
             }
             $before = $entitlement->only(['expires_at', 'paused_at', 'remaining_seconds']);
@@ -143,22 +145,61 @@ class ManageEntitlements
         }, 3);
     }
 
-    public function status(Entitlement $entitlement, string $field, bool $value, Model $actor, string $reason): void
+    /** Stops all access to the product, including free access and key redemption, until lifted or $until passes. */
+    public function suspend(Entitlement $entitlement, Model $actor, ?string $reason = null, ?CarbonImmutable $until = null): void
     {
-        DB::transaction(function () use ($entitlement, $field, $value, $actor, $reason): void {
+        $this->changeStatus($entitlement, $actor, $reason, 'block', Entitlement::SUSPENDED, $until);
+    }
+
+    public function unsuspend(Entitlement $entitlement, Model $actor, ?string $reason = null): void
+    {
+        $this->changeStatus($entitlement, $actor, $reason, 'unblock');
+    }
+
+    /** Cancels paid access, for example after a refund. Another key cannot renew a cancelled license. */
+    public function revoke(Entitlement $entitlement, Model $actor, ?string $reason = null): void
+    {
+        $this->changeStatus($entitlement, $actor, $reason, 'revoke', Entitlement::REVOKED);
+    }
+
+    public function restore(Entitlement $entitlement, Model $actor, ?string $reason = null): void
+    {
+        $this->changeStatus($entitlement, $actor, $reason, 'restoreAccess');
+    }
+
+    /** Suspends a customer for a product, creating their license record if they have none yet. */
+    public function suspendCustomer(Model $user, Product $product, Model $actor, ?string $reason = null, ?CarbonImmutable $until = null): Entitlement
+    {
+        return DB::transaction(function () use ($user, $product, $actor, $reason, $until): Entitlement {
+            $user = $user->newQuery()->whereKey($user->getKey())->lockForUpdate()->first() ?? throw new LicensingException('user_unavailable');
+            $entitlement = Entitlement::firstOrCreate(['user_id' => $user->getKey(), 'product_id' => $product->id]);
+            $this->suspend($entitlement, $actor, $reason, $until);
+
+            return $entitlement->fresh() ?? $entitlement;
+        }, 3);
+    }
+
+    private function changeStatus(Entitlement $entitlement, Model $actor, ?string $reason, string $ability, ?string $status = null, ?CarbonImmutable $until = null): void
+    {
+        $reason = $this->optionalReason($reason);
+        if ($until !== null && ! $until->isFuture()) {
+            throw new LicensingException('invalid_suspension_end', 422);
+        }
+        DB::transaction(function () use ($entitlement, $actor, $reason, $ability, $status, $until): void {
             $actor->newQuery()->whereKey(array_filter([$actor->getKey(), $entitlement->user_id], fn ($id): bool => $id !== null))->orderBy($actor->getKeyName())->lockForUpdate()->get();
-            if (! in_array($field, ['is_revoked', 'is_blocked'], true) || trim($reason) === '') {
-                throw new LicensingException('invalid_status_change', 422);
-            }
             Product::whereKey($entitlement->product_id)->lockForUpdate()->firstOrFail();
             $entitlement = Entitlement::whereKey($entitlement->id)->lockForUpdate()->first() ?? throw new LicensingException('license_unavailable');
-            $this->authorize($actor, $field === 'is_revoked' ? ($value ? 'revoke' : 'restoreAccess') : ($value ? 'block' : 'unblock'), $entitlement);
-            $before = $entitlement->only([$field]);
-            $entitlement->update([$field => $value]);
-            if ($value) {
+            $this->authorize($actor, $ability, $entitlement);
+            $before = $entitlement->only(['status', 'suspended_until']);
+            $entitlement->update([
+                'status' => $status ?? $entitlement->restingStatus(),
+                'suspended_until' => $status === Entitlement::SUSPENDED ? $until?->utc()->startOfSecond() : null,
+            ]);
+            if ($status !== null && $entitlement->user !== null) {
                 Event::dispatch(new EntitlementAccessInvalidated($entitlement));
+                Event::dispatch(new ProductAccessInvalidated($entitlement->user, $entitlement->product_id));
             }
-            $this->audit->record('user:'.$actor->getKey(), 'entitlement_status_changed', $entitlement, $before, [$field => $value], $reason);
+            $this->audit->record('user:'.$actor->getKey(), 'license_status_changed', $entitlement, $before, $entitlement->only(['status', 'suspended_until']), $reason);
         });
     }
 

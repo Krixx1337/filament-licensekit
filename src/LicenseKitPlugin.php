@@ -12,7 +12,6 @@ use LicenseKit\Filament\Resources\DeviceResetHistory\DeviceResetHistoryResource;
 use LicenseKit\Filament\Resources\Entitlements\EntitlementResource;
 use LicenseKit\Filament\Resources\LicenseKeys\LicenseKeyResource;
 use LicenseKit\Filament\Resources\LicensePlans\LicensePlanResource;
-use LicenseKit\Filament\Resources\LicensingBans\LicensingBanResource;
 use LicenseKit\Filament\Resources\Products\ProductResource;
 use LicenseKit\Support\SetupDiagnostics;
 
@@ -35,9 +34,6 @@ final class LicenseKitPlugin implements Plugin
             return;
         }
         $resources = [ProductResource::class, LicensePlanResource::class, LicenseKeyResource::class, BatchResource::class, EntitlementResource::class, ApiClientResource::class, DeviceResetHistoryResource::class, AuditEventResource::class];
-        if (config('licensekit.features.licensing_bans') === true) {
-            $resources[] = LicensingBanResource::class;
-        }
         $panel->resources($resources);
     }
 

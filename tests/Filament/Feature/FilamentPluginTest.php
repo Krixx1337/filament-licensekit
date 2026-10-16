@@ -24,14 +24,14 @@ test('core resources require panel registration and host gate', function () {
     $this->actingAs($user, 'staff')->get('/admin/licensekit/products')->assertForbidden();
     adminUser();
     $this->get('/admin/licensekit/products')->assertOk();
-    foreach (['license-plans', 'license-keys', 'entitlements', 'api-clients', 'audit-events', 'device-reset-history', 'bans'] as $slug) {
+    foreach (['license-plans', 'license-keys', 'entitlements', 'api-clients', 'audit-events', 'device-reset-history'] as $slug) {
         $this->get('/admin/licensekit/'.$slug)->assertOk();
     }
 });
 
 test('product creation validates catalog settings and records panel actor once', function () {
     $admin = adminUser();
-    $data = ['name' => 'Software', 'slug' => 'software', 'is_enabled' => true, 'is_blocked' => false];
+    $data = ['name' => 'Software', 'slug' => 'software', 'status' => 'active'];
     Livewire::test(ManageProducts::class)->callAction('create', data: $data)->assertHasNoActionErrors();
     $this->assertDatabaseHas('licensekit_products', ['slug' => 'software']);
     $this->assertDatabaseCount('licensekit_audit_events', 1);
@@ -57,7 +57,7 @@ test('key creation action uses package backend', function () {
 
 test('resources register on non-tenant panels and unsupported tenancy is rejected', function () {
     $core = Panel::make()->id('core')->authGuard('staff')->plugin(LicenseKitPlugin::make());
-    expect($core->getResources())->toHaveCount(9);
+    expect($core->getResources())->toHaveCount(8);
     $tenant = Panel::make()->id('tenant')->tenant(User::class)->plugin(LicenseKitPlugin::make());
     expect($tenant->getResources())->toBe([]);
     expect(fn () => $tenant->getPlugin('licensekit')->boot($tenant))->toThrow(LicensingException::class, 'licensing unavailable');

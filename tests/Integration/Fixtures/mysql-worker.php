@@ -11,7 +11,6 @@ use LicenseKit\Core\Actions\IssueLicenses;
 use LicenseKit\Core\Actions\LicensedDevices;
 use LicenseKit\Core\Actions\ManageApiClients;
 use LicenseKit\Core\Actions\ManageEntitlements;
-use LicenseKit\Core\Actions\ManageLicensingBans;
 use LicenseKit\Core\Actions\ManagementOperations;
 use LicenseKit\Core\Exceptions\LicensingException;
 use LicenseKit\Core\Models\ApiClient;
@@ -99,7 +98,6 @@ $run = fn () => match ($operation) {
 
         return 1;
     })(),
-    'ban' => app(ManageLicensingBans::class)->create(User::findOrFail($payload['user_id']), Product::findOrFail($payload['product_id']), 'Abuse', User::findOrFail($payload['actor_id']))->id,
     'login' => app(ClientSessions::class)->login(Product::findOrFail($payload['product_id']), User::findOrFail($payload['user_id'])->email, 'password', $hwid)['token'],
     'heartbeat' => app(ClientSessions::class)->heartbeat(Product::findOrFail($payload['product_id']), $payload['token'], $hwid)['expires_at'],
     'reassign' => DB::transaction(function () use ($payload): int {

@@ -8,6 +8,7 @@ use Illuminate\Contracts\Pagination\Paginator;
 use Illuminate\Support\Collection;
 use LicenseKit\Core\Actions\DeviceBindings;
 use LicenseKit\Core\Models\Entitlement;
+use LicenseKit\Filament\Actions\LicensingActions;
 use LicenseKit\Filament\Concerns\DisplaysLicensingErrors;
 use LicenseKit\Filament\Resources\Entitlements\EntitlementResource;
 
@@ -37,6 +38,6 @@ class ManageEntitlements extends ManageRecords
 
     protected function getHeaderActions(): array
     {
-        return [];
+        return [LicensingActions::suspendCustomer()];
     }
 }

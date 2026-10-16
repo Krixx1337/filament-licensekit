@@ -14,22 +14,21 @@ use LicenseKit\Core\Users\UserAccess;
 
 class AccessPolicy
 {
-    public function __construct(private UserAccess $users, private AccessRestrictions $restrictions, private EntitlementClock $clock, private ReadinessCheck $readiness, private LicensingBans $bans) {}
+    public function __construct(private UserAccess $users, private AccessRestrictions $restrictions, private EntitlementClock $clock, private ReadinessCheck $readiness) {}
 
     public function authorize(Model $user, Product $product, ?CarbonImmutable $freeUntil = null): AccessAuthorization
     {
         $user = $user->newQuery()->whereKey($user->getKey())->when(DB::transactionLevel() > 0, fn ($query) => $query->sharedLock())->first() ?? throw new LicensingException('user_unavailable');
         $product = Product::whereKey($product->id)->when(DB::transactionLevel() > 0, fn ($query) => $query->sharedLock())->first() ?? throw new LicensingException('service_unavailable');
         $entitlement = $this->check($user, $product);
-        if ($entitlement !== null && ! $entitlement->is_revoked && ! $entitlement->is_blocked && $this->clock->active($entitlement)) {
+        if ($entitlement !== null && ! $entitlement->isRevoked() && $this->clock->active($entitlement)) {
             return new AccessAuthorization($user, $product, $entitlement, 'paid', $entitlement->expires_at);
         }
         if ($freeUntil !== null && $freeUntil->isFuture()) {
             return new AccessAuthorization($user, $product, null, 'host_free', $freeUntil->utc());
         }
         throw new LicensingException(match (true) {
-            $entitlement === null, $entitlement->is_revoked => 'license_unavailable',
-            $entitlement->is_blocked => 'service_unavailable',
+            $entitlement === null, $entitlement->isRevoked() => 'license_unavailable',
             default => 'license_expired',
         });
     }
@@ -49,12 +48,14 @@ class AccessPolicy
         if (! $this->users->available($user)) {
             throw new LicensingException('user_unavailable');
         }
-        $this->bans->assertAllowed($user, $product);
-        if (! $product->is_enabled || $product->is_blocked) {
+        if ($product->status === Product::MAINTENANCE) {
             throw new LicensingException('service_unavailable');
         }
         $entitlement = Entitlement::where('user_id', $user->getKey())->where('product_id', $product->id)->when(DB::transactionLevel() > 0, fn ($query) => $query->sharedLock())->first();
         $this->restrictions->assertAllowed($user, $product, $entitlement);
+        if ($entitlement?->isSuspended()) {
+            throw new LicensingException('license_suspended');
+        }
         if ($entitlement?->paused_at !== null) {
             throw new LicensingException('subscription_paused');
         }

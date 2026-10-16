@@ -18,7 +18,7 @@ test('adding time extends running licenses and banks paused ones', function () {
     $paused = $owned(['expires_at' => null, 'paused_at' => '2026-10-10 00:00:00', 'remaining_seconds' => 3600]);
     $expired = $owned(['expires_at' => '2026-10-15 12:00:00']);
     $lifetime = $owned(['is_lifetime' => true, 'expires_at' => null]);
-    $revoked = $owned(['is_revoked' => true]);
+    $revoked = $owned(['status' => 'revoked']);
     $orphan = Entitlement::factory()->create(['product_id' => $product->id, 'user_id' => null]);
     $otherProduct = Entitlement::factory()->create(['user_id' => User::factory()->create()->id, 'expires_at' => '2026-10-20 12:00:00']);
     $untouched = collect([$expired, $lifetime, $revoked, $orphan, $otherProduct])->mapWithKeys(fn (Entitlement $e) => [$e->id => $e->fresh()->getAttributes()]);

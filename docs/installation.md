@@ -45,7 +45,7 @@ Choose these before the first device is saved. There is no conversion later.
 
 Buyers can reset their own PC. The wait is `licensekit.device_binding.customer_reset.cooldown_days`, default 7. `0` means no wait. Set `customer_reset.enabled` to `false` to leave resets to an admin.
 
-Product bans start on. Set `licensekit.features.licensing_bans` to `false` to stop using them. Stored bans remain.
+To ban someone from a product, **Suspend** their license, or use **Suspend a customer** on the Licenses page if they have not bought it yet. A suspension can end on a date you choose.
 
 One account gets one PC per product. A second PC needs another account, or a reset.
 
@@ -66,14 +66,13 @@ In `config/filament-shield.php`, merge this into `resources.manage`:
 \LicenseKit\Filament\Resources\LicensePlans\LicensePlanResource::class => ['viewAny', 'view', 'create', 'update', 'createKeys'],
 \LicenseKit\Filament\Resources\LicenseKeys\LicenseKeyResource::class => ['viewAny', 'view', 'claim', 'revoke', 'updateNote'],
 \LicenseKit\Filament\Resources\Batches\BatchResource::class => ['viewAny', 'view', 'exportUnclaimed', 'revokeUnclaimed'],
-\LicenseKit\Filament\Resources\Entitlements\EntitlementResource::class => ['viewAny', 'view', 'revoke', 'restoreAccess', 'block', 'unblock', 'extend', 'pause', 'resume'],
-\LicenseKit\Filament\Resources\LicensingBans\LicensingBanResource::class => ['viewAny', 'view', 'create', 'lift'],
+\LicenseKit\Filament\Resources\Entitlements\EntitlementResource::class => ['viewAny', 'view', 'create', 'revoke', 'restoreAccess', 'block', 'unblock', 'extend', 'pause', 'resume'],
 \LicenseKit\Filament\Resources\ApiClients\ApiClientResource::class => ['viewAny', 'view', 'create', 'update', 'rotateToken', 'revokeTokens', 'retire'],
 \LicenseKit\Filament\Resources\AuditEvents\AuditEventResource::class => ['viewAny', 'view'],
 \LicenseKit\Filament\Resources\DeviceResetHistory\DeviceResetHistoryResource::class => ['viewAny', 'view'],
 ```
 
-Leave out LicensingBan when bans are off. Keep class-level `viewAny` and `create` in `policies.single_parameter_methods`. The other abilities need a record. `policies.merge=false` replaces the list for every resource in that config, so include your own resources too.
+Keep class-level `viewAny` and `create` in `policies.single_parameter_methods`. The other abilities need a record. `policies.merge=false` replaces the list for every resource in that config, so include your own resources too.
 
 ```sh
 php artisan shield:generate --all --panel=admin --no-interaction
@@ -90,7 +89,6 @@ foreach ([
     \LicenseKit\Core\Models\LicenseKey::class => \App\Policies\LicenseKeyPolicy::class,
     \LicenseKit\Core\Models\Batch::class => \App\Policies\BatchPolicy::class,
     \LicenseKit\Core\Models\Entitlement::class => \App\Policies\EntitlementPolicy::class,
-    \LicenseKit\Core\Models\LicensingBan::class => \App\Policies\LicensingBanPolicy::class,
     \LicenseKit\Core\Models\ApiClient::class => \App\Policies\ApiClientPolicy::class,
     \LicenseKit\Core\Models\AuditEvent::class => \App\Policies\AuditEventPolicy::class,
     \LicenseKit\Core\Models\DeviceResetHistory::class => \App\Policies\DeviceResetHistoryPolicy::class,
@@ -99,7 +97,7 @@ foreach ([
 }
 ```
 
-For a helper role, grant Entitlement `viewAny` / `view`, Product `resetHwid` / `inspectDevice`, and LicensingBan `viewAny` / `view` / `create` / `lift`. Add reset-history `viewAny` / `view` only if they should see past resets. Leave out key creation, plans, API clients, and product-wide Add time.
+For a helper role, grant Entitlement `viewAny` / `view` / `block` / `unblock` (suspend and unsuspend) and Product `resetHwid` / `inspectDevice`. Entitlement `create` shows **Suspend a customer**. Add reset-history `viewAny` / `view` only if they should see past resets. Leave out key creation, plans, API clients, and product-wide Add time.
 
 Grant Entitlement `extend`, `pause`, and `resume` separately when staff should manage individual license time. These actions require a reason. See [individual license support](client.md#individual-license-support) for behavior.
 
@@ -107,7 +105,7 @@ A missing policy method denies the action. `licensekit.manage` cannot override t
 
 ## Reseller account ownership
 
-API clients can optionally belong to a registered host user. Configure `licensekit.user.suspended_column` to your account suspension column if suspension should also block reseller API access. The existing `require_verified` setting applies to client owners. Product licensing bans do not independently disable reseller credentials.
+API clients can optionally belong to a registered host user. Configure `licensekit.user.suspended_column` to your account suspension column if suspension should also block reseller API access. The existing `require_verified` setting applies to client owners. Suspending a license does not disable reseller credentials.
 
 Owner selection is available when creating an API client. Ownership cannot change afterward, including for initially ownerless clients. Use a new client for a different owner. Token rotation preserves the existing client identity, references, and batch visibility.
 

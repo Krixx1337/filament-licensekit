@@ -148,9 +148,9 @@ test('desktop access denies unavailable user product and entitlement states', fu
     match ($state) {
         'suspended' => $user->forceFill(['is_suspended' => true])->save(),
         'unverified' => $user->forceFill(['email_verified_at' => null])->save(),
-        'revoked' => $entitlement->update(['is_revoked' => true]),
+        'revoked' => $entitlement->update(['status' => 'revoked']),
         'expired' => $entitlement->update(['expires_at' => now()->subSecond()]),
-        'blocked' => $product->update(['is_blocked' => true]),
+        'blocked' => $product->update(['status' => 'maintenance']),
     };
 
     $response = $this->postJson(route('licensekit.desktop.login', $product->slug), desktopRequest($user));
@@ -181,9 +181,9 @@ test('heartbeat denies token exactly at expiry and rechecks revoked license', fu
     $entitlement = Entitlement::factory()->create(['user_id' => $user->id, 'product_id' => $product->id]);
     $token = $this->postJson(route('licensekit.desktop.login', $product->slug), desktopRequest($user))->json('data.token');
 
-    $entitlement->update(['is_revoked' => true]);
+    $entitlement->update(['status' => 'revoked']);
     $this->withToken($token)->postJson(route('licensekit.desktop.heartbeat', $product->slug), desktopRequest($user))->assertForbidden()->assertJsonPath('error', 'license_unavailable');
-    $entitlement->update(['is_revoked' => false]);
+    $entitlement->update(['status' => 'active']);
     $this->travel(15)->minutes();
     $this->postJson(route('licensekit.desktop.heartbeat', $product->slug), desktopRequest($user))->assertUnauthorized();
 });

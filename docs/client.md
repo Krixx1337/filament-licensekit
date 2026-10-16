@@ -46,7 +46,7 @@ public function bypassHwid($user, Product $product): bool
 
 Use your host application's role or permission check in place of `is_admin`. With Shield/Spatie permissions, you can check `$user->hasPermissionTo('bypass_hwid')`. Create and assign that permission in the host application; LicenseKit does not generate a Shield checkbox. `licensekit.manage` alone does not grant immunity. Laravel Gate hooks, including host super-admin hooks, still apply.
 
-Both exemptions affect direct `DeviceBindings::bind()`/`verify()` and `LicensedDevices::bind()`/`verify()`/`upgrade()`. These calls still require a valid HWID array and run your handler's `assertAllowed()` with the saved baseline when present. Account checks, licensing bans, product restrictions, maintenance mode, and license requirements still apply. Staff immunity grants no entitlement.
+Both exemptions affect direct `DeviceBindings::bind()`/`verify()` and `LicensedDevices::bind()`/`verify()`/`upgrade()`. These calls still require a valid HWID array and run your handler's `assertAllowed()` with the saved baseline when present. Account checks, license suspensions, product restrictions, maintenance mode, and license requirements still apply. Staff immunity grants no entitlement.
 
 Exempt calls accept different PCs without creating or changing a device binding. `verify()` succeeds without a saved PC, and `upgrade()` returns the normalized presented HWID without changing a baseline or emitting an upgrade audit/event. Existing bindings and reset cooldowns remain stored. Customer and admin reset tools keep their existing behavior.
 
@@ -108,13 +108,35 @@ $licenses->resume($entitlement, $admin, 'Customer returned');
 
 Each call checks its own policy ability, `extend`, `pause`, or `resume`, and requires a reason of 1–2000 characters after trimming. Extensions accept 1–315360000 seconds. They add to a future expiry or start from now if expired. A paused license banks the added seconds.
 
-Pause saves remaining seconds and clears expiry. Resume starts that balance from now. Lifetime, revoked, and deleted-user licenses cannot use these actions. Blocked licenses can, but the block stays. Pausing an expired license or repeating a pause/resume returns HTTP 409 with `cannot_pause_entitlement` or `cannot_resume_entitlement`.
+Pause saves remaining seconds and clears expiry. Resume starts that balance from now. Lifetime, cancelled, suspended, and deleted-user licenses cannot use these actions. Pausing an expired license or repeating a pause/resume returns HTTP 409 with `cannot_pause_entitlement` or `cannot_resume_entitlement`.
 
-While paused, paid access, host-provided free access, and key claims fail with `subscription_paused`, HTTP 403. Keys stay unclaimed, including lifetime keys. Resume first before claiming. Customer summaries report `paused`, unless revoked or blocked, and expose `paused_at` and `remaining_seconds`. A null `expires_at` alone does not mean lifetime.
+While paused, paid access, host-provided free access, and key claims fail with `subscription_paused`, HTTP 403. Keys stay unclaimed, including lifetime keys. Resume first before claiming. Customer summaries report `paused`, unless cancelled or suspended, and expose `paused_at` and `remaining_seconds`. A null `expires_at` alone does not mean lifetime.
 
 Pause dispatches `EntitlementAccessInvalidated` inside the transaction. Your host app must listen to that event to invalidate its sessions. Bind and verify also reject paused licenses. Keep listener database writes in the same transaction; defer external side effects until commit.
 
 Product-wide **Add time** adds the time to a paused license's banked balance instead of its end date.
+
+## License status
+
+Each license has one `status`: `active`, `paused`, `suspended` or `revoked`.
+
+```php
+use LicenseKit\Core\Actions\ManageEntitlements;
+
+$licenses = app(ManageEntitlements::class);
+$licenses->suspend($license, $admin, 'Chargeback', until: now()->addWeek()); // until is optional
+$licenses->unsuspend($license, $admin);
+$licenses->revoke($license, $admin, 'Refund');   // "Cancel license" in the admin
+$licenses->restore($license, $admin);
+$licenses->suspendCustomer($user, $product, $admin, 'Cheating'); // works before a purchase
+```
+
+- **Suspended** stops all access to that product, including free access, and rejects key redemption with `license_suspended`. The clock keeps running. A suspension with `until` ends by itself.
+- **Revoked** (cancelled) stops paid access only. Another key cannot renew it. Host-approved free access still works.
+- Unsuspending or restoring returns the license to `paused` if it was paused, otherwise `active`.
+- Suspending or revoking dispatches `EntitlementAccessInvalidated` and `ProductAccessInvalidated` inside the transaction.
+
+Products have one `status` too: `active`, `maintenance` (the software stops working for everyone, `service_unavailable`) or `discontinued` (no new keys, existing licenses keep working).
 
 ## Reset
 
