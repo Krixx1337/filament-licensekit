@@ -33,6 +33,9 @@
         "filament/filament": "^4.13.3 || ^5.8.3",
         "ext-sodium": "*"
     },
+    "suggest": {
+        "phiki/phiki": "Adds syntax highlighting to the example code on the Connect your app page."
+    },
     "require-dev": {
         "orchestra/testbench": "^10.0 || ^11.0",
         "pestphp/pest": "^4.4.1",

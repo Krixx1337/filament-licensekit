@@ -6,9 +6,12 @@ use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Infolists\Components\CodeEntry;
+use Filament\Infolists\Components\Entry;
 use Filament\Infolists\Components\KeyValueEntry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
+use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Callout;
 use Filament\Schemas\Components\Flex;
 use Filament\Schemas\Components\Section;
@@ -18,6 +21,7 @@ use Filament\Schemas\Components\Text;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\FontFamily;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Support\Js;
 use LicenseKit\Core\Actions\AccessPolicy;
 use LicenseKit\Core\Actions\DeviceBans;
 use LicenseKit\Core\Actions\ResponseSigning;
@@ -31,6 +35,7 @@ use LicenseKit\Filament\Navigation;
 use LicenseKit\Filament\Resources\Products\ProductResource;
 use LicenseKit\Filament\Support\TimeLeft;
 use Livewire\Attributes\Url;
+use Phiki\Phiki;
 
 /** Everything a seller's developer needs to make their app talk to LicenseKit, per product. */
 class ConnectYourApp extends LicenseKitPage
@@ -134,14 +139,8 @@ class ConnectYourApp extends LicenseKitPage
                     ->map(fn (string $label, string $path) => TextEntry::make('endpoint_'.$path)->label($label)->state('POST '.$base.'/'.$path)
                         ->fontFamily(FontFamily::Mono)->copyable()->copyableState($base.'/'.$path)->copyMessage('Address copied'))->values()->all()),
             Section::make('3. Example code')->icon(Heroicon::OutlinedCodeBracket)
-                ->description('Copy one into your app. Only run your software while the heartbeat says access is true.')
-                ->schema([Tabs::make('languages')->tabs(collect(['Python' => 'client.py', 'C#' => 'Client.cs', 'C++' => 'client.cpp', 'curl (testing only)' => 'client.sh'])
-                    // Explicit keys: Filament keys tabs by label slug, and "C#" and "C++" both become "c".
-                    ->map(fn (string $file, string $language): Tab => Tab::make($language)->key('snippet-'.str_replace('.', '-', strtolower($file)))->schema([
-                        TextEntry::make('snippet_'.md5($file))->hiddenLabel()->markdown()
-                            ->state("```\n".$this->snippet($file, $base, $publicKey)."\n```")
-                            ->copyable()->copyableState($this->snippet($file, $base, $publicKey))->copyMessage('Code copied'),
-                    ]))->values()->all())]),
+                ->description('Pick your language. Only run your software while the heartbeat says access is true.')
+                ->schema([Tabs::make('languages')->tabs($this->codeTabs($base, $publicKey))]),
             Section::make('What customers may see')->icon(Heroicon::OutlinedChatBubbleLeftEllipsis)->collapsible()->collapsed()
                 ->description('Messages your app can show, and what each one means.')
                 ->schema([KeyValueEntry::make('errors')->hiddenLabel()->state(self::ERRORS)->keyLabel('Code')->valueLabel('What it means')]),
@@ -150,6 +149,52 @@ class ConnectYourApp extends LicenseKitPage
                 Text::make('Website two-factor login does not apply to app logins.'),
             ]),
         ]);
+    }
+
+    /**
+     * A short usage preview per language, with the full client one click away. The full client matters:
+     * it checks each answer's signature, nonce and time, which stops a fake server from granting access.
+     *
+     * @return list<Tab>
+     */
+    private function codeTabs(string $base, ?string $publicKey): array
+    {
+        $languages = ['python' => ['Python', 'client.py', 'python'], 'csharp' => ['C#', 'Client.cs', 'csharp'],
+            'cpp' => ['C++', 'client.cpp', 'cpp'], 'curl' => ['curl (testing only)', 'client.sh', 'shellscript']];
+        $tabs = [];
+        foreach ($languages as $key => [$label, $file, $grammar]) {
+            $full = $this->snippet($file, $base, $publicKey);
+            $usage = __DIR__.'/../../../resources/snippets/usage/'.$file;
+            $preview = is_file($usage) ? trim(str_replace("\r\n", "\n", (string) file_get_contents($usage))) : $full;
+            $schema = [$this->code('code_'.$key, $preview, $grammar)];
+            if ($preview !== $full) {
+                array_unshift($schema, Text::make('How your app uses it. The full example adds the call() function, which checks that every answer really came from your server.'));
+                $schema[] = Actions::make([
+                    Action::make('copy_'.$key)->label('Copy full example')->icon(Heroicon::OutlinedClipboardDocument)->color('gray')
+                        ->alpineClickHandler('window.navigator.clipboard.writeText('.Js::from($full).'); $tooltip('.Js::from('Full example copied')
+                            .', { theme: $store.theme, timeout: 2000 })'),
+                    Action::make('download_'.$key)->label('Download '.$file)->icon(Heroicon::OutlinedArrowDownTray)->color('gray')
+                        ->action(fn () => response()->streamDownload(function () use ($full): void {
+                            echo $full;
+                        }, $file, ['Cache-Control' => 'private, no-store'])),
+                ])->key('code_actions_'.$key);
+            }
+            // Explicit keys: Filament keys tabs by label slug, and "C#" and "C++" both become "c".
+            $tabs[] = Tab::make($label)->key('snippet-'.$key)->schema($schema);
+        }
+
+        return $tabs;
+    }
+
+    /** Highlighted with CodeEntry when the host has installed phiki/phiki, otherwise a plain code block. */
+    private function code(string $name, string $code, string $grammar): Entry
+    {
+        if (class_exists(Phiki::class)) {
+            return CodeEntry::make($name)->hiddenLabel()->state($code)->grammar($grammar)->copyable()->copyMessage('Copied');
+        }
+
+        return TextEntry::make($name)->hiddenLabel()->markdown()->state("```\n".$code."\n```")
+            ->copyable()->copyableState($code)->copyMessage('Copied');
     }
 
     private function status(string $label, bool $good, string $yes, string $no): TextEntry
@@ -169,7 +214,7 @@ class ConnectYourApp extends LicenseKitPage
 
     private function snippet(string $file, string $base, ?string $publicKey): string
     {
-        return trim(str_replace(['__BASE__', '__PUBLIC_KEY__'], [$base, $publicKey ?? 'RUN_LICENSEKIT_INSTALL'],
+        return trim(str_replace(['__BASE__', '__PUBLIC_KEY__', "\r\n"], [$base, $publicKey ?? 'RUN_LICENSEKIT_INSTALL', "\n"],
             (string) file_get_contents(__DIR__.'/../../../resources/snippets/'.$file)));
     }
 }
