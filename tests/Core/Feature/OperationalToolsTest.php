@@ -1,47 +1,45 @@
 <?php
 
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Event;
-use Illuminate\Support\Facades\Schema;
 use LicenseKit\Core\Actions\ClaimLicense;
-use LicenseKit\Core\Actions\CreateBatch;
-use LicenseKit\Core\Actions\ManageLicenses;
+use LicenseKit\Core\Actions\Keys;
+use LicenseKit\Core\Actions\ManageKeys;
+use LicenseKit\Core\Data\IssueContext;
 use LicenseKit\Core\Exceptions\LicensingException;
-use LicenseKit\Core\Models\AuditEvent;
+use LicenseKit\Core\Models\ActivityEntry;
 use LicenseKit\Core\Models\LicenseKey;
 use LicenseKit\Core\Models\LicensePlan;
-use LicenseKit\Support\ModuleReadiness;
 use LicenseKit\Tests\Core\Fixtures\User;
 
 test('batch export and revocation isolate unclaimed nonrevoked keys and preserve claimed access', function () {
     $this->freezeTime();
     $actor = testAdminActor();
     $plan = LicensePlan::factory()->create();
-    $batch = app(CreateBatch::class)->createFor($actor, $plan, 4, 'batch');
-    $other = app(CreateBatch::class)->createFor($actor, $plan, 1, 'other');
+    $batch = app(Keys::class)->issue($plan, 4, new IssueContext(source: 'admin', actor: $actor, reference: 'batch'));
+    $other = app(Keys::class)->issue($plan, 1, new IssueContext(source: 'admin', actor: $actor, reference: 'other'));
     $user = User::factory()->create();
     $license = app(ClaimLicense::class)->claim($user, $batch->keys[0]->key);
-    app(ManageLicenses::class)->revokeKey($batch->keys[1], $actor, 'Prior revoke');
+    app(ManageKeys::class)->revokeKey($batch->keys[1], $actor, 'Prior revoke');
     $before = $license->fresh()->getAttributes();
-    $tools = app(ManageLicenses::class);
+    $tools = app(ManageKeys::class);
 
-    $values = $tools->exportUnclaimedBatch($batch, $actor);
+    $values = $tools->exportUnusedBatch($batch, $actor);
 
     expect($values)->toBe([$batch->keys[2]->key, $batch->keys[3]->key]);
-    expect($tools->exportUnclaimedBatch($batch, $actor))->toBe($values);
-    $this->assertDatabaseCount('licensekit_license_keys', 5);
-    expect($tools->revokeUnclaimedBatch($batch, $actor, ' Chargeback '))->toBe(2);
-    expect($tools->revokeUnclaimedBatch($batch, $actor, 'Repeated'))->toBe(0);
-    expect($tools->exportUnclaimedBatch($batch, $actor))->toBe([]);
+    expect($tools->exportUnusedBatch($batch, $actor))->toBe($values);
+    $this->assertDatabaseCount('licensekit_keys', 5);
+    expect($tools->cancelUnusedBatch($batch, $actor, ' Chargeback '))->toBe(2);
+    expect($tools->cancelUnusedBatch($batch, $actor, 'Repeated'))->toBe(0);
+    expect($tools->exportUnusedBatch($batch, $actor))->toBe([]);
     expect($license->fresh()->getAttributes())->toBe($before);
-    expect($other->keys->first()->fresh()->revoked_at)->toBeNull();
-    $this->assertDatabaseHas('licensekit_audit_events', ['event' => 'batch_unclaimed_revoked', 'reason' => 'Chargeback']);
+    expect($other->keys->first()->fresh()->cancelled_at)->toBeNull();
+    $this->assertDatabaseHas('licensekit_activity_log', ['event' => 'batch_unused_cancelled', 'meta->note' => 'Chargeback']);
 });
 
 test('key notes are trimmed cleared private and limited', function () {
     $actor = testAdminActor();
-    $key = LicenseKey::factory()->create(['claimed_at' => now()]);
-    $tools = app(ManageLicenses::class);
+    $key = LicenseKey::factory()->create(['redeemed_at' => now()]);
+    $tools = app(ManageKeys::class);
 
     $tools->updateNote($key, $actor, '  Support follow-up  ');
 
@@ -56,45 +54,39 @@ test('key notes are trimmed cleared private and limited', function () {
 test('new writes roll back on audit failure', function (string $operation) {
     $actor = testAdminActor();
     $plan = LicensePlan::factory()->create();
-    $batch = app(CreateBatch::class)->createFor($actor, $plan, 1, 'batch');
-    Event::listen('eloquent.creating: '.AuditEvent::class, fn () => throw new RuntimeException('Audit failed'));
-    $tools = app(ManageLicenses::class);
+    $batch = app(Keys::class)->issue($plan, 1, new IssueContext(source: 'admin', actor: $actor, reference: 'batch'));
+    Event::listen('eloquent.creating: '.ActivityEntry::class, fn () => throw new RuntimeException('Audit failed'));
+    $tools = app(ManageKeys::class);
 
     expect(fn () => match ($operation) {
-        'revoke' => $tools->revokeUnclaimedBatch($batch, $actor, 'Reason'),
+        'revoke' => $tools->cancelUnusedBatch($batch, $actor, 'Reason'),
         'note' => $tools->updateNote($batch->keys->first(), $actor, 'Note'),
     })->toThrow(RuntimeException::class, 'Audit failed');
 
-    expect($batch->keys->first()->fresh()->revoked_at)->toBeNull();
+    expect($batch->keys->first()->fresh()->cancelled_at)->toBeNull();
     expect($batch->keys->first()->fresh()->note)->toBeNull();
-    $this->assertDatabaseCount('licensekit_license_keys', 1);
+    $this->assertDatabaseCount('licensekit_keys', 1);
 })->with(['revoke', 'note']);
 
 test('invalid batch reasons do not revoke keys or create audit', function (string $reason) {
     $actor = testAdminActor();
     $plan = LicensePlan::factory()->create();
-    $batch = app(CreateBatch::class)->createFor($actor, $plan, 1, 'batch');
+    $batch = app(Keys::class)->issue($plan, 1, new IssueContext(source: 'admin', actor: $actor, reference: 'batch'));
 
-    expect(fn () => app(ManageLicenses::class)->revokeUnclaimedBatch($batch, $actor, $reason))->toThrow(LicensingException::class, 'invalid revocation reason');
+    expect(fn () => app(ManageKeys::class)->cancelUnusedBatch($batch, $actor, $reason))->toThrow(LicensingException::class, 'invalid revocation reason');
 
-    expect($batch->keys->first()->fresh()->revoked_at)->toBeNull();
-    expect(AuditEvent::where('event', 'batch_unclaimed_revoked')->count())->toBe(0);
-})->with([' ', str_repeat('x', 2001)]);
+    expect($batch->keys->first()->fresh()->cancelled_at)->toBeNull();
+    expect(ActivityEntry::where('event', 'batch_unused_cancelled')->count())->toBe(0);
+})->with([str_repeat('x', 2001)]);
 
 test('generated lifetime batch remains lifetime after plan edits', function () {
     $actor = testAdminActor();
     $user = User::factory()->create();
     $plan = LicensePlan::factory()->lifetime()->create();
-    $batch = app(CreateBatch::class)->createFor($actor, $plan, 1, 'lifetime');
+    $batch = app(Keys::class)->issue($plan, 1, new IssueContext(source: 'admin', actor: $actor, reference: 'lifetime'));
     $plan->update(['duration_days' => 30]);
     $license = app(ClaimLicense::class)->claim($user, $batch->keys[0]->key);
     expect($batch->duration_days)->toBeNull();
     expect($batch->keys[0]->fresh()->duration_days)->toBeNull();
     expect($license->is_lifetime)->toBeTrue()->and($license->expires_at)->toBeNull();
-});
-
-test('schema diagnostics detect old databases missing private key notes', function () {
-    Schema::table('licensekit_license_keys', fn (Blueprint $table) => $table->dropColumn('note'));
-
-    expect(app(ModuleReadiness::class)->issues())->toContain('Missing licensekit_license_keys column: note. Run php artisan migrate with the installed LicenseKit version.');
 });

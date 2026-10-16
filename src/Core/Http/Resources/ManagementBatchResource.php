@@ -22,12 +22,12 @@ class ManagementBatchResource extends JsonResource
     /** @return array<string, mixed> */
     public function toArray(Request $request): array
     {
-        return ['id' => $this->id, 'issuer' => $this->issuer, 'reference' => $this->reference, 'plan_id' => $this->license_plan_id,
+        return ['id' => $this->id, 'source' => $this->source, 'reference' => $this->reference, 'plan_id' => $this->plan_id,
             'quantity' => $this->quantity, 'duration_days' => $this->duration_days, 'label' => $this->label,
             'total_count' => $this->whenHas('total_count'),
-            'claimed_count' => $this->whenHas('claimed_count'),
-            'unclaimed_count' => $this->whenHas('unclaimed_count'),
-            'revoked_count' => $this->whenHas('revoked_count'),
+            'redeemed_count' => $this->whenHas('redeemed_count'),
+            'unused_count' => $this->whenHas('unused_count'),
+            'cancelled_count' => $this->whenHas('cancelled_count'),
             'keys' => $this->when($this->includeKeys, fn () => $this->keys->map(fn (LicenseKey $key): array => ['id' => $key->id, 'key' => $key->key])->all())];
     }
 }

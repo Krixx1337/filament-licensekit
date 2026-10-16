@@ -24,7 +24,6 @@ body:
         Laravel:
         Filament:
         Livewire:
-        Sanctum:
     validations:
       required: true
   - type: textarea

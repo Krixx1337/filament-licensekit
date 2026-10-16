@@ -7,6 +7,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use LicenseKit\Core\Casts\UtcDateTime;
 use LicenseKit\Core\Users\ConfiguredUserModel;
 use LicenseKit\Database\Factories\Core\LicenseFactory;
@@ -19,6 +20,8 @@ use LicenseKit\Database\Factories\Core\LicenseFactory;
  * @property string $status active, paused, suspended or revoked
  * @property CarbonImmutable|null $suspended_until
  * @property CarbonImmutable|null $expires_at
+ * @property string|null $note
+ * @property CarbonImmutable|null $paused_until
  * @property CarbonImmutable|null $paused_at
  * @property int|null $remaining_seconds
  * @property Product $product
@@ -37,7 +40,8 @@ class License extends Model
 
     public const REVOKED = 'revoked';
 
-    protected $fillable = ['user_id', 'product_id', 'is_lifetime', 'status', 'suspended_until', 'expires_at', 'paused_at', 'remaining_seconds', 'device', 'device_bound_at', 'device_reset_at'];
+    protected $fillable = ['user_id', 'product_id', 'is_lifetime', 'status', 'suspended_until', 'expires_at', 'paused_at', 'paused_until', 'note', 'remaining_seconds', 'device',
+        'device_bound_at', 'device_reset_at'];
 
     protected $hidden = ['device'];
 
@@ -56,7 +60,9 @@ class License extends Model
     /** @return array<string, string> */
     protected function casts(): array
     {
-        return ['created_at' => UtcDateTime::class, 'updated_at' => UtcDateTime::class, 'product_id' => 'integer', 'is_lifetime' => 'boolean', 'suspended_until' => UtcDateTime::class, 'expires_at' => UtcDateTime::class, 'paused_at' => UtcDateTime::class, 'remaining_seconds' => 'integer', 'device_bound_at' => UtcDateTime::class, 'device_reset_at' => UtcDateTime::class];
+        return ['created_at' => UtcDateTime::class, 'updated_at' => UtcDateTime::class, 'product_id' => 'integer', 'is_lifetime' => 'boolean',
+            'suspended_until' => UtcDateTime::class, 'expires_at' => UtcDateTime::class, 'paused_at' => UtcDateTime::class, 'paused_until' => UtcDateTime::class,
+            'remaining_seconds' => 'integer', 'device_bound_at' => UtcDateTime::class, 'device_reset_at' => UtcDateTime::class];
     }
 
     /** Suspension ends by itself once suspended_until has passed. */
@@ -74,6 +80,12 @@ class License extends Model
     public function restingStatus(): string
     {
         return $this->paused_at === null ? self::ACTIVE : self::PAUSED;
+    }
+
+    /** @return HasMany<LicenseKey, $this> */
+    public function keys(): HasMany
+    {
+        return $this->hasMany(LicenseKey::class);
     }
 
     /** @return BelongsTo<Product, $this> */

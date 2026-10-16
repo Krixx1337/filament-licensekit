@@ -12,12 +12,12 @@ class UserAccess
         $model = ConfiguredUserModel::className();
 
         return $user instanceof $model && ! $this->suspended($user)
-            && (! config('licensekit.user.require_verified') || ($user instanceof MustVerifyEmail && $user->hasVerifiedEmail()));
+            && (! ($user instanceof MustVerifyEmail) || $user->hasVerifiedEmail());
     }
 
     public function suspended(Model $user): bool
     {
-        $column = config('licensekit.user.suspended_column');
+        $column = config('licensekit.user_suspended_column');
 
         return is_string($column) && (bool) $user->getAttribute($column);
     }

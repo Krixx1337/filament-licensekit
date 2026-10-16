@@ -33,7 +33,7 @@ class DenyProductBrowsingPolicy
 test('every panel user is a LicenseKit admin unless the host redefines the gate', function () {
     $this->actingAs(User::factory()->create(), 'staff');
 
-    foreach (['products', 'license-plans', 'batches', 'api-clients', 'audit-events', 'licenses', 'license-keys'] as $slug) {
+    foreach (['dashboard', 'products', 'batches', 'connections', 'activity-log', 'licenses', 'license-keys'] as $slug) {
         $this->get('/admin/licensekit/'.$slug)->assertOk();
     }
 });
@@ -41,10 +41,10 @@ test('every panel user is a LicenseKit admin unless the host redefines the gate'
 test('support staff browse licenses keys and the activity log but not admin pages', function () {
     supportUser();
 
-    foreach (['licenses', 'license-keys', 'audit-events'] as $slug) {
+    foreach (['licenses', 'license-keys', 'activity-log'] as $slug) {
         $this->get('/admin/licensekit/'.$slug)->assertOk();
     }
-    foreach (['products', 'license-plans', 'batches', 'api-clients'] as $slug) {
+    foreach (['products', 'batches', 'connections', 'device-bans'] as $slug) {
         $this->get('/admin/licensekit/'.$slug)->assertForbidden();
     }
 });
@@ -81,5 +81,31 @@ test('host model policies still apply on top of the LicenseKit role', function (
     Gate::policy(Product::class, DenyProductBrowsingPolicy::class);
 
     $this->get('/admin/licensekit/products')->assertForbidden();
-    $this->get('/admin/licensekit/license-plans')->assertOk();
+    $this->get('/admin/licensekit/license-keys')->assertOk();
+});
+
+class DenyLicenseUpdatePolicy
+{
+    public function viewAny(Model $user): bool
+    {
+        return true;
+    }
+
+    public function view(Model $user, License $license): bool
+    {
+        return true;
+    }
+
+    public function update(Model $user, License $license): bool
+    {
+        return false;
+    }
+}
+
+test('native license update policy also restricts custom actions', function () {
+    supportUser();
+    Gate::policy(License::class, DenyLicenseUpdatePolicy::class);
+    $license = License::factory()->create(['user_id' => User::factory()->create()->id]);
+    Livewire::test(ManageLicenses::class)->assertTableActionHidden('suspend', $license);
+    expect($license->fresh()->status)->toBe('active');
 });

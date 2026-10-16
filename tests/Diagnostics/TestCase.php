@@ -4,7 +4,6 @@ namespace LicenseKit\Tests\Diagnostics;
 
 use BladeUI\Heroicons\BladeHeroiconsServiceProvider;
 use BladeUI\Icons\BladeIconsServiceProvider;
-use Laravel\Sanctum\SanctumServiceProvider;
 use LicenseKit\LicenseKitServiceProvider;
 use LicenseKit\Tests\Filament\Fixtures\TestPanelProvider;
 use LicenseKit\Tests\Filament\Fixtures\User;
@@ -41,7 +40,7 @@ class TestCase extends OrchestraTestCase
 
     protected function getPackageProviders($app): array
     {
-        $providers = [SanctumServiceProvider::class, LivewireServiceProvider::class,
+        $providers = [LivewireServiceProvider::class,
             BladeIconsServiceProvider::class, BladeHeroiconsServiceProvider::class];
         $installed = json_decode(file_get_contents(__DIR__.'/../../vendor/composer/installed.json'), true);
         foreach ($installed['packages'] as $package) {

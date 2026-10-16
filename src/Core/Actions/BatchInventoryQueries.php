@@ -17,9 +17,9 @@ class BatchInventoryQueries
     {
         return $query->withCount([
             'keys as total_count',
-            'keys as claimed_count' => fn (Builder $keys) => $keys->whereNotNull('claimed_at'),
-            'keys as unclaimed_count' => fn (Builder $keys) => $keys->whereNull('claimed_at')->whereNull('revoked_at'),
-            'keys as revoked_count' => fn (Builder $keys) => $keys->whereNotNull('revoked_at'),
+            'keys as redeemed_count' => fn (Builder $keys) => $keys->whereNotNull('redeemed_at'),
+            'keys as unused_count' => fn (Builder $keys) => $keys->whereNull('redeemed_at')->whereNull('cancelled_at'),
+            'keys as cancelled_count' => fn (Builder $keys) => $keys->whereNotNull('cancelled_at'),
         ]);
     }
 
@@ -30,24 +30,24 @@ class BatchInventoryQueries
         }
     }
 
-    /** @return LengthAwarePaginator<int, array{id: int, key: string, duration_days: int|null, claimed_at: string|null, revoked_at: string|null}> */
+    /** @return LengthAwarePaginator<int, array{id: int, key: string, duration_days: int|null, redeemed_at: string|null, cancelled_at: string|null}> */
     public function keys(Batch $batch, int $perPage, int $page, string $status): LengthAwarePaginator
     {
         $this->pagination($perPage, $page);
-        if (! in_array($status, ['all', 'unclaimed', 'claimed', 'revoked'], true)) {
+        if (! in_array($status, ['all', 'unused', 'redeemed', 'cancelled'], true)) {
             throw new LicensingException('invalid_key_status', 422);
         }
         $query = $batch->keys();
         match ($status) {
-            'unclaimed' => $query->whereNull('claimed_at')->whereNull('revoked_at'),
-            'claimed' => $query->whereNotNull('claimed_at'),
-            'revoked' => $query->whereNotNull('revoked_at'),
+            'unused' => $query->whereNull('redeemed_at')->whereNull('cancelled_at'),
+            'redeemed' => $query->whereNotNull('redeemed_at'),
+            'cancelled' => $query->whereNotNull('cancelled_at'),
             default => null,
         };
 
-        return $query->orderBy('id')->paginate($perPage, ['*'], 'page', $page)->through(fn (LicenseKey $key): array => [
-            'id' => $key->id, 'key' => $key->key, 'duration_days' => $key->duration_days,
-            'claimed_at' => $key->claimed_at?->toIso8601String(), 'revoked_at' => $key->revoked_at?->toIso8601String(),
+        return $query->with('batch')->orderBy('id')->paginate($perPage, ['*'], 'page', $page)->through(fn (LicenseKey $key): array => [
+            'id' => $key->id, 'key' => $key->key, 'duration_days' => $key->batch->duration_days,
+            'redeemed_at' => $key->redeemed_at?->toIso8601String(), 'cancelled_at' => $key->cancelled_at?->toIso8601String(),
         ]);
     }
 }

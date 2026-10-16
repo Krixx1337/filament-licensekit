@@ -1,7 +1,8 @@
 <?php
 
 use Illuminate\Support\Facades\Schema;
-use LicenseKit\Core\Actions\CreateBatch;
+use LicenseKit\Core\Actions\Keys;
+use LicenseKit\Core\Data\IssueContext;
 use LicenseKit\Core\Models\License;
 use LicenseKit\Core\Models\LicensePlan;
 use LicenseKit\Core\Models\Product;
@@ -43,17 +44,17 @@ test('administrative key claim honors suspension without consuming the key', fun
     adminUser();
     $customer = User::factory()->create();
     $plan = LicensePlan::factory()->create();
-    $key = app(CreateBatch::class)->create($plan, 1, 'sale', 'test')->keys->first();
+    $key = app(Keys::class)->issue($plan, 1, new IssueContext(source: 'app', reference: 'sale'))->keys->first();
     License::factory()->create(['user_id' => $customer->id, 'product_id' => $plan->product_id, 'status' => License::SUSPENDED]);
 
-    Livewire::test(ManageLicenseKeys::class)->callTableAction('claim', $key, data: ['user_id' => $customer->id])->assertNotified('License suspended');
+    Livewire::test(ManageLicenseKeys::class)->callTableAction('claim', $key, data: ['user_id' => $customer->id])->assertNotified('Your license is suspended. Contact support for help.');
 
-    expect($key->fresh()->claimed_at)->toBeNull();
+    expect($key->fresh()->redeemed_at)->toBeNull();
 });
 
 test('configured usernames display and search across licensing administration', function () {
     Schema::table('users', fn ($table) => $table->string('username')->nullable());
-    config(['licensekit.user.display_column' => 'username']);
+    config(['licensekit.user_label' => 'username']);
     adminUser();
     $owner = User::factory()->create(['username' => 'player-owner']);
     $license = License::factory()->create(['user_id' => $owner->id]);
@@ -64,7 +65,7 @@ test('configured usernames display and search across licensing administration', 
 
 test('configured user selector limits results and resolves selected users outside initial options', function () {
     Schema::table('users', fn ($table) => $table->string('username')->nullable());
-    config(['licensekit.user.display_column' => 'username']);
+    config(['licensekit.user_label' => 'username']);
     adminUser()->update(['username' => 'staff']);
     User::factory()->count(51)->create(['username' => 'matching-player']);
     $last = User::factory()->create(['username' => 'selected-player']);

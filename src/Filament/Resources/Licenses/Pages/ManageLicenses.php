@@ -20,6 +20,6 @@ class ManageLicenses extends ManageRecords
 
     protected function getHeaderActions(): array
     {
-        return [LicensingActions::suspendCustomer()];
+        return [LicensingActions::giveLicense(), LicensingActions::suspendCustomer()];
     }
 }

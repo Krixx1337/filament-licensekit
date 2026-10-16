@@ -3,7 +3,7 @@
 use Carbon\CarbonImmutable;
 use LicenseKit\Core\Actions\ManageLicenses;
 use LicenseKit\Core\Exceptions\LicensingException;
-use LicenseKit\Core\Models\AuditEvent;
+use LicenseKit\Core\Models\ActivityEntry;
 use LicenseKit\Core\Models\License;
 use LicenseKit\Core\Models\Product;
 use LicenseKit\Tests\Core\Fixtures\User;
@@ -33,8 +33,8 @@ test('adding time extends running licenses and banks paused ones', function () {
     foreach ($untouched as $id => $attributes) {
         expect(License::findOrFail($id)->getAttributes())->toBe($attributes);
     }
-    $audit = AuditEvent::where('event', 'product_time_added')->sole();
-    expect($audit->after['license_count'])->toBe(2)->and($audit->reason)->toBe('Server outage');
+    $audit = ActivityEntry::where('event', 'product_time_added')->sole();
+    expect($audit->meta['after']['license_count'])->toBe(2)->and($audit->meta['note'])->toBe('Server outage');
 });
 
 test('a since date also credits licenses that expired after it, from their old end date', function () {
@@ -60,7 +60,7 @@ test('adding time rejects invalid input without changes', function (int $seconds
         since: $since === null ? null : CarbonImmutable::parse($since)))->toThrow(LicensingException::class, $error);
 
     expect($license->fresh()->getAttributes())->toBe($before);
-    expect(AuditEvent::where('event', 'product_time_added')->count())->toBe(0);
+    expect(ActivityEntry::where('event', 'product_time_added')->count())->toBe(0);
 })->with([
     'zero' => [0, null, 'invalid duration'],
     'too long' => [ManageLicenses::MAXIMUM_ADDED_SECONDS + 1, null, 'invalid duration'],

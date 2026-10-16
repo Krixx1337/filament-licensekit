@@ -1,7 +1,14 @@
 {
     "name": "licensekit/licensekit",
     "description": "Software licensing APIs and Filament administration for Laravel.",
-    "keywords": ["laravel", "filament", "filament-plugin", "licensing", "license-keys", "hwid"],
+    "keywords": [
+        "laravel",
+        "filament",
+        "filament-plugin",
+        "licensing",
+        "license-keys",
+        "hwid"
+    ],
     "homepage": "https://github.com/Krixx1337/filament-licensekit",
     "support": {
         "issues": "https://github.com/Krixx1337/filament-licensekit/issues",
@@ -23,8 +30,8 @@
         "illuminate/http": "^12.0 || ^13.0",
         "illuminate/routing": "^12.0 || ^13.0",
         "illuminate/support": "^12.0 || ^13.0",
-        "laravel/sanctum": "^4.1",
-        "filament/filament": "^4.13.3 || ^5.8.3"
+        "filament/filament": "^4.13.3 || ^5.8.3",
+        "ext-sodium": "*"
     },
     "require-dev": {
         "orchestra/testbench": "^10.0 || ^11.0",
@@ -63,8 +70,10 @@
         "format": "pint",
         "check": [
             "@test",
-            "@analyse"
-        ]
+            "@analyse",
+            "@lint:lines"
+        ],
+        "lint:lines": "@php scripts/check-line-length.php"
     },
     "minimum-stability": "stable",
     "prefer-stable": true

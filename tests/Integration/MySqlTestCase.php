@@ -4,10 +4,9 @@ namespace LicenseKit\Tests\Integration;
 
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
-use Laravel\Sanctum\SanctumServiceProvider;
 use LicenseKit\LicenseKitServiceProvider;
-use LicenseKit\Tests\Core\Fixtures\ClientProtocolProvider;
 use LicenseKit\Tests\Integration\Fixtures\User;
+use Livewire\LivewireServiceProvider;
 use Orchestra\Testbench\TestCase;
 use Symfony\Component\Process\Process;
 
@@ -24,7 +23,7 @@ class MySqlTestCase extends TestCase
 
     protected function getPackageProviders($app): array
     {
-        return [SanctumServiceProvider::class, LicenseKitServiceProvider::class, ClientProtocolProvider::class];
+        return [LivewireServiceProvider::class, LicenseKitServiceProvider::class];
     }
 
     protected function defineEnvironment($app): void
@@ -40,7 +39,7 @@ class MySqlTestCase extends TestCase
             'charset' => 'utf8mb4', 'collation' => 'utf8mb4_unicode_ci', 'prefix' => '', 'strict' => true,
         ]);
         $app['config']->set('auth.providers.users.model', User::class);
-        $app['config']->set('licensekit.user.suspended_column', 'is_suspended');
+        $app['config']->set('licensekit.user_suspended_column', 'is_suspended');
         $app['config']->set('queue.default', 'null');
         $app['config']->set('session.driver', 'array');
         $app['config']->set('cache.default', 'array');
@@ -49,7 +48,6 @@ class MySqlTestCase extends TestCase
     protected function defineDatabaseMigrations(): void
     {
         $this->app['migrator']->path(__DIR__.'/Fixtures/migrations');
-        $this->app['migrator']->path(__DIR__.'/../../vendor/laravel/sanctum/database/migrations');
     }
 
     /** Bootstrap entry point for isolated worker processes, not a test. */

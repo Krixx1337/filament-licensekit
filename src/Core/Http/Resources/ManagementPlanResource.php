@@ -13,6 +13,6 @@ class ManagementPlanResource extends JsonResource
     public function toArray(Request $request): array
     {
         return ['id' => $this->id, 'product_id' => $this->product_id, 'name' => $this->name,
-            'duration_days' => $this->duration_days, 'is_enabled' => $this->is_enabled];
+            'duration_days' => $this->duration_days, 'is_active' => $this->is_active];
     }
 }

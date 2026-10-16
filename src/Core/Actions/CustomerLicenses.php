@@ -5,14 +5,14 @@ namespace LicenseKit\Core\Actions;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Pagination\LengthAwarePaginator;
-use LicenseKit\Core\Contracts\ReadinessCheck;
 use LicenseKit\Core\Exceptions\LicensingException;
 use LicenseKit\Core\Models\License;
+use LicenseKit\Core\Users\ConfiguredUserModel;
 use LicenseKit\Core\Users\UserAccess;
 
 class CustomerLicenses
 {
-    public function __construct(private UserAccess $users, private ReadinessCheck $readiness, private CustomerLicenseSummary $summary) {}
+    public function __construct(private UserAccess $users, private CustomerLicenseSummary $summary) {}
 
     /** @return LengthAwarePaginator<int, array<string, mixed>> */
     public function paginate(Model $user, int $perPage = 25): LengthAwarePaginator
@@ -35,9 +35,9 @@ class CustomerLicenses
     /** @return Builder<License> */
     private function query(Model $user): Builder
     {
-        $this->readiness->assertReady();
-        $user = $user->fresh();
-        if ($user === null || ! $this->users->available($user)) {
+        $model = ConfiguredUserModel::className();
+        $user = $user instanceof $model ? $user->fresh() : null;
+        if ($user === null || $this->users->suspended($user)) {
             throw new LicensingException('user_unavailable');
         }
 

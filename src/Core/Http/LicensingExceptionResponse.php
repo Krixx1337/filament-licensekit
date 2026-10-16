@@ -17,7 +17,7 @@ class LicensingExceptionResponse
             return null;
         }
 
-        return response()->json(['error' => $exception->error, 'message' => $exception->getMessage()], $exception->status)->header('Cache-Control', 'private, no-store');
+        return response()->json(['error' => $exception->error, 'message' => $exception->friendlyMessage(), ...$exception->details], $exception->status)->header('Cache-Control', 'private, no-store');
     }
 
     public function renderStorageFailure(PDOException|SQLiteDatabaseDoesNotExistException $exception, Request $request): ?JsonResponse

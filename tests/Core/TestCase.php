@@ -3,10 +3,10 @@
 namespace LicenseKit\Tests\Core;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Laravel\Sanctum\SanctumServiceProvider;
+use LicenseKit\Core\Actions\ResponseSigning;
 use LicenseKit\LicenseKitServiceProvider;
-use LicenseKit\Tests\Core\Fixtures\ClientProtocolProvider;
 use LicenseKit\Tests\Core\Fixtures\User;
+use Livewire\LivewireServiceProvider;
 use Orchestra\Testbench\TestCase as OrchestraTestCase;
 
 class TestCase extends OrchestraTestCase
@@ -24,9 +24,15 @@ class TestCase extends OrchestraTestCase
     /** @var array<string, mixed> */
     public array $routingSettings = [];
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        app(ResponseSigning::class)->install();
+    }
+
     protected function getPackageProviders($app): array
     {
-        return [SanctumServiceProvider::class, LicenseKitServiceProvider::class, ...($this->clientFixture ? [ClientProtocolProvider::class] : [])];
+        return [LivewireServiceProvider::class, LicenseKitServiceProvider::class];
     }
 
     protected function defineEnvironment($app): void
@@ -35,9 +41,9 @@ class TestCase extends OrchestraTestCase
         $app['config']->set('database.default', 'testing');
         $app['config']->set('database.connections.testing', ['driver' => 'sqlite', 'database' => ':memory:', 'prefix' => '', 'foreign_key_constraints' => true]);
         $app['config']->set('auth.providers.users.model', User::class);
-        $app['config']->set('licensekit.user.suspended_column', 'is_suspended');
+        $app['config']->set('licensekit.user_suspended_column', 'is_suspended');
         $app['config']->set('host_client.enabled', $this->desktop);
-        $app['config']->set('licensekit.management.enabled', $this->management);
+        $app['config']->set('licensekit.store_api_enabled', $this->management);
         $app['config']->set('session.driver', 'array');
         $app['config']->set('cache.default', 'array');
         $app['config']->set($this->routingSettings);
@@ -46,6 +52,5 @@ class TestCase extends OrchestraTestCase
     protected function defineDatabaseMigrations(): void
     {
         $this->loadMigrationsFrom(__DIR__.'/Fixtures/migrations');
-        $this->loadMigrationsFrom(__DIR__.'/../../vendor/laravel/sanctum/database/migrations');
     }
 }

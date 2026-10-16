@@ -4,15 +4,19 @@ namespace LicenseKit;
 
 use Filament\Contracts\Plugin;
 use Filament\Panel;
-use LicenseKit\Core\Exceptions\LicensingException;
-use LicenseKit\Filament\Resources\ApiClients\ApiClientResource;
-use LicenseKit\Filament\Resources\AuditEvents\AuditEventResource;
+use LicenseKit\Filament\Middleware\EnsurePanelSetup;
+use LicenseKit\Filament\Pages\ConnectYourApp;
+use LicenseKit\Filament\Pages\Dashboard;
+use LicenseKit\Filament\Pages\Settings;
+use LicenseKit\Filament\Pages\SetupNeeded;
+use LicenseKit\Filament\Pages\TeamAccess;
+use LicenseKit\Filament\Resources\ActivityLog\ActivityEntryResource;
+use LicenseKit\Filament\Resources\ApiConnections\ApiConnectionResource;
 use LicenseKit\Filament\Resources\Batches\BatchResource;
+use LicenseKit\Filament\Resources\DeviceBans\DeviceBanResource;
 use LicenseKit\Filament\Resources\LicenseKeys\LicenseKeyResource;
-use LicenseKit\Filament\Resources\LicensePlans\LicensePlanResource;
 use LicenseKit\Filament\Resources\Licenses\LicenseResource;
 use LicenseKit\Filament\Resources\Products\ProductResource;
-use LicenseKit\Support\SetupDiagnostics;
 
 final class LicenseKitPlugin implements Plugin
 {
@@ -28,20 +32,12 @@ final class LicenseKitPlugin implements Plugin
 
     public function register(Panel $panel): void
     {
-        $diagnostics = app(SetupDiagnostics::class);
-        if ($diagnostics->configurationErrors() !== [] || $diagnostics->panelError($panel) !== null) {
-            return;
-        }
-        $resources = [ProductResource::class, LicensePlanResource::class, LicenseKeyResource::class, BatchResource::class, LicenseResource::class, ApiClientResource::class, AuditEventResource::class];
-        $panel->resources($resources);
+        $panel->resources([ProductResource::class, LicenseKeyResource::class, BatchResource::class, LicenseResource::class,
+            ApiConnectionResource::class, ActivityEntryResource::class, DeviceBanResource::class]);
+        $panel->pages([Dashboard::class, Settings::class,
+            ConnectYourApp::class, SetupNeeded::class, TeamAccess::class]);
+        $panel->authMiddleware([EnsurePanelSetup::class], isPersistent: true);
     }
 
-    public function boot(Panel $panel): void
-    {
-        $diagnostics = app(SetupDiagnostics::class);
-        $diagnostics->assertConfigured();
-        if ($diagnostics->panelError($panel) !== null) {
-            throw new LicensingException('licensing_unavailable', 503);
-        }
-    }
+    public function boot(Panel $panel): void {}
 }

@@ -6,13 +6,10 @@
 *.md diff=markdown
 *.php diff=php
 
-.github/workflows/browser-tests.yml export-ignore
 
-/apps export-ignore
 /docs export-ignore
 /tests export-ignore
 /vendor export-ignore
-/packages export-ignore
 /.agents export-ignore
 /.codex export-ignore
 /.github export-ignore
@@ -32,3 +29,5 @@
 /phpstan.neon export-ignore
 /pint.json export-ignore
 /art export-ignore
+
+/scripts export-ignore

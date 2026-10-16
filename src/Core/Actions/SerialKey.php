@@ -19,6 +19,13 @@ class SerialKey
     }
 
     /** Accepts any case, optional dashes and surrounding whitespace. */
+    public function searchTerm(string $value): string
+    {
+        $letters = str_replace('-', '', strtoupper(trim($value)));
+
+        return implode('-', str_split($letters, 5));
+    }
+
     public function normalize(#[\SensitiveParameter] string $value): string
     {
         $value = strtoupper(str_replace('-', '', trim($value)));

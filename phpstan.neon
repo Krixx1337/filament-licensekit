@@ -2,11 +2,13 @@ includes:
     - vendor/larastan/larastan/extension.neon
     - vendor/nesbot/carbon/extension.neon
 parameters:
+    bootstrapFiles:
+        - tests/phpstan-bootstrap.php
+    parallel:
+        maximumNumberOfProcesses: 1
     level: 7
     databaseMigrationsPath:
         - database/migrations/core
-        - database/migrations/outages
-        - vendor/laravel/sanctum/database/migrations
     paths:
         - src
         - database/factories

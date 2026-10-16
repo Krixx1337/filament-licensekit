@@ -14,9 +14,9 @@ class BatchFactory extends Factory
     /** @return array<string, mixed> */
     public function definition(): array
     {
-        return ['issuer' => 'admin:1', 'reference' => fake()->uuid(), 'license_plan_id' => LicensePlan::factory(),
+        return ['request_hash' => fake()->sha256(), 'source' => 'admin', 'created_by' => 'Admin', 'issuance_key' => fake()->unique()->sha256(), 'reference' => fake()->uuid(), 'plan_id' => LicensePlan::factory(),
             'quantity' => 1,
-            'duration_days' => fn (array $attributes): ?int => LicensePlan::whereKey($attributes['license_plan_id'])->firstOrFail()->duration_days,
-            'label' => null, 'api_client_id' => null, 'created_by_user_id' => null];
+            'duration_days' => fn (array $attributes): ?int => LicensePlan::whereKey($attributes['plan_id'])->firstOrFail()->duration_days,
+            'label' => null, 'api_connection_id' => null];
     }
 }

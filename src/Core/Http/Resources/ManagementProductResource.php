@@ -13,6 +13,6 @@ class ManagementProductResource extends JsonResource
     public function toArray(Request $request): array
     {
         return ['id' => $this->id, 'name' => $this->name, 'slug' => $this->slug,
-            'status' => $this->status, 'requires_hwid' => $this->requires_hwid];
+            'status' => $this->status, 'device_lock' => $this->device_lock];
     }
 }

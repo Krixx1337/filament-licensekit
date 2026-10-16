@@ -14,7 +14,7 @@ class LicensePlanFactory extends Factory
     /** @return array<string, mixed> */
     public function definition(): array
     {
-        return ['product_id' => Product::factory(), 'name' => '30 days', 'duration_days' => 30, 'is_enabled' => true];
+        return ['product_id' => Product::factory(), 'name' => '30 days', 'duration_days' => 30, 'is_active' => true];
     }
 
     public function lifetime(): static

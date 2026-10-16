@@ -4,13 +4,16 @@ namespace LicenseKit\Filament\Resources\Products\Pages;
 
 use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ManageRecords;
-use LicenseKit\Filament\CatalogWrites;
+use LicenseKit\Core\Actions\ActivityLog;
+use LicenseKit\Filament\AdminAccess;
 use LicenseKit\Filament\Concerns\DisplaysLicensingErrors;
+use LicenseKit\Filament\Concerns\ShowsResult;
 use LicenseKit\Filament\Resources\Products\ProductResource;
 
 class ManageProducts extends ManageRecords
 {
     use DisplaysLicensingErrors;
+    use ShowsResult;
 
     public function boot(): void
     {
@@ -21,6 +24,7 @@ class ManageProducts extends ManageRecords
 
     protected function getHeaderActions(): array
     {
-        return [CreateAction::make()->using(fn (array $data) => CatalogWrites::create(static::getModel(), $data))];
+        return [CreateAction::make()->databaseTransaction()->after(fn ($record) => app(ActivityLog::class)->record('user:'.AdminAccess::actor()->getKey(), 'product_created',
+            $record, ['after' => $record->toArray()]))];
     }
 }

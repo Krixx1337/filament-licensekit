@@ -6,7 +6,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Auth\User;
 use Illuminate\Foundation\Bootstrap\LoadConfiguration;
 use Illuminate\Support\Facades\Schema;
-use LicenseKit\Core\Models\AuditEvent;
+use LicenseKit\Core\Models\ActivityEntry;
 use LicenseKit\Core\Models\License;
 use LicenseKit\Core\Models\Product;
 use LicenseKit\LicenseKitServiceProvider;
@@ -29,7 +29,7 @@ try {
 
     $app = Application::configure(basePath: getcwd())
         ->withExceptions()
-        ->withProviders([LicenseKitServiceProvider::class])
+        ->withProviders([\Livewire\LivewireServiceProvider::class, LicenseKitServiceProvider::class])
         ->create();
 
     $app->afterBootstrapping(LoadConfiguration::class, function (Application $app): void {
@@ -42,7 +42,6 @@ try {
             'database.connections.testing' => ['driver' => 'sqlite', 'database' => ':memory:', 'prefix' => '', 'foreign_key_constraints' => true],
             'cache.default' => 'array',
             'session.driver' => 'array',
-            'licensekit.user.require_verified' => false,
         ]);
     });
 
@@ -69,39 +68,35 @@ try {
         }
     }
 
-    $user = CompatibilityUser::create(['email' => 'compatibility@example.test', 'password' => 'unused']);
+    $user = CompatibilityUser::create(['email' => 'customer@example.test', 'password' => password_hash('password', PASSWORD_BCRYPT)]);
     $product = Product::create(['name' => 'Compatibility', 'slug' => 'compatibility']);
-    if ($product->fresh()->name !== 'Compatibility' || AuditEvent::where('subject_id', $product->id)->count() !== 1) {
-        throw new RuntimeException('Product creation or observer audit failed.');
-    }
-
-    $binding = License::create(['user_id' => $user->id, 'product_id' => $product->id, 'device' => 'private-hwid'])->fresh();
-    if ($binding->device !== 'private-hwid' || array_key_exists('device', $binding->toArray())) {
-        throw new RuntimeException('Device binding storage or serialization privacy failed.');
-    }
-
-    $binding->delete();
-    $suspended = License::create(['user_id' => $user->id, 'product_id' => $product->id, 'status' => License::SUSPENDED, 'suspended_until' => now()->addDay()]);
-    if (! $suspended->fresh()->isSuspended() || $suspended->fresh()->restingStatus() !== License::ACTIVE) {
-        throw new RuntimeException('License suspension state failed.');
-    }
-    $suspended->update(['suspended_until' => now()->subMinute()]);
-    if ($suspended->fresh()->isSuspended()) {
-        throw new RuntimeException('Expired suspension still applied.');
-    }
-    $suspended->delete();
-
-
     $plan = \LicenseKit\Core\Models\LicensePlan::create(['product_id' => $product->id, 'name' => '30 days', 'duration_days' => 30]);
-    config(['licensekit.local_integrations.store' => ['enabled' => true, 'all_products' => true, 'maximum_quantity' => 1, 'disclose_serials' => true]]);
-    $issuer = app(\LicenseKit\Core\Actions\IssueLicenses::class);
-    $first = $issuer->issue('store', $plan->id, 1, 'purchase:1', discloseSerials: true);
-    $retry = $issuer->issue('store', $plan->id, 1, 'purchase:1', discloseSerials: true);
-    if ($first->batchId !== $retry->batchId || ! $retry->replayed || $first->serials !== $retry->serials) {
+    $issuer = app(\LicenseKit\Core\Actions\Keys::class);
+    $context = new \LicenseKit\Core\Data\IssueContext(reference: 'purchase:1');
+    $first = $issuer->issue($plan, 1, $context);
+    $retry = $issuer->issue($plan, 1, $context);
+    if ($first->id !== $retry->id || $first->keys[0]->key !== $retry->keys[0]->key) {
         throw new RuntimeException('Native issuance retry failed.');
     }
-    $customer = CompatibilityUser::create(['email' => 'customer@example.test', 'password' => 'unused']);
-    app(\LicenseKit\Core\Actions\ClaimLicense::class)->claim($customer, $first->serials[0]);
+    $sessions = app(\LicenseKit\Core\Actions\LoaderSessions::class);
+    $restricted = $sessions->login($product, $user->email, 'password', 'pc');
+    if ($restricted['access'] !== false) { throw new RuntimeException('Unlicensed login granted access.'); }
+    $redeemed = $sessions->redeem($product, $restricted['token'], $first->keys[0]->key);
+    if ($redeemed['access'] !== true || $sessions->heartbeat($product, $restricted['token'], 'pc')['access'] !== true) {
+        throw new RuntimeException('Loader redemption or heartbeat failed.');
+    }
+    $signing = app(\LicenseKit\Core\Actions\ResponseSigning::class);
+    $signing->install();
+    $body = json_encode($redeemed, JSON_THROW_ON_ERROR);
+    if (! sodium_crypto_sign_verify_detached(base64_decode($signing->sign($body)), $body, base64_decode($signing->publicKey()))) {
+        throw new RuntimeException('Response signing failed.');
+    }
+    $license = License::sole();
+    if ($license->device !== 'pc' || array_key_exists('device', $license->toArray()) || ActivityEntry::where('event', 'key_redeemed')->count() !== 1) {
+        throw new RuntimeException('License state, privacy or activity failed.');
+    }
+    app(\LicenseKit\Core\Actions\ManageLicenses::class)->suspend($license, $user);
+    if (\LicenseKit\Core\Models\LoaderSession::count() !== 0) { throw new RuntimeException('Session invalidation failed.'); }
 
     echo 'Runtime smoke passed on Laravel '.$app->version().' / PHP '.PHP_VERSION.".\n";
 } catch (Throwable $exception) {

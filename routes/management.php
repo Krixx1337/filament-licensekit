@@ -3,17 +3,10 @@
 use Illuminate\Support\Facades\Route;
 use LicenseKit\Core\Http\Controllers\Management\BatchController;
 use LicenseKit\Core\Http\Controllers\Management\CatalogController;
-use LicenseKit\Core\Http\Middleware\RequireApiClient;
-use LicenseKit\Http\Middleware\EnsureConfigured;
-use LicenseKit\Support\SetupDiagnostics;
+use LicenseKit\Core\Http\Middleware\RequireApiConnection;
 
-if (app(SetupDiagnostics::class)->managementErrors() !== []) {
-    return;
-}
-
-Route::prefix(config('licensekit.management.prefix'))
-    ->domain(config('licensekit.management.domain'))
-    ->middleware(['api', 'licensekit.json', EnsureConfigured::class, ...config('licensekit.management.middleware'), RequireApiClient::class, 'throttle:licensekit.management'])
+Route::prefix(config('licensekit.store_api_prefix'))
+    ->middleware(['api', 'licensekit.json', RequireApiConnection::class, 'throttle:licensekit.management'])
     ->group(function (): void {
         Route::get('products', [CatalogController::class, 'products'])->name('licensekit.management.products.index');
         Route::get('plans', [CatalogController::class, 'plans'])->name('licensekit.management.plans.index');

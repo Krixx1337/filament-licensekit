@@ -3,16 +3,17 @@
 use LicenseKit\Core\Actions\ExactDeviceMatcher;
 
 return [
-    'local_integrations' => [],
-    'management' => [
-        'enabled' => false,
-        'prefix' => 'api/licensekit/v1/manage',
-        'domain' => null,
-        'middleware' => [],
-        'rate_limits' => ['reads' => 120, 'writes' => 60],
-    ],
-    'user' => ['guard' => null, 'display_column' => 'email', 'suspended_column' => null, 'require_verified' => true],
-    'access_restrictions' => [],
-    'maximum_batch_size' => 1000,
+    'client_enabled' => true,
+    'client_prefix' => 'api/licensekit',
+    'client_login_column' => 'email',
+    'store_api_enabled' => false,
+    'store_api_prefix' => 'api/licensekit/store',
+    'portal_api_enabled' => false,
+    'portal_api_prefix' => 'account',
     'device_matcher' => ExactDeviceMatcher::class,
+    'max_batch_size' => 1000,
+    'user_label' => 'email',
+    'user_guard' => null,
+    'user_suspended_column' => null,
+    'signing_key_path' => storage_path('app/private/licensekit-signing.key'),
 ];

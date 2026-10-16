@@ -3,14 +3,21 @@
 namespace LicenseKit\Core\Users;
 
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use InvalidArgumentException;
 
 class ConfiguredUserModel
 {
+    /** @return Builder<Model&Authenticatable> */
+    public static function query(): Builder
+    {
+        return (new (self::className()))->newQuery();
+    }
+
     public static function guard(): string
     {
-        $guard = config('licensekit.user.guard') ?? config('auth.defaults.guard');
+        $guard = config('licensekit.user_guard') ?? config('auth.defaults.guard');
         if (! is_string($guard) || $guard === '') {
             throw new InvalidArgumentException('LicenseKit requires a configured Laravel auth guard.');
         }

@@ -4,6 +4,7 @@ namespace LicenseKit\Console;
 
 use ErrorException;
 use Illuminate\Console\Command;
+use LicenseKit\Core\Actions\ResponseSigning;
 use LicenseKit\Core\Users\ConfiguredUserModel;
 use LicenseKit\Support\SetupDiagnostics;
 
@@ -13,7 +14,7 @@ class InstallLicenseKit extends Command
 
     protected $description = 'Publish missing LicenseKit configuration and explain host integration steps.';
 
-    public function handle(SetupDiagnostics $diagnostics): int
+    public function handle(SetupDiagnostics $diagnostics, ResponseSigning $signing): int
     {
         if (! is_file(config_path('licensekit.php'))) {
             try {
@@ -39,11 +40,18 @@ class InstallLicenseKit extends Command
 
             return self::FAILURE;
         }
+        try {
+            $signing->install();
+        } catch (\Throwable) {
+            $this->error('Could not create signing key. Check sodium and private storage permissions.');
+
+            return self::FAILURE;
+        }
         $this->info('Host user: '.ConfiguredUserModel::className());
         $this->line('Register LicenseKit\LicenseKitPlugin::make() in your existing non-tenant Filament panel.');
         $this->line('Every panel user is a LicenseKit admin by default. Define the licensekit.admin and licensekit.support gates to restrict staff.');
-        $this->line('Prepare your host users and Sanctum personal_access_tokens migrations, then run php artisan migrate.');
-        $this->line('Run php artisan licensekit:check after migration. Module changes require rebuilding caches and restarting workers.');
+        $this->line('Prepare your host users migration, then run php artisan migrate.');
+        $this->line('Run php artisan licensekit:check after migration.');
 
         return self::SUCCESS;
     }

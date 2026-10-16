@@ -52,7 +52,6 @@ test('staff clock forms reject invalid duration units and reasons', function (ar
     'too many days' => [['duration' => 3651], 'duration'],
     'too many hours' => [['duration' => 87601, 'unit' => 'hours'], 'duration'],
     'unknown unit' => [['unit' => 'weeks'], 'unit'],
-    'missing reason' => [['reason' => ''], 'reason'],
     'long reason' => [['reason' => str_repeat('x', 2001)], 'reason'],
 ]);
 

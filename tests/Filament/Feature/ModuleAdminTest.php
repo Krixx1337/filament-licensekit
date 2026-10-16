@@ -2,16 +2,15 @@
 
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Gate;
-use LicenseKit\Core\Actions\CreateBatch;
-use LicenseKit\Core\Models\ApiClient;
+use LicenseKit\Core\Actions\Keys;
+use LicenseKit\Core\Actions\LoaderSessions;
+use LicenseKit\Core\Data\IssueContext;
 use LicenseKit\Core\Models\License;
 use LicenseKit\Core\Models\LicensePlan;
 use LicenseKit\Core\Models\Product;
-use LicenseKit\Filament\Resources\ApiClients\Pages\ManageApiClients;
 use LicenseKit\Filament\Resources\LicenseKeys\Pages\ManageLicenseKeys;
 use LicenseKit\Filament\Resources\Licenses\Pages\ManageLicenses;
 use LicenseKit\Filament\Resources\Products\Pages\ManageProducts;
-use LicenseKit\Tests\Core\Fixtures\ClientSessions;
 use LicenseKit\Tests\Filament\Fixtures\UlidAdminUser;
 use LicenseKit\Tests\Filament\Fixtures\User;
 use LicenseKit\Tests\Filament\Fixtures\UuidAdminUser;
@@ -23,27 +22,18 @@ test('license status uses audited actions without package session termination', 
     Livewire::test(ManageLicenses::class)->callTableAction('suspend', $license, data: ['reason' => 'Support'])->assertHasNoActionErrors();
     expect($license->fresh()->isSuspended())->toBeTrue();
     Livewire::test(ManageLicenses::class)->assertTableActionDoesNotExist('terminate_session');
-    $this->assertDatabaseHas('licensekit_audit_events', ['event' => 'license_status_changed', 'reason' => 'Support']);
+    $this->assertDatabaseHas('licensekit_activity_log', ['event' => 'license_status_changed', 'meta->note' => 'Support']);
 });
 
 test('claim and key revocation use existing backend rules', function () {
     adminUser();
     $customer = User::factory()->create();
     $plan = LicensePlan::factory()->create();
-    $keys = app(CreateBatch::class)->create($plan, 2, 'sale', 'test')->keys;
+    $keys = app(Keys::class)->issue($plan, 2, new IssueContext(source: 'app', reference: 'sale'))->keys;
     Livewire::test(ManageLicenseKeys::class)->callTableAction('claim', $keys[0], data: ['user_id' => $customer->id])->assertHasNoActionErrors();
     $this->assertDatabaseHas('licensekit_licenses', ['user_id' => $customer->id, 'product_id' => $plan->product_id]);
     Livewire::test(ManageLicenseKeys::class)->callTableAction('revoke_key', $keys[1], data: ['reason' => 'Refund'])->assertHasNoActionErrors();
-    expect($keys[1]->fresh()->revoked_at)->not->toBeNull();
-});
-
-test('issuance token rotates as private download and can be revoked', function () {
-    adminUser();
-    $client = ApiClient::factory()->state(['all_products' => true, 'permissions' => ['licenses:create', 'keys:read']])->create();
-    Livewire::test(ManageApiClients::class)->callTableAction('rotate_token', $client, data: ['expires_at' => now()->addYear()->format('Y-m-d H:i:s')])->assertFileDownloaded('management-token.txt');
-    expect($client->tokens()->count())->toBe(1);
-    Livewire::test(ManageApiClients::class)->callTableAction('revoke_tokens', $client)->assertHasNoActionErrors();
-    expect($client->tokens()->count())->toBe(0);
+    expect($keys[1]->fresh()->cancelled_at)->not->toBeNull();
 });
 
 test('string host user IDs survive administrative claims and audit actors', function (string $model) {
@@ -57,30 +47,30 @@ test('string host user IDs survive administrative claims and audit actors', func
     Gate::define('licensekit.admin', fn ($actor): bool => $actor->getKey() === $admin->getKey());
     Filament::setCurrentPanel(Filament::getPanel('admin'));
     $plan = LicensePlan::factory()->create();
-    $key = app(CreateBatch::class)->create($plan, 1, 'sale', 'test')->keys->first();
+    $key = app(Keys::class)->issue($plan, 1, new IssueContext(source: 'app', reference: 'sale'))->keys->first();
     Livewire::test(ManageLicenseKeys::class)->callTableAction('claim', $key, data: ['user_id' => $customer->getKey()])->assertHasNoActionErrors();
     $this->assertDatabaseHas('licensekit_licenses', ['user_id' => $customer->getKey()]);
-    $this->assertDatabaseHas('licensekit_audit_events', ['event' => 'key_claimed', 'actor' => 'user:'.$admin->getKey()]);
+    $this->assertDatabaseHas('licensekit_activity_log', ['event' => 'key_redeemed', 'actor' => 'user:'.$admin->getKey()]);
 })->with([[UuidAdminUser::class], [UlidAdminUser::class]]);
 
 test('reset device action clears the device and session with a support note', function () {
     adminUser();
     $customer = User::factory()->create();
     $license = License::factory()->create(['user_id' => $customer->id]);
-    app(ClientSessions::class)->login($license->product, $customer->email, 'password', 'pc');
+    app(LoaderSessions::class)->login($license->product, $customer->email, 'password', 'pc');
     Livewire::test(ManageLicenses::class)->callTableAction('reset_hwid', $license, data: ['reason' => 'Support request'])->assertHasNoActionErrors();
     expect($license->fresh()->device)->toBeNull();
-    $this->assertDatabaseCount('client_sessions', 0);
-    $this->assertDatabaseHas('licensekit_audit_events', ['event' => 'device_reset', 'reason' => 'Support request']);
+    $this->assertDatabaseCount('licensekit_loader_sessions', 0);
+    $this->assertDatabaseHas('licensekit_activity_log', ['event' => 'device_reset', 'meta->note' => 'Support request']);
 });
 
 test('backend eligibility failure becomes notification without consuming key', function () {
     adminUser();
     $customer = User::factory()->unverified()->create();
     $plan = LicensePlan::factory()->create();
-    $key = app(CreateBatch::class)->create($plan, 1, 'notification-sale', 'test')->keys->first();
-    Livewire::test(ManageLicenseKeys::class)->callTableAction('claim', $key, data: ['user_id' => $customer->id])->assertNotified('User unavailable');
-    expect($key->fresh()->claimed_at)->toBeNull();
+    $key = app(Keys::class)->issue($plan, 1, new IssueContext(source: 'app', reference: 'notification-sale'))->keys->first();
+    Livewire::test(ManageLicenseKeys::class)->callTableAction('claim', $key, data: ['user_id' => $customer->id])->assertNotified('Verify your email before redeeming keys or signing in to your app.');
+    expect($key->fresh()->redeemed_at)->toBeNull();
     $this->assertDatabaseCount('licensekit_licenses', 0);
 });
 

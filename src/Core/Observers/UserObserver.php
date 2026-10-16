@@ -3,13 +3,12 @@
 namespace LicenseKit\Core\Observers;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Event;
-use LicenseKit\Core\Events\ProductAccessInvalidated;
+use LicenseKit\Core\Models\LoaderSession;
 
 class UserObserver
 {
     public function deleting(Model $user): void
     {
-        Event::dispatch(new ProductAccessInvalidated($user));
+        LoaderSession::where('user_id', $user->getKey())->delete();
     }
 }

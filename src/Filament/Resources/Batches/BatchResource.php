@@ -15,6 +15,12 @@ use LicenseKit\Filament\Resources\LicensingResource;
 
 class BatchResource extends LicensingResource
 {
+    protected static ?int $navigationSort = 60;
+
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-rectangle-stack';
+
+    protected static ?string $navigationParentItem = 'Settings';
+
     protected static ?string $slug = 'licensekit/batches';
 
     protected static ?string $model = Batch::class;
@@ -22,20 +28,21 @@ class BatchResource extends LicensingResource
     public static function table(Table $table): Table
     {
         return $table->columns([
-            TextColumn::make('id')->label('Batch')->formatStateUsing(fn ($state, Batch $record): string => 'Batch #'.$state.($record->label !== null ? ' · '.$record->label : ''))->sortable()->toggleable(),
+            TextColumn::make('id')->label('Batch')->formatStateUsing(fn ($state, Batch $record): string => 'Batch #'.$state.($record->label !== null ? ' · '.$record->label : ''))
+                ->sortable()->toggleable(),
             TextColumn::make('label')->searchable()->toggleable(isToggledHiddenByDefault: true),
             TextColumn::make('plan.name')->label('Plan')->searchable()->toggleable(),
-            TextColumn::make('creator.'.config('licensekit.user.display_column'))->label('Created by')->searchable()->toggleable(),
-            TextColumn::make('apiClient.name')->label('API client')->searchable()->toggleable(),
-            TextColumn::make('issuer')->searchable()->toggleable(isToggledHiddenByDefault: true),
+            TextColumn::make('created_by')->label('Created by')->searchable()->toggleable(),
+            TextColumn::make('apiConnection.name')->label('Store connection')->searchable()->toggleable(),
+            TextColumn::make('source')->searchable()->toggleable(isToggledHiddenByDefault: true),
             TextColumn::make('reference')->searchable()->toggleable(isToggledHiddenByDefault: true),
             TextColumn::make('quantity')->label('Original quantity')->toggleable(isToggledHiddenByDefault: true),
-            TextColumn::make('claimed_count')->label('Claimed')->toggleable(),
-            TextColumn::make('unclaimed_count')->label('Unclaimed')->toggleable(),
-            TextColumn::make('revoked_count')->label('Revoked')->toggleable(),
+            TextColumn::make('redeemed_count')->label('Redeemed')->toggleable(),
+            TextColumn::make('unused_count')->label('Unused')->toggleable(),
+            TextColumn::make('cancelled_count')->label('Cancelled')->toggleable(),
             TextColumn::make('created_at')->dateTime()->toggleable(isToggledHiddenByDefault: true),
         ])->filters([
-            SelectFilter::make('api_client_id')->label('API client')->relationship('apiClient', 'name')->searchable(),
+            SelectFilter::make('api_connection_id')->label('Store connection')->relationship('apiConnection', 'name')->searchable(),
         ])->recordActions([
             Action::make('keys')->label('View keys')->visible(fn (): bool => LicenseKeyResource::canViewAny())
                 ->url(fn (Batch $record): string => LicenseKeyResource::getUrl('index', ['filters' => ['batch_id' => ['value' => $record->id]]])),
@@ -46,10 +53,10 @@ class BatchResource extends LicensingResource
     /** @return Builder<Batch> */
     public static function getEloquentQuery(): Builder
     {
-        return Batch::query()->with(['plan', 'creator', 'apiClient'])->withCount([
-            'keys as claimed_count' => fn (Builder $query) => $query->whereNotNull('claimed_at'),
-            'keys as unclaimed_count' => fn (Builder $query) => $query->whereNull('claimed_at')->whereNull('revoked_at'),
-            'keys as revoked_count' => fn (Builder $query) => $query->whereNotNull('revoked_at'),
+        return Batch::query()->with(['plan', 'apiConnection'])->withCount([
+            'keys as redeemed_count' => fn (Builder $query) => $query->whereNotNull('redeemed_at'),
+            'keys as unused_count' => fn (Builder $query) => $query->whereNull('redeemed_at')->whereNull('cancelled_at'),
+            'keys as cancelled_count' => fn (Builder $query) => $query->whereNotNull('cancelled_at'),
         ]);
     }
 

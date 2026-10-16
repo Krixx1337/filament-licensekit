@@ -1,36 +1,27 @@
 <?php
 
-use Illuminate\Validation\ValidationException;
-use LicenseKit\Core\Models\AuditEvent;
 use LicenseKit\Core\Models\Product;
-use LicenseKit\Filament\CatalogWrites;
 use LicenseKit\Filament\Resources\Products\Pages\ManageProducts;
 use Livewire\Livewire;
 
-test('product forms default to HWID protection and persist audited toggle changes', function () {
-    $actor = adminUser();
-    Livewire::test(ManageProducts::class)->callAction('create', data: ['name' => 'Protected', 'slug' => 'protected'])->assertHasNoActionErrors();
-    $product = Product::firstOrFail();
-    expect($product->requires_hwid)->toBeTrue();
-
-    Livewire::test(ManageProducts::class)->callTableAction('edit', $product, data: ['requires_hwid' => false])->assertHasNoActionErrors();
-
-    expect($product->fresh()->requires_hwid)->toBeFalse();
-    $audit = AuditEvent::where('event', 'configuration_updated')->where('subject_type', Product::class)->where('subject_id', $product->id)->firstOrFail();
-    expect($audit->before)->toBe(['requires_hwid' => true]);
-    expect($audit->after)->toBe(['requires_hwid' => false]);
-    expect($audit->actor)->toBe('user:'.$actor->id);
-
-    Livewire::test(ManageProducts::class)->callAction('create', data: ['name' => 'Utility', 'slug' => 'utility', 'requires_hwid' => false])->assertHasNoActionErrors();
-    expect(Product::where('slug', 'utility')->firstOrFail()->requires_hwid)->toBeFalse();
+test('product form creates inline plans and device settings with optional free window', function () {
+    adminUser();
+    config(['app.timezone' => 'Europe/Warsaw']);
+    Livewire::test(ManageProducts::class)->callAction('create', data: [
+        'name' => 'Software', 'slug' => 'software', 'status' => 'active', 'device_lock' => true,
+        'device_move_cooldown_days' => 14, 'plans' => [['name' => 'Monthly', 'duration_preset' => '30', 'duration_days' => 30, 'is_active' => true]],
+        'free_from' => '2026-11-01 18:00:00', 'free_until' => '2026-11-03 18:00:00',
+    ])->assertHasNoActionErrors();
+    $product = Product::sole();
+    expect($product->device_lock)->toBeTrue()->and($product->device_move_cooldown_days)->toBe(14);
+    expect($product->plans()->sole()->duration_days)->toBe(30);
+    expect($product->free_from->toIso8601String())->toBe('2026-11-01T17:00:00+00:00');
 });
 
-test('catalog rejects invalid HWID toggle before mutation', function (mixed $value) {
+test('product form rejects reversed free window', function () {
     adminUser();
-    $product = Product::factory()->create();
-
-    expect(fn () => CatalogWrites::update($product, ['requires_hwid' => $value]))->toThrow(ValidationException::class);
-
-    expect($product->fresh()->requires_hwid)->toBeTrue();
-    $this->assertDatabaseMissing('licensekit_audit_events', ['event' => 'configuration_updated', 'subject_id' => $product->id]);
-})->with([null, 'invalid', 2]);
+    Livewire::test(ManageProducts::class)->callAction('create', data: ['name' => 'Bad', 'slug' => 'bad', 'status' => 'active',
+        'device_lock' => false, 'plans' => [], 'free_from' => '2026-11-03 18:00:00', 'free_until' => '2026-11-01 18:00:00'])
+        ->assertHasActionErrors(['free_until']);
+    $this->assertDatabaseCount('licensekit_products', 0);
+});

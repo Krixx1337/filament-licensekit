@@ -2,14 +2,13 @@
 
 namespace LicenseKit\Core\Models;
 
-use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use LicenseKit\Core\Actions\LicenseDuration;
+use LicenseKit\Core\Casts\UtcDateTime;
 use LicenseKit\Core\Exceptions\LicensingException;
-use LicenseKit\Core\Observers\LicensingConfigurationObserver;
 use LicenseKit\Database\Factories\Core\LicensePlanFactory;
 
 /**
@@ -17,20 +16,16 @@ use LicenseKit\Database\Factories\Core\LicensePlanFactory;
  * @property int $product_id
  * @property string $name
  * @property int|null $duration_days
- * @property bool $is_enabled
+ * @property bool $is_active
  * @property Product $product
  */
-#[ObservedBy([LicensingConfigurationObserver::class])]
 class LicensePlan extends Model
 {
-    protected $fillable = ['product_id', 'name', 'duration_days', 'is_enabled'];
+    protected $fillable = ['product_id', 'name', 'duration_days', 'is_active'];
 
-    /** @internal Actor supplied by supported catalog operations for synchronous auditing. */
-    public ?string $auditActor = null;
+    protected $table = 'licensekit_plans';
 
-    protected $table = 'licensekit_license_plans';
-
-    protected $attributes = ['is_enabled' => true];
+    protected $attributes = ['is_active' => true];
 
     protected static function newFactory(): LicensePlanFactory
     {
@@ -43,7 +38,7 @@ class LicensePlan extends Model
     /** @return array<string, string> */
     protected function casts(): array
     {
-        return ['product_id' => 'integer', 'duration_days' => 'integer', 'is_enabled' => 'boolean'];
+        return ['created_at' => UtcDateTime::class, 'updated_at' => UtcDateTime::class, 'product_id' => 'integer', 'duration_days' => 'integer', 'is_active' => 'boolean'];
     }
 
     /** @return BelongsTo<Product, $this> */
@@ -52,10 +47,10 @@ class LicensePlan extends Model
         return $this->belongsTo(Product::class);
     }
 
-    /** @return HasMany<LicenseKey, $this> */
-    public function keys(): HasMany
+    /** @return HasManyThrough<LicenseKey, Batch, $this> */
+    public function keys(): HasManyThrough
     {
-        return $this->hasMany(LicenseKey::class);
+        return $this->hasManyThrough(LicenseKey::class, Batch::class, 'plan_id', 'batch_id');
     }
 
     protected static function booted(): void

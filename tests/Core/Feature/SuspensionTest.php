@@ -1,35 +1,22 @@
 <?php
 
 use Carbon\CarbonImmutable;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use LicenseKit\Core\Actions\AccessPolicy;
 use LicenseKit\Core\Actions\ClaimLicense;
-use LicenseKit\Core\Actions\CreateBatch;
 use LicenseKit\Core\Actions\CustomerLicenseSummary;
+use LicenseKit\Core\Actions\Keys;
+use LicenseKit\Core\Actions\LoaderSessions;
 use LicenseKit\Core\Actions\ManageLicenses;
-use LicenseKit\Core\Contracts\AccessRestriction;
-use LicenseKit\Core\Events\LicenseGranted;
+use LicenseKit\Core\Data\IssueContext;
+use LicenseKit\Core\Events\KeyRedeemed;
 use LicenseKit\Core\Exceptions\LicensingException;
-use LicenseKit\Core\Models\AuditEvent;
+use LicenseKit\Core\Models\ActivityEntry;
 use LicenseKit\Core\Models\License;
 use LicenseKit\Core\Models\LicensePlan;
-use LicenseKit\Core\Models\Product;
 use LicenseKit\Core\Users\UserAccess;
-use LicenseKit\Tests\Core\Fixtures\ClientSessions;
 use LicenseKit\Tests\Core\Fixtures\User;
-
-class HostBanRestriction implements AccessRestriction
-{
-    public ?License $license = null;
-
-    public function assertAllowed(Model $user, Product $product, ?License $license): void
-    {
-        $this->license = $license;
-        throw new LicensingException('host_banned');
-    }
-}
 
 function suspensionAdministrator(): User
 {
@@ -43,18 +30,18 @@ test('suspending a customer before their first purchase blocks redemption withou
     $actor = suspensionAdministrator();
     $user = User::factory()->create();
     $plan = LicensePlan::factory()->create();
-    $key = app(CreateBatch::class)->create($plan, 1, 'sale', 'test')->keys->first();
-    Event::fake([LicenseGranted::class]);
+    $key = app(Keys::class)->issue($plan, 1, new IssueContext(source: 'app', reference: 'sale'))->keys->first();
+    Event::fake([KeyRedeemed::class]);
 
     $license = app(ManageLicenses::class)->suspendCustomer($user, $plan->product, $actor, '  Chargeback  ');
 
     expect($license->status)->toBe(License::SUSPENDED)->and($license->expires_at)->toBeNull();
-    expect(fn () => app(ClaimLicense::class)->claim($user, $key->key))->toThrow(LicensingException::class, 'license suspended');
-    expect(fn () => app(ClaimLicense::class)->claimFor($actor, $user, $key))->toThrow(LicensingException::class, 'license suspended');
-    expect($key->fresh()->claimed_at)->toBeNull();
-    Event::assertNotDispatched(LicenseGranted::class);
-    $audit = AuditEvent::where('event', 'license_status_changed')->sole();
-    expect($audit->actor)->toBe('user:'.$actor->id)->and($audit->reason)->toBe('Chargeback');
+    expect(fn () => app(ClaimLicense::class)->claim($user, $key->key))->toThrow(LicensingException::class, 'suspended');
+    expect(fn () => app(ClaimLicense::class)->claimFor($actor, $user, $key))->toThrow(LicensingException::class, 'suspended');
+    expect($key->fresh()->redeemed_at)->toBeNull();
+    Event::assertNotDispatched(KeyRedeemed::class);
+    $audit = ActivityEntry::where('event', 'license_status_changed')->sole();
+    expect($audit->actor)->toBe('user:'.$actor->id)->and($audit->meta['note'])->toBe('Chargeback');
 });
 
 test('suspension blocks paid and free access for that product only', function () {
@@ -65,8 +52,8 @@ test('suspension blocks paid and free access for that product only', function ()
 
     app(ManageLicenses::class)->suspend($license, $actor);
 
-    expect(fn () => app(AccessPolicy::class)->authorize($user, $license->product))->toThrow(LicensingException::class, 'license suspended');
-    expect(fn () => app(AccessPolicy::class)->authorize($user, $license->product, CarbonImmutable::now()->addDay()))->toThrow(LicensingException::class, 'license suspended');
+    expect(fn () => app(AccessPolicy::class)->authorize($user, $license->product))->toThrow(LicensingException::class, 'suspended');
+    expect(fn () => app(AccessPolicy::class)->authorize($user, $license->product))->toThrow(LicensingException::class, 'suspended');
     expect(app(AccessPolicy::class)->authorize($user, $other->product)->source)->toBe('paid');
     expect(app(CustomerLicenseSummary::class)->for($license->fresh())['status'])->toBe('suspended');
 });
@@ -81,7 +68,7 @@ test('a temporary suspension ends by itself at the chosen time', function () {
     expect($license->fresh()->suspended_until->toIso8601String())->toBe('2026-01-01T00:00:10+00:00');
 
     $this->travel(9)->seconds();
-    expect(fn () => app(AccessPolicy::class)->authorize($user, $license->product))->toThrow(LicensingException::class, 'license suspended');
+    expect(fn () => app(AccessPolicy::class)->authorize($user, $license->product))->toThrow(LicensingException::class, 'suspended');
     $this->travel(1)->seconds();
     expect(app(AccessPolicy::class)->authorize($user, $license->product)->source)->toBe('paid');
 });
@@ -105,7 +92,7 @@ test('suspension ends the product sessions but keeps the clock and other session
     $actor = suspensionAdministrator();
     $user = User::factory()->create();
     $licenses = collect([1, 2])->map(fn () => License::factory()->create(['user_id' => $user->id]));
-    $desktop = app(ClientSessions::class);
+    $desktop = app(LoaderSessions::class);
     $tokens = $licenses->map(fn ($license) => $desktop->login($license->product, $user->email, 'password', desktopRequest($user)['hwid'])['token']);
     $expiry = $licenses[0]->fresh()->expires_at;
 
@@ -113,7 +100,7 @@ test('suspension ends the product sessions but keeps the clock and other session
 
     expect($licenses[0]->fresh()->expires_at->equalTo($expiry))->toBeTrue();
     expect(fn () => $desktop->heartbeat($licenses[0]->product, $tokens[0], desktopRequest($user)['hwid']))->toThrow(LicensingException::class, 'invalid token');
-    expect(fn () => $desktop->login($licenses[0]->product, $user->email, 'password', desktopRequest($user)['hwid']))->toThrow(LicensingException::class, 'license suspended');
+    expect(fn () => $desktop->login($licenses[0]->product, $user->email, 'password', desktopRequest($user)['hwid']))->toThrow(LicensingException::class, 'suspended');
     $desktop->heartbeat($licenses[1]->product, $tokens[1], desktopRequest($user)['hwid']);
 
     app(ManageLicenses::class)->unsuspend($licenses[0], $actor);
@@ -129,57 +116,28 @@ test('a suspension end in the past is rejected without changes', function () {
     expect($license->fresh()->status)->toBe(License::ACTIVE);
 });
 
-test('host restrictions reject both claim paths before mutation with optional paid history', function (bool $existing, bool $admin) {
-    $actor = suspensionAdministrator();
-    $user = User::factory()->create();
-    $plan = LicensePlan::factory()->create();
-    $key = app(CreateBatch::class)->create($plan, 1, 'sale', 'test')->keys->first();
-    $license = $existing ? License::factory()->expired()->create(['user_id' => $user->id, 'product_id' => $plan->product_id]) : null;
-    $before = $license?->fresh()->getAttributes();
-    $restriction = new HostBanRestriction;
-    app()->instance(HostBanRestriction::class, $restriction);
-    config(['licensekit.access_restrictions' => [HostBanRestriction::class]]);
-    Event::fake([LicenseGranted::class]);
-
-    expect(fn () => $admin ? app(ClaimLicense::class)->claimFor($actor, $user, $key) : app(ClaimLicense::class)->claim($user, $key->key))
-        ->toThrow(LicensingException::class, 'host banned');
-
-    expect($restriction->license?->id)->toBe($license?->id);
-    expect($license?->fresh()->getAttributes())->toBe($before);
-    expect($key->fresh()->claimed_at)->toBeNull();
-    $this->assertDatabaseCount('licensekit_licenses', $existing ? 1 : 0);
-    $this->assertDatabaseMissing('licensekit_audit_events', ['event' => 'key_claimed']);
-    Event::assertNotDispatched(LicenseGranted::class);
-})->with([true, false])->with([true, false]);
-
-test('host restrictions deny paid and free access', function (bool $paid) {
-    $user = User::factory()->create();
-    $product = Product::factory()->create();
-    if ($paid) {
-        License::factory()->create(['user_id' => $user->id, 'product_id' => $product->id]);
-    }
-    config(['licensekit.access_restrictions' => [HostBanRestriction::class]]);
-
-    expect(fn () => app(AccessPolicy::class)->authorize($user, $product, freeUntil: CarbonImmutable::now()->addHour()))
-        ->toThrow(LicensingException::class, 'host banned');
-    expect(fn () => app(AccessPolicy::class)->assertAllowed($user, $product))->toThrow(LicensingException::class, 'host banned');
-})->with([true, false]);
-
 test('host suspension accepts boolean timestamp and computed attributes', function (string $attribute) {
-    config(['licensekit.user.suspended_column' => $attribute, 'licensekit.user.require_verified' => false]);
+    config(['licensekit.user_suspended_column' => $attribute, 'licensekit.user.require_verified' => false]);
     $user = User::factory()->create(['is_suspended' => true]);
 
     expect(app(UserAccess::class)->available($user))->toBeFalse();
 
     $user->update(['is_suspended' => false, 'email_verified_at' => null]);
-    expect(app(UserAccess::class)->available($user->fresh()))->toBeTrue();
+    expect(app(UserAccess::class)->available($user->fresh()))->toBeFalse();
 })->with(['is_suspended', 'email_verified_at', 'licensing_suspended']);
 
 test('setup diagnostics accept computed suspension attributes and reject missing attributes', function () {
-    config(['licensekit.user.suspended_column' => 'licensing_suspended']);
+    config(['licensekit.user_suspended_column' => 'licensing_suspended']);
 
     $this->artisan('licensekit:check')->expectsOutputToContain('LicenseKit installation is ready.')->assertSuccessful();
 
-    config(['licensekit.user.suspended_column' => 'missing_suspension']);
+    config(['licensekit.user_suspended_column' => 'missing_suspension']);
     $this->artisan('licensekit:check')->expectsOutputToContain('Missing user column: missing_suspension.')->assertFailed();
+});
+
+test('suspension cannot undo a cancellation', function () {
+    $user = User::factory()->create();
+    $license = License::factory()->create(['user_id' => $user->id, 'status' => 'revoked']);
+    expect(fn () => app(ManageLicenses::class)->suspend($license, $user))->toThrow(LicensingException::class, 'cannot suspend license');
+    expect($license->fresh()->status)->toBe('revoked');
 });

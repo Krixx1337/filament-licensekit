@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   package:
-    name: PHP ${{ matrix.php }} / Laravel ${{ matrix.laravel }} / Filament ${{ matrix.filament }} / Sanctum ${{ matrix.sanctum }}
+    name: PHP ${{ matrix.php }} / Laravel ${{ matrix.laravel }} / Filament ${{ matrix.filament }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
@@ -25,47 +25,38 @@ jobs:
             laravel: '12.*'
             testbench: '10.*'
             filament: '5.*'
-            sanctum: '4.*'
           - php: '8.3'
             laravel: '13.*'
             testbench: '11.*'
             filament: '5.*'
-            sanctum: '4.*'
           - php: '8.5'
             laravel: '13.*'
             testbench: '11.*'
             filament: '5.*'
-            sanctum: '4.*'
           - php: '8.3'
             laravel: '12.*'
             testbench: '10.*'
             filament: '5.8.3'
-            sanctum: '4.1.0'
           - php: '8.3'
             laravel: '13.*'
             testbench: '11.*'
             filament: '5.8.3'
-            sanctum: '4.*'
           - php: '8.3'
             laravel: '12.*'
             testbench: '10.*'
             filament: '4.*'
-            sanctum: '4.*'
           - php: '8.3'
             laravel: '13.*'
             testbench: '11.*'
             filament: '4.*'
-            sanctum: '4.*'
           - php: '8.3'
             laravel: '12.*'
             testbench: '10.*'
             filament: '4.13.3'
-            sanctum: '4.1.0'
           - php: '8.3'
             laravel: '13.*'
             testbench: '11.*'
             filament: '4.13.3'
-            sanctum: '4.3.1'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -73,25 +64,26 @@ jobs:
       - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
           php-version: ${{ matrix.php }}
-          extensions: intl, mbstring, pdo_sqlite, zip
+          extensions: intl, mbstring, pdo_sqlite, sodium, zip
           tools: composer:v2
           coverage: none
       - name: Resolve dependencies
         run: |
-          composer require "filament/filament:${{ matrix.filament }}" "laravel/sanctum:${{ matrix.sanctum }}" --no-update --no-interaction
+          composer require "filament/filament:${{ matrix.filament }}" --no-update --no-interaction
           composer require --dev "laravel/framework:${{ matrix.laravel }}" "orchestra/testbench:${{ matrix.testbench }}" --no-update --no-interaction
           composer update --prefer-dist --no-interaction --no-progress
       - name: Run package tests
         run: composer test
       - name: Check package quality
-        if: matrix.php == '8.3' && matrix.laravel == '13.*' && matrix.filament == '5.*' && matrix.sanctum == '4.*'
+        if: matrix.php == '8.3' && matrix.laravel == '13.*' && matrix.filament == '5.*'
         run: |
           composer validate --strict
           php vendor/bin/pint --test
           composer analyse
+          composer lint:lines
           composer audit
       - name: Verify distribution archive
-        if: matrix.php == '8.3' && matrix.laravel == '13.*' && matrix.filament == '5.*' && matrix.sanctum == '4.*'
+        if: matrix.php == '8.3' && matrix.laravel == '13.*' && matrix.filament == '5.*'
         run: |
           git archive --format=zip --output="$RUNNER_TEMP/licensekit.zip" HEAD
           php .github/scripts/check-archive.php "$RUNNER_TEMP/licensekit.zip"
@@ -111,7 +103,7 @@ jobs:
       - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
           php-version: '8.3'
-          extensions: intl, mbstring, pdo_sqlite, zip
+          extensions: intl, mbstring, pdo_sqlite, sodium, zip
           tools: composer:v2
           coverage: none
       - name: Install runtime consumer without package development tools
@@ -149,7 +141,7 @@ jobs:
       - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
           php-version: '8.3'
-          extensions: intl, mbstring, pdo_mysql, zip
+          extensions: intl, mbstring, pdo_mysql, sodium, zip
           tools: composer:v2
           coverage: none
       - name: Resolve dependencies

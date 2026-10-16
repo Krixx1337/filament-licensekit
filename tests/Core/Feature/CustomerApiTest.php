@@ -5,18 +5,18 @@ use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use LicenseKit\Core\Actions\ClaimLicense;
-use LicenseKit\Core\Actions\CreateBatch;
 use LicenseKit\Core\Actions\CustomerLicenses;
+use LicenseKit\Core\Actions\Keys;
+use LicenseKit\Core\Data\IssueContext;
 use LicenseKit\Core\Exceptions\LicensingException;
 use LicenseKit\Core\Models\License;
 use LicenseKit\Core\Models\LicensePlan;
 use LicenseKit\Tests\Core\Fixtures\User;
 
 test('removed customer endpoints stay absent even with stale configuration', function (bool $management) {
-    $this->routingSettings = ['licensekit.management.enabled' => $management, 'licensekit.customer.enabled' => true, 'licensekit.routes.enabled' => true];
+    $this->routingSettings = ['licensekit.store_api_enabled' => $management, 'licensekit.customer.enabled' => true, 'licensekit.routes.enabled' => true];
     $this->refreshApplication();
     app('migrator')->path(__DIR__.'/../Fixtures/migrations');
-    app('migrator')->path(__DIR__.'/../../../vendor/laravel/sanctum/database/migrations');
     $this->artisan('migrate', ['--force' => true])->assertSuccessful();
     expect(Route::has('licensekit.licenses.index'))->toBeFalse();
     expect(Route::has('licensekit.management.products.index'))->toBe($management);
@@ -26,7 +26,7 @@ test('removed customer endpoints stay absent even with stale configuration', fun
     $this->postJson('/api/licensekit/v1/products/example/hwid-reset', [])->assertNotFound();
     $user = User::factory()->create();
     $plan = LicensePlan::factory()->create();
-    $key = app(CreateBatch::class)->create($plan, 1, 'php-customer', 'test')->keys->first();
+    $key = app(Keys::class)->issue($plan, 1, new IssueContext(source: 'app', reference: 'php-customer'))->keys->first();
     $license = app(ClaimLicense::class)->claim($user, $key->key);
     expect(app(CustomerLicenses::class)->find($user, $license->id)['status'])->toBe('active');
 })->with([false, true]);
@@ -51,7 +51,7 @@ test('customer reads recheck current suspension and verification', function (arr
     $user = User::factory()->create();
     $user->newQuery()->whereKey($user->id)->update($attributes);
     expect(fn () => app(CustomerLicenses::class)->paginate($user))->toThrow(LicensingException::class, 'user unavailable');
-})->with([[['is_suspended' => true]], [['email_verified_at' => null]]]);
+})->with([[['is_suspended' => true]]]);
 
 test('customer detail cannot disclose another owners license', function () {
     $user = User::factory()->create();

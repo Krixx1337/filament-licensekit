@@ -1,8 +1,7 @@
 {
     "preset": "laravel",
     "exclude": [
-        "apps",
-        "packages",
-        ".codex"
+        ".codex",
+        ".phpunit.cache"
     ]
 }

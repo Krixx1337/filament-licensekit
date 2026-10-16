@@ -8,19 +8,16 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\Expression;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
-use LicenseKit\Core\Events\LicenseAccessInvalidated;
-use LicenseKit\Core\Events\ProductAccessInvalidated;
+use LicenseKit\Core\Events\AccessRevoked;
 use LicenseKit\Core\Exceptions\LicensingException;
-use LicenseKit\Core\Models\Batch;
 use LicenseKit\Core\Models\License;
-use LicenseKit\Core\Models\LicenseKey;
 use LicenseKit\Core\Models\Product;
 
 class ManageLicenses
 {
     public const MAXIMUM_ADDED_SECONDS = 315360000;
 
-    public function __construct(private Audit $audit) {}
+    public function __construct(private ActivityLog $audit) {}
 
     /**
      * Adds time to every running or paused license of a product, for example after downtime.
@@ -35,7 +32,7 @@ class ManageLicenses
         $reason = $this->optionalReason($reason);
 
         return DB::transaction(function () use ($product, $seconds, $actor, $reason, $since): int {
-            $product = Product::whereKey($product->id)->lockForUpdate()->first() ?? throw new LicensingException('service_unavailable');
+            $product = Product::whereKey($product->id)->first() ?? throw new LicensingException('maintenance');
             $now = CarbonImmutable::now('UTC')->format('Y-m-d H:i:s');
             // $seconds is a validated integer, so interpolating it into the expression is safe.
             $expiry = DB::getDriverName() === 'sqlite' ? "datetime(expires_at, '+{$seconds} seconds')" : "DATE_ADD(expires_at, INTERVAL {$seconds} SECOND)";
@@ -43,8 +40,8 @@ class ManageLicenses
                 ->update(['expires_at' => new Expression($expiry), 'updated_at' => $now]); // @phpstan-ignore argument.type (validated integer, see above)
             $paused = $this->addTimeTargets($product, $since)->whereNotNull('paused_at')
                 ->increment('remaining_seconds', $seconds, ['updated_at' => $now]);
-            $this->audit->record('user:'.$actor->getKey(), 'product_time_added', $product, [],
-                ['seconds' => $seconds, 'since' => $since->toIso8601String(), 'license_count' => $running + $paused], $reason);
+            $this->audit->record('user:'.$actor->getKey(), 'product_time_added', $product, ['before' => [], 'after' => ['seconds' => $seconds, 'since' => $since->toIso8601String(),
+                'license_count' => $running + $paused], 'note' => $reason]);
 
             return $running + $paused;
         }, 3);
@@ -84,7 +81,18 @@ class ManageLicenses
         return $reason === '' ? null : $reason;
     }
 
-    public function extend(License $license, int $seconds, Model $actor, string $reason): void
+    public function updateNote(License $license, Model $actor, ?string $note): void
+    {
+        $note = $this->optionalReason($note);
+        DB::transaction(function () use ($license, $actor, $note): void {
+            $license = License::whereKey($license->id)->lockForUpdate()->firstOrFail();
+            $before = $license->note;
+            $license->update(['note' => $note]);
+            $this->audit->record('user:'.$actor->getKey(), 'license_note_updated', $license, ['before' => $before, 'note' => $note]);
+        });
+    }
+
+    public function extend(License $license, int $seconds, Model $actor, ?string $reason = null): void
     {
         if ($seconds < 1 || $seconds > 315360000) {
             throw new LicensingException('invalid_duration', 422);
@@ -92,30 +100,23 @@ class ManageLicenses
         $this->changeClock($license, 'extend', $actor, $reason, $seconds);
     }
 
-    public function pause(License $license, Model $actor, string $reason): void
+    public function pause(License $license, Model $actor, ?string $reason = null, ?CarbonImmutable $until = null): void
     {
-        $this->changeClock($license, 'pause', $actor, $reason);
+        $this->changeClock($license, 'pause', $actor, $reason, until: $until);
     }
 
-    public function resume(License $license, Model $actor, string $reason): void
+    public function resume(License $license, Model $actor, ?string $reason = null): void
     {
         $this->changeClock($license, 'resume', $actor, $reason);
     }
 
     /** @param 'extend'|'pause'|'resume' $ability */
-    private function changeClock(License $license, string $ability, Model $actor, string $reason, ?int $seconds = null): void
+    private function changeClock(License $license, string $ability, Model $actor, ?string $reason = null, ?int $seconds = null, ?CarbonImmutable $until = null): void
     {
-        $reason = trim($reason);
-        if ($reason === '' || mb_strlen($reason) > 2000) {
-            throw new LicensingException('invalid_reason', 422);
-        }
+        $reason = $this->optionalReason($reason);
 
-        DB::transaction(function () use ($license, $ability, $actor, $reason, $seconds): void {
-            $users = $actor->newQuery()->whereKey(array_filter([$actor->getKey(), $license->user_id], fn ($id): bool => $id !== null))
-                ->orderBy($actor->getKeyName())->lockForUpdate()->get();
-            $actor = $users->first(fn (Model $user): bool => (string) $user->getKey() === (string) $actor->getKey()) ?? throw new LicensingException('admin_forbidden');
-            Product::whereKey($license->product_id)->lockForUpdate()->firstOrFail();
-            $license = License::whereKey($license->id)->lockForUpdate()->first() ?? throw new LicensingException('license_unavailable');
+        DB::transaction(function () use ($license, $ability, $actor, $reason, $seconds, $until): void {
+            $license = License::whereKey($license->id)->lockForUpdate()->first() ?? throw new LicensingException('no_license');
             if ($license->user_id === null || $license->is_lifetime || $license->isRevoked()
                 || $license->isSuspended()) {
                 throw new LicensingException('cannot_'.$ability.'_license', 409);
@@ -124,11 +125,11 @@ class ManageLicenses
             $clock = app(LicenseClock::class);
             match ($ability) {
                 'extend' => $clock->extend($license, $seconds ?? throw new LicensingException('invalid_duration', 422)),
-                'pause' => $clock->pause($license),
+                'pause' => $clock->pause($license, $until),
                 'resume' => $clock->resume($license),
             };
             if ($ability === 'pause') {
-                Event::dispatch(new LicenseAccessInvalidated($license));
+                Event::dispatch(new AccessRevoked($license));
             }
             $after = $license->only(['expires_at', 'paused_at', 'remaining_seconds']);
             if ($seconds !== null) {
@@ -139,7 +140,7 @@ class ManageLicenses
                 'pause' => 'license_paused',
                 'resume' => 'license_resumed',
             };
-            $this->audit->record('user:'.$actor->getKey(), $event, $license, $before, $after, $reason);
+            $this->audit->record('user:'.$actor->getKey(), $event, $license, ['before' => $before, 'after' => $after, 'note' => $reason]);
         }, 3);
     }
 
@@ -169,7 +170,7 @@ class ManageLicenses
     public function suspendCustomer(Model $user, Product $product, Model $actor, ?string $reason = null, ?CarbonImmutable $until = null): License
     {
         return DB::transaction(function () use ($user, $product, $actor, $reason, $until): License {
-            $user = $user->newQuery()->whereKey($user->getKey())->lockForUpdate()->first() ?? throw new LicensingException('user_unavailable');
+            $user = $user->newQuery()->whereKey($user->getKey())->first() ?? throw new LicensingException('user_unavailable');
             $license = License::firstOrCreate(['user_id' => $user->getKey(), 'product_id' => $product->id]);
             $this->suspend($license, $actor, $reason, $until);
 
@@ -184,70 +185,22 @@ class ManageLicenses
             throw new LicensingException('invalid_suspension_end', 422);
         }
         DB::transaction(function () use ($license, $actor, $reason, $status, $until): void {
-            $actor->newQuery()->whereKey(array_filter([$actor->getKey(), $license->user_id], fn ($id): bool => $id !== null))->orderBy($actor->getKeyName())->lockForUpdate()->get();
-            Product::whereKey($license->product_id)->lockForUpdate()->firstOrFail();
-            $license = License::whereKey($license->id)->lockForUpdate()->first() ?? throw new LicensingException('license_unavailable');
+            $license = License::whereKey($license->id)->lockForUpdate()->first() ?? throw new LicensingException('no_license');
+            if ($status === License::SUSPENDED && $license->isRevoked()) {
+                throw new LicensingException('cannot_suspend_license', 409);
+            }
             $before = $license->only(['status', 'suspended_until']);
             $license->update([
                 'status' => $status ?? $license->restingStatus(),
                 'suspended_until' => $status === License::SUSPENDED ? $until?->utc()->startOfSecond() : null,
             ]);
+            if ($status === null) {
+                app(LicenseClock::class)->resumeWhenDue($license);
+            }
             if ($status !== null && $license->user !== null) {
-                Event::dispatch(new LicenseAccessInvalidated($license));
-                Event::dispatch(new ProductAccessInvalidated($license->user, $license->product_id));
+                Event::dispatch(new AccessRevoked($license));
             }
-            $this->audit->record('user:'.$actor->getKey(), 'license_status_changed', $license, $before, $license->only(['status', 'suspended_until']), $reason);
+            $this->audit->record('user:'.$actor->getKey(), 'license_status_changed', $license, ['before' => $before, 'after' => $license->only(['status', 'suspended_until']), 'note' => $reason]);
         });
-    }
-
-    public function revokeKey(LicenseKey $key, Model $actor, string $reason): void
-    {
-        DB::transaction(function () use ($key, $actor, $reason): void {
-            Product::whereKey($key->plan->product_id)->lockForUpdate()->firstOrFail();
-            $key = LicenseKey::whereKey($key->id)->lockForUpdate()->first() ?? throw new LicensingException('invalid_key', 422);
-            if ($key->claimed_at !== null || trim($reason) === '') {
-                throw new LicensingException('key_revocation_forbidden');
-            }
-            $key->update(['revoked_at' => now()]);
-            $this->audit->record('user:'.$actor->getKey(), 'key_revoked', $key, [], ['revoked' => true], $reason);
-        });
-    }
-
-    public function updateNote(LicenseKey $key, Model $actor, ?string $note): void
-    {
-        $note = trim($note ?? '');
-        if (mb_strlen($note) > 255) {
-            throw new LicensingException('invalid_key_note', 422);
-        }
-        DB::transaction(function () use ($key, $actor, $note): void {
-            Product::whereKey($key->plan->product_id)->lockForUpdate()->firstOrFail();
-            $key = LicenseKey::whereKey($key->id)->lockForUpdate()->firstOrFail();
-            $before = $key->only(['note']);
-            $key->update(['note' => $note === '' ? null : $note]);
-            $this->audit->record('user:'.$actor->getKey(), 'key_note_updated', $key, $before, $key->only(['note']));
-        }, 3);
-    }
-
-    public function revokeUnclaimedBatch(Batch $batch, Model $actor, string $reason): int
-    {
-        $reason = trim($reason);
-        if ($reason === '' || mb_strlen($reason) > 2000) {
-            throw new LicensingException('invalid_revocation_reason', 422);
-        }
-
-        return DB::transaction(function () use ($batch, $actor, $reason): int {
-            Product::whereKey($batch->plan->product_id)->lockForUpdate()->firstOrFail();
-            $batch = Batch::whereKey($batch->id)->lockForUpdate()->firstOrFail();
-            $count = $batch->keys()->whereNull('claimed_at')->whereNull('revoked_at')->update(['revoked_at' => now('UTC')]);
-            $this->audit->record('user:'.$actor->getKey(), 'batch_unclaimed_revoked', $batch, [], ['revoked_count' => $count], $reason);
-
-            return $count;
-        }, 3);
-    }
-
-    /** @return list<string> */
-    public function exportUnclaimedBatch(Batch $batch): array
-    {
-        return array_values($batch->keys()->whereNull('claimed_at')->whereNull('revoked_at')->orderBy('id')->pluck('key')->all());
     }
 }

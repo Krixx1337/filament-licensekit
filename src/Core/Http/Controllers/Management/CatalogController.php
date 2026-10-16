@@ -15,13 +15,15 @@ class CatalogController extends Controller
     {
         $request->validate(['per_page' => ['sometimes', 'integer', 'min:1', 'max:100'], 'page' => ['sometimes', 'integer', 'min:1'], 'search' => ['sometimes', 'string', 'max:255']]);
 
-        return ManagementProductResource::collection($queries->products($request->bearerToken() ?? '', $request->integer('per_page', 25), $request->integer('page', 1), $request->input('search'))->withQueryString())->response();
+        return ManagementProductResource::collection($queries->products($request->attributes->get('licensekit.connection'), $request->integer('per_page', 25), $request
+            ->integer('page', 1), $request->input('search'))->withQueryString())->response();
     }
 
     public function plans(Request $request, ManagementQueries $queries): JsonResponse
     {
         $request->validate(['per_page' => ['sometimes', 'integer', 'min:1', 'max:100'], 'page' => ['sometimes', 'integer', 'min:1'], 'product_id' => ['sometimes', 'integer', 'min:1']]);
 
-        return ManagementPlanResource::collection($queries->plans($request->bearerToken() ?? '', $request->integer('per_page', 25), $request->integer('page', 1), $request->filled('product_id') ? $request->integer('product_id') : null)->withQueryString())->response();
+        return ManagementPlanResource::collection($queries->plans($request->attributes->get('licensekit.connection'), $request->integer('per_page', 25), $request->integer('page',
+            1), $request->filled('product_id') ? $request->integer('product_id') : null)->withQueryString())->response();
     }
 }

@@ -13,6 +13,6 @@ class ProductFactory extends Factory
     /** @return array<string, mixed> */
     public function definition(): array
     {
-        return ['name' => fake()->words(2, true), 'slug' => fake()->unique()->slug(), 'status' => Product::ACTIVE, 'requires_hwid' => true];
+        return ['name' => fake()->words(2, true), 'slug' => fake()->unique()->slug(), 'status' => Product::ACTIVE, 'device_lock' => true];
     }
 }

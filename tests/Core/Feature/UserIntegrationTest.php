@@ -4,15 +4,12 @@ use Illuminate\Auth\EloquentUserProvider;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\Schema;
 use LicenseKit\Core\Actions\ClaimLicense;
-use LicenseKit\Core\Actions\CreateBatch;
-use LicenseKit\Core\Models\License;
-use LicenseKit\Core\Models\LicensePlan;
+use LicenseKit\Core\Actions\LoaderSessions;
+use LicenseKit\Core\Exceptions\LicensingException;
+use LicenseKit\Core\Models\LicenseKey;
 use LicenseKit\Core\Models\Product;
 use LicenseKit\Core\Users\ConfiguredUserModel;
-use LicenseKit\Tests\Core\Fixtures\ClientSecurity;
-use LicenseKit\Tests\Core\Fixtures\ClientSessions;
 use LicenseKit\Tests\Core\Fixtures\CustomUser;
-use LicenseKit\Tests\Core\Fixtures\HostAuthenticateUser;
 use LicenseKit\Tests\Core\Fixtures\User;
 
 class HostPasswordProvider extends EloquentUserProvider
@@ -23,118 +20,55 @@ class HostPasswordProvider extends EloquentUserProvider
     }
 }
 
-test('desktop credentials use native host provider without browser authentication or remember changes', function () {
+test('loader uses native host provider without changing browser session or remember token', function () {
     $user = User::factory()->create();
     $this->app['auth']->provider('host-password', fn ($app, array $config) => new HostPasswordProvider($app['hash'], $config['model']));
     config(['auth.providers.members' => ['driver' => 'host-password', 'model' => User::class],
-        'auth.guards.customer' => ['driver' => 'session', 'provider' => 'members'], 'licensekit.user.guard' => 'customer']);
-    expect(app(HostAuthenticateUser::class)->authenticate('  '.strtoupper($user->email).'  ', 'host-secret')->getKey())->toBe($user->id);
-    expect(app(HostAuthenticateUser::class)->authenticate($user->email, 'password'))->toBeNull();
+        'auth.guards.customer' => ['driver' => 'session', 'provider' => 'members'], 'licensekit.user_guard' => 'customer']);
+    $product = Product::factory()->create();
+    $result = app(LoaderSessions::class)->login($product, $user->email, 'host-secret', 'pc');
+    expect($result['access'])->toBeFalse();
+    expect(fn () => app(LoaderSessions::class)->login($product, $user->email, 'wrong', 'pc'))->toThrow(LicensingException::class, 'invalid credentials');
     $this->assertGuest('customer');
     expect($user->fresh()->getRememberToken())->toBe('');
 });
 
-test('missing desktop users return invalid credentials under host argon hasher', function () {
-    config(['hashing.driver' => 'argon']);
-    $product = Product::factory()->create();
-    $this->postJson(route('licensekit.desktop.login', $product->slug), [
-        'login' => 'missing@example.com', 'password' => 'password',
-        'hwid' => 'pc',
-    ])->assertUnauthorized()->assertJsonPath('error', 'invalid_credentials');
-    $this->assertDatabaseCount('client_sessions', 0);
-});
-
-test('configured username credentials use host provider', function () {
+test('username login is independent of admin display column', function () {
     Schema::table('users', fn ($table) => $table->string('username')->nullable());
-    config(['host_client.username_column' => 'username']);
+    config(['licensekit.client_login_column' => 'username']);
     $user = User::factory()->create(['username' => 'player']);
-    expect(app(HostAuthenticateUser::class)->authenticate(' PLAYER ', 'password')->getKey())->toBe($user->id);
-    expect(app(HostAuthenticateUser::class)->authenticate('player', 'wrong'))->toBeNull();
+    $product = Product::factory()->create();
+    expect(app(LoaderSessions::class)->login($product, 'player', 'password', 'pc')['access'])->toBeFalse();
+    expect(fn () => app(LoaderSessions::class)->login($product, $user->email, 'password', 'pc'))->toThrow(LicensingException::class);
 });
 
-test('custom guard provider and user table own claimed license', function () {
+test('custom guard provider and user table own redeemed license', function () {
     config(['auth.providers.members' => ['driver' => 'eloquent', 'model' => CustomUser::class],
-        'auth.guards.customer' => ['driver' => 'session', 'provider' => 'members'], 'licensekit.user.guard' => 'customer']);
+        'auth.guards.customer' => ['driver' => 'session', 'provider' => 'members'], 'licensekit.user_guard' => 'customer']);
     $this->app['db']->connection()->rollBack();
     $this->artisan('migrate:fresh')->assertSuccessful();
     $this->app['db']->connection()->beginTransaction();
     $user = CustomUser::factory()->create();
-    $plan = LicensePlan::factory()->create();
-    $key = app(CreateBatch::class)->create($plan, 1, 'sale', 'test')->keys->first();
+    $key = LicenseKey::factory()->create();
     $license = app(ClaimLicense::class)->claim($user, $key->key);
     expect($license->user)->toBeInstanceOf(CustomUser::class);
-    expect($license->user_id)->toBe($user->id);
-    expect(Schema::hasTable('members'))->toBeTrue();
-    expect(app(HostAuthenticateUser::class)->authenticate($user->email, 'password'))->toBeInstanceOf(CustomUser::class);
+    expect(app(LoaderSessions::class)->login($license->product, $user->email, 'password', 'pc')['access'])->toBeTrue();
     $this->artisan('licensekit:check')->assertSuccessful();
 });
 
-test('unsupported host user configuration fails clearly', function (array $settings) {
+test('unsupported host user configurations fail diagnostics', function (array $settings) {
     config($settings);
     expect(fn () => ConfiguredUserModel::className())->toThrow(InvalidArgumentException::class);
     $this->artisan('licensekit:check')->assertFailed();
 })->with([
-    'missing guard' => [['licensekit.user.guard' => 'missing']],
-    'missing provider' => [['auth.guards.web.provider' => 'missing']],
-    'non eloquent' => [['auth.providers.users.model' => stdClass::class]],
+    [['licensekit.user_guard' => 'missing']], [['auth.guards.web.provider' => 'missing']], [['auth.providers.users.model' => stdClass::class]],
 ]);
 
-test('installation check reports configured lookup columns without changing users', function () {
-    config(['licensekit.user.display_column' => 'missing_email']);
-    $this->artisan('licensekit:check')->assertFailed();
-    expect(Schema::hasColumn('users', 'missing_email'))->toBeFalse();
-    $this->assertDatabaseCount('users', 0);
-});
-
-test('native provider returning wrong host model fails closed', function () {
-    $user = User::factory()->create();
-    $this->app['auth']->provider('mismatched', fn ($app, array $config) => new HostPasswordProvider($app['hash'], User::class));
-    config(['auth.providers.users' => ['driver' => 'mismatched', 'model' => CustomUser::class]]);
-    expect(fn () => app(HostAuthenticateUser::class)->authenticate($user->email, 'host-secret'))
-        ->toThrow(InvalidArgumentException::class, 'unsupported LicenseKit user model');
-    $this->assertDatabaseCount('client_sessions', 0);
-});
-
-test('unsupported native provider driver reports installation failure', function () {
-    config(['auth.providers.users.driver' => 'missing-driver']);
-    $this->artisan('licensekit:check')->assertFailed();
-    $this->assertDatabaseCount('users', 0);
-});
-
-test('display configuration does not control host credentials or security invalidation', function (string $field, string $value, bool $bulk) {
-    Schema::table('users', fn ($table) => $table->string('username')->nullable());
-    $user = User::factory()->create(['username' => 'player']);
-    $product = Product::factory()->create();
-    $license = License::factory()->create(['user_id' => $user->id, 'product_id' => $product->id]);
-    $sessions = app(ClientSessions::class);
-    $token = $sessions->login($product, $user->email, 'password', 'pc')['token'];
-    $fingerprint = app(ClientSecurity::class)->fingerprint($user);
-    config(['licensekit.user.display_column' => 'username']);
-
-    expect(app(HostAuthenticateUser::class)->authenticate($user->email, 'password')->getKey())->toBe($user->id);
-    expect(app(ClientSecurity::class)->fingerprint($user))->toBe($fingerprint);
-    $this->withToken($token)->postJson(route('licensekit.desktop.heartbeat', $product->slug), desktopRequest($user, 'pc'))->assertOk();
-    if ($bulk) {
-        User::whereKey($user->getKey())->update([$field => $value]);
-    } else {
-        $user->update([$field => $value]);
-    }
-    $this->withToken($token)->postJson(route('licensekit.desktop.heartbeat', $product->slug), desktopRequest($user, 'pc'))->assertUnauthorized();
-    $this->assertDatabaseCount('client_sessions', $bulk ? 1 : 0);
-    expect($license->fresh()->user_id)->toBe($user->id);
-    $this->assertDatabaseHas('licensekit_licenses', ['user_id' => $user->id, 'product_id' => $product->id, 'device' => 'pc']);
-})->with([
-    'email observer' => ['email', 'changed@example.com', false],
-    'username observer' => ['username', 'renamed-player', false],
-    'email bulk update' => ['email', 'changed@example.com', true],
-    'username bulk update' => ['username', 'renamed-player', true],
-]);
-
-test('username-only host passes installation checks without email verification', function () {
-    config(['licensekit.user.display_column' => 'username', 'licensekit.user.require_verified' => false]);
-    Schema::table('users', function ($table) {
-        $table->renameColumn('email', 'username');
-        $table->dropColumn('email_verified_at');
-    });
-    $this->artisan('licensekit:check')->assertSuccessful();
+test('verification follows host model and is never controlled by old config', function () {
+    $user = User::factory()->create(['email_verified_at' => null]);
+    config(['licensekit.user.require_verified' => false]);
+    $key = LicenseKey::factory()->create();
+    expect(fn () => app(ClaimLicense::class)->claim($user, $key->key))->toThrow(LicensingException::class, 'email not verified');
+    expect(fn () => app(LoaderSessions::class)->login($key->batch->plan->product, $user->email, 'password', 'pc'))->toThrow(LicensingException::class, 'email not verified');
+    expect($key->fresh()->redeemed_at)->toBeNull();
 });
