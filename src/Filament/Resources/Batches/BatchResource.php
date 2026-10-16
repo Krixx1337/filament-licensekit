@@ -2,7 +2,8 @@
 
 namespace LicenseKit\Filament\Resources\Batches;
 
-use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
+use Filament\Support\Enums\FontWeight;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
@@ -30,32 +31,36 @@ class BatchResource extends LicensingResource
     public static function table(Table $table): Table
     {
         return $table->columns([
-            TextColumn::make('id')->label('Batch')->formatStateUsing(fn ($state, Batch $record): string => 'Batch #'.$state.($record->label !== null ? ' · '.$record->label : ''))
-                ->sortable()->toggleable(),
-            TextColumn::make('label')->searchable()->toggleable(isToggledHiddenByDefault: true),
-            TextColumn::make('plan.name')->label('Plan')->searchable()->toggleable(),
-            TextColumn::make('created_by')->label('Created by')->searchable()->toggleable(),
-            TextColumn::make('apiConnection.name')->label('Store connection')->searchable()->toggleable(),
-            TextColumn::make('source')->searchable()->toggleable(isToggledHiddenByDefault: true),
-            TextColumn::make('reference')->searchable()->toggleable(isToggledHiddenByDefault: true),
-            TextColumn::make('quantity')->label('Original quantity')->toggleable(isToggledHiddenByDefault: true),
-            TextColumn::make('redeemed_count')->label('Redeemed')->toggleable(),
-            TextColumn::make('unused_count')->label('Unused')->toggleable(),
-            TextColumn::make('cancelled_count')->label('Cancelled')->toggleable(),
-            TextColumn::make('created_at')->dateTime()->toggleable(isToggledHiddenByDefault: true),
+            TextColumn::make('id')->label('Batch')->weight(FontWeight::Medium)->sortable()
+                ->formatStateUsing(fn ($state, Batch $record): string => $record->label ?? 'Batch #'.$state)
+                ->description(fn (Batch $record): string => 'Batch #'.$record->id.' · by '.$record->created_by.', '.$record->created_at?->diffForHumans())
+                ->searchable(['label', 'reference']),
+            TextColumn::make('plan.product.name')->label('Product')->description(fn (Batch $record): string => $record->plan->name),
+            TextColumn::make('redeemed_count')->label('Redeemed')
+                ->formatStateUsing(fn ($state, Batch $record): string => $state.' of '.$record->quantity)
+                ->description(fn (Batch $record): string => $record->unused_count.' unused'.($record->cancelled_count > 0 ? ', '.$record->cancelled_count.' cancelled' : '')),
+            TextColumn::make('source')->label('Made by')->badge()->color('gray')
+                ->formatStateUsing(fn (string $state, Batch $record): string => match ($state) {
+                    'api' => 'Store: '.($record->apiConnection->name ?? 'deleted connection'),
+                    'admin' => 'Admin panel',
+                    default => 'Your app',
+                }),
+            TextColumn::make('reference')->label('Order reference')->toggleable(isToggledHiddenByDefault: true),
         ])->filters([
             SelectFilter::make('api_connection_id')->label('Store connection')->relationship('apiConnection', 'name')->searchable(),
         ])->recordActions([
-            Action::make('keys')->label('View keys')->visible(fn (): bool => LicenseKeyResource::canViewAny())
-                ->url(fn (Batch $record): string => LicenseKeyResource::getUrl('index', ['filters' => ['batch_id' => ['value' => $record->id]]])),
-            LicensingActions::exportBatch(), LicensingActions::revokeBatch(),
-        ])->defaultSort('id', 'desc');
+            ActionGroup::make([LicensingActions::exportBatch(), LicensingActions::revokeBatch()]),
+        ])->recordUrl(fn (Batch $record): ?string => LicenseKeyResource::canViewAny()
+            ? LicenseKeyResource::getUrl('index', ['filters' => ['batch_id' => ['value' => $record->id]]]) : null)
+            ->emptyStateHeading('No key batches yet')->emptyStateIcon('heroicon-o-rectangle-stack')
+            ->emptyStateDescription('Every time you or your store generate keys, they are grouped in a batch here.')
+            ->defaultSort('id', 'desc');
     }
 
     /** @return Builder<Batch> */
     public static function getEloquentQuery(): Builder
     {
-        return Batch::query()->with(['plan', 'apiConnection'])->withCount([
+        return Batch::query()->with(['plan.product', 'apiConnection'])->withCount([
             'keys as redeemed_count' => fn (Builder $query) => $query->whereNotNull('redeemed_at'),
             'keys as unused_count' => fn (Builder $query) => $query->whereNull('redeemed_at')->whereNull('cancelled_at'),
             'keys as cancelled_count' => fn (Builder $query) => $query->whereNotNull('cancelled_at'),

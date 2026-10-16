@@ -16,6 +16,7 @@ use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Text;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
+use Filament\Schemas\Components\Wizard\Step;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
@@ -96,14 +97,14 @@ class LicensingActions
 
     public static function editNote(): Action
     {
-        return Action::make('edit_note')->label('Edit note')->authorize(fn (LicenseKey $record): bool => self::mayChange($record))
+        return Action::make('edit_note')->label('Edit note')->icon(Heroicon::OutlinedPencilSquare)->authorize(fn (LicenseKey $record): bool => self::mayChange($record))
             ->fillForm(fn (LicenseKey $record): array => ['note' => $record->getAttribute('note')])->schema([TextInput::make('note')->maxLength(255)])
             ->action(fn (LicenseKey $record, array $data) => app(ManageKeys::class)->updateNote($record, self::actor(), $data['note'] ?? null));
     }
 
     public static function exportBatch(): Action
     {
-        return Action::make('export_unused')->label('Download unused keys')->authorize(fn (): bool => AdminAccess::isAdmin())
+        return Action::make('export_unused')->label('Download unused keys')->icon(Heroicon::OutlinedArrowDownTray)->authorize(fn (): bool => AdminAccess::isAdmin())
             ->action(function (Batch $record): ?StreamedResponse {
                 $keys = app(ManageKeys::class)->exportUnusedBatch($record);
                 if ($keys === []) {
@@ -121,10 +122,11 @@ class LicensingActions
 
     public static function revokeBatch(): Action
     {
-        return Action::make('cancel_unused')->label('Cancel unused keys')->color('danger')->requiresConfirmation()
-            ->modalDescription('Cancels unused keys. Customers who already redeemed keep their time.')
+        return Action::make('cancel_unused')->label('Cancel unused keys')->icon(Heroicon::OutlinedXCircle)->color('danger')->requiresConfirmation()
+            ->modalIcon(Heroicon::OutlinedXCircle)
+            ->modalDescription('Unused keys in this batch stop working, for example after a leak. Customers who already redeemed keep their time.')
             ->authorize(fn (Batch $record): bool => self::mayChange($record))
-            ->schema([Textarea::make('reason')->maxLength(2000)])
+            ->schema([Textarea::make('reason')->label('Note (optional)')->maxLength(2000)])
             ->action(function (Batch $record, array $data): void {
                 $count = app(ManageKeys::class)->cancelUnusedBatch($record, self::actor(), ($data['reason'] ?? null));
                 Notification::make()->title('Cancelled '.$count.' unused keys in this key batch')->success()->send();
@@ -133,17 +135,39 @@ class LicensingActions
 
     public static function createKeys(): Action
     {
-        return Action::make('create_keys')->label('Generate keys')->authorize(fn (): bool => AdminAccess::isAdmin())
-            ->schema([
-                Select::make('product_id')->label('Product')->options(fn () => Product::pluck('name', 'id'))->required()->live()
-                    ->default(fn (?Model $record) => $record instanceof Product ? $record->id : ($record instanceof LicensePlan ? $record->product_id : null))
-                    ->afterStateUpdated(fn (Set $set) => $set('plan_id', null)),
-                Select::make('plan_id')->label('Plan')->options(fn (Get $get) => LicensePlan::where('product_id', $get('product_id'))->where('is_active', true)->pluck('name', 'id'))
-                    ->default(fn (?Model $record) => $record instanceof LicensePlan ? $record->id : null)->required(),
-                TextInput::make('quantity')->label('How many')->integer()->minValue(1)->maxValue(config('licensekit.max_batch_size'))->default(1)->required(),
-                TextInput::make('label')->label('Label (optional)')->maxLength(255),
-                Select::make('connection_id')->label('Store connection (optional)')->options(fn () => ApiConnection::where('is_active', true)->pluck('name', 'id')),
-            ])->action(function (array $data, $livewire): void {
+        return Action::make('create_keys')->label('Generate keys')->icon(Heroicon::OutlinedKey)->authorize(fn (): bool => AdminAccess::isAdmin())
+            ->modalHeading('Generate keys')->modalWidth('2xl')
+            ->steps([
+                Step::make('What')->description('Product and plan')->icon(Heroicon::OutlinedCube)->schema([
+                    Select::make('product_id')->label('Product')->options(fn () => Product::where('status', '!=', Product::DISCONTINUED)->orderBy('name')->pluck('name', 'id'))
+                        ->required()->live()
+                        ->default(fn (?Model $record) => $record instanceof Product ? $record->id : ($record instanceof LicensePlan ? $record->product_id : null))
+                        ->afterStateUpdated(fn (Set $set) => $set('plan_id', null)),
+                    Select::make('plan_id')->label('Plan')->required()->live()
+                        ->options(fn (Get $get) => LicensePlan::where('product_id', $get('product_id'))->where('is_active', true)->get()
+                            ->mapWithKeys(fn (LicensePlan $plan): array => [$plan->id => $plan->name.' · '.self::planLength($plan)])->all())
+                        ->default(fn (?Model $record) => $record instanceof LicensePlan ? $record->id : null)
+                        ->helperText('Each key gives the customer this much time when redeemed.'),
+                ]),
+                Step::make('How many')->description('Amount and label')->icon(Heroicon::OutlinedHashtag)->schema([
+                    TextInput::make('quantity')->label('How many keys')->integer()->minValue(1)->maxValue(config('licensekit.max_batch_size'))->default(1)->required()->live(onBlur: true)
+                        ->helperText('Up to '.config('licensekit.max_batch_size').' at once.'),
+                    TextInput::make('label')->label('Label (optional)')->maxLength(255)->placeholder('For example: October giveaway')
+                        ->helperText('Helps you find this batch later.'),
+                    Select::make('connection_id')->label('Store connection (optional)')->options(fn () => ApiConnection::where('is_active', true)->pluck('name', 'id'))
+                        ->helperText('Only if these keys are for a connected store.'),
+                ]),
+                Step::make('Review')->description('Check and generate')->icon(Heroicon::OutlinedCheckCircle)->schema([
+                    Text::make(function (Get $get): string {
+                        $plan = LicensePlan::with('product')->whereKey($get('plan_id'))->first();
+                        $count = (int) $get('quantity');
+
+                        return $plan === null ? 'Choose a product and plan first.' : 'You are about to generate '.$count.' '.($count === 1 ? 'key' : 'keys').' for '
+                            .$plan->product->name.' · '.$plan->name.'. Each key gives '.self::planLength($plan).'.';
+                    }),
+                    Text::make('You can copy the keys or download them as a text file on the next screen.'),
+                ]),
+            ])->modalSubmitActionLabel('Generate keys')->action(function (array $data, $livewire): void {
                 $plan = LicensePlan::where('product_id', $data['product_id'])->whereKey($data['plan_id'])->firstOrFail();
                 $connection = empty($data['connection_id']) ? null : ApiConnection::whereKey($data['connection_id'])->firstOrFail();
                 $batch = app(Keys::class)->issue($plan, (int) $data['quantity'], new IssueContext(source: 'admin', actor: self::actor(), connection: $connection, label: $data['label'] ?? null));
@@ -151,14 +175,22 @@ class LicensingActions
             });
     }
 
+    private static function planLength(LicensePlan $plan): string
+    {
+        $days = $plan->getRawOriginal('duration_days');
+
+        return $days === null ? 'lifetime access' : TimeLeft::duration((int) $days * 86400);
+    }
+
     public static function giveLicense(): Action
     {
-        return Action::make('give_license')->label('Give license')->authorize(fn (): bool => AdminAccess::isAdmin())
+        return Action::make('give_license')->label('Give license')->icon(Heroicon::OutlinedGift)->authorize(fn (): bool => AdminAccess::isAdmin())
+            ->modalDescription('Gives a customer a license right away, without a key. Use it for refunds, testers or giveaways.')
             ->schema([self::userSelect()->label('Customer'),
                 Select::make('product_id')->label('Product')->options(fn () => Product::pluck('name', 'id'))->live()->required(),
                 Select::make('plan_id')->label('Plan')->options(fn (Get $get) => LicensePlan::where('product_id', $get('product_id'))->where('is_active', true)->pluck('name', 'id'))
                     ->requiredWithout('custom_days'),
-                TextInput::make('custom_days')->label('Custom days (optional)')->integer()->minValue(1)->maxValue(LicenseDuration::MAXIMUM_DAYS),
+                TextInput::make('custom_days')->label('Or a custom number of days')->integer()->minValue(1)->maxValue(LicenseDuration::MAXIMUM_DAYS),
             ])->action(function (array $data): void {
                 DB::transaction(function () use ($data): void {
                     $plan = LicensePlan::where('product_id', $data['product_id'])->where('is_active', true)
@@ -167,7 +199,7 @@ class LicensingActions
                     $batch = app(Keys::class)->issue($plan, 1, new IssueContext(source: 'admin', actor: self::actor(), customDays: empty($data['custom_days']) ? null : (int) $data['custom_days']));
                     app(ClaimLicense::class)->claimFor(self::actor(), ConfiguredUserModel::className()::findOrFail($data['user_id']), $batch->keys->firstOrFail());
                 });
-                Notification::make()->title('License given')->success()->send();
+                Notification::make()->title('License given')->body('The customer can use the product now.')->success()->send();
             });
     }
 
@@ -210,22 +242,26 @@ class LicensingActions
 
     public static function claim(): Action
     {
-        return Action::make('claim')->authorize(fn (): bool => AdminAccess::isAdmin())->label('Redeem for customer')->visible(fn (LicenseKey $record): bool => $record
-            ->redeemed_at === null && $record->cancelled_at === null)
-            ->schema([self::userSelect()])
+        return Action::make('claim')->authorize(fn (): bool => AdminAccess::isAdmin())->label('Redeem for a customer')->icon(Heroicon::OutlinedUserPlus)
+            ->visible(fn (LicenseKey $record): bool => $record->redeemed_at === null && $record->cancelled_at === null)
+            ->schema([self::userSelect()->label('Customer')])
             ->action(function (LicenseKey $record, array $data): void {
                 app(ClaimLicense::class)->claimFor(self::actor(), ConfiguredUserModel::className()::findOrFail($data['user_id']), $record);
+                Notification::make()->title('Key redeemed for the customer')->success()->send();
             });
     }
 
     public static function revokeKey(): Action
     {
-        return Action::make('revoke_key')->label('Cancel key')->requiresConfirmation()
-            ->modalDescription('Cancels this unused key. Existing licenses keep their time.')
+        return Action::make('revoke_key')->label('Cancel key')->icon(Heroicon::OutlinedXCircle)->requiresConfirmation()->modalIcon(Heroicon::OutlinedXCircle)
+            ->modalDescription('This key stops working. Nobody has redeemed it yet, so no customer loses time.')
             ->authorize(fn (LicenseKey $record): bool => self::mayChange($record))->color('danger')->visible(fn (LicenseKey $record): bool => $record
             ->redeemed_at === null && $record->cancelled_at === null)
-            ->schema([Textarea::make('reason')->maxLength(2000)])
-            ->action(fn (LicenseKey $record, array $data) => app(ManageKeys::class)->revokeKey($record, self::actor(), ($data['reason'] ?? null)));
+            ->schema([Textarea::make('reason')->label('Note (optional)')->maxLength(2000)])
+            ->action(function (LicenseKey $record, array $data): void {
+                app(ManageKeys::class)->revokeKey($record, self::actor(), ($data['reason'] ?? null));
+                Notification::make()->title('Key cancelled')->success()->send();
+            });
     }
 
     public static function suspend(): Action

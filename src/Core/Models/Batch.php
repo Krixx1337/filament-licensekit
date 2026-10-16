@@ -23,6 +23,9 @@ use LicenseKit\Database\Factories\Core\BatchFactory;
  * @property int|null $api_connection_id
  * @property LicensePlan $plan
  * @property Collection<int, LicenseKey> $keys
+ * @property-read int|null $redeemed_count from BatchResource's withCount
+ * @property-read int|null $unused_count
+ * @property-read int|null $cancelled_count
  */
 class Batch extends Model
 {

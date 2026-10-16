@@ -7,6 +7,7 @@ use Filament\Support\Contracts\HasIcon;
 use Filament\Support\Contracts\HasLabel;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use LicenseKit\Core\Models\LicenseKey;
 
 enum KeyStatus: string implements HasColor, HasIcon, HasLabel
@@ -25,8 +26,10 @@ enum KeyStatus: string implements HasColor, HasIcon, HasLabel
     }
 
     /**
-     * @param  Builder<LicenseKey>  $query
-     * @return Builder<LicenseKey>
+     * @template TModel of Model
+     *
+     * @param  Builder<TModel>  $query
+     * @return Builder<TModel>
      */
     public function scope(Builder $query): Builder
     {

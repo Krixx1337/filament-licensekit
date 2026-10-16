@@ -6,7 +6,7 @@ use LicenseKit\Core\Data\IssueContext;
 use LicenseKit\Core\Models\Batch;
 use LicenseKit\Core\Models\LicensePlan;
 use LicenseKit\Filament\Resources\LicenseKeys\Pages\ManageLicenseKeys;
-use LicenseKit\Filament\Resources\Products\Pages\ManageProducts;
+use LicenseKit\Filament\Resources\Products\Pages\CreateProduct;
 use LicenseKit\Tests\Filament\Fixtures\User;
 use Livewire\Livewire;
 
@@ -24,19 +24,19 @@ test('core resources require panel registration and host gate', function () {
 test('product creation validates catalog settings and records panel actor once', function () {
     $admin = adminUser();
     $data = ['plans' => [], 'name' => 'Software', 'slug' => 'software', 'status' => 'active'];
-    Livewire::test(ManageProducts::class)->callAction('create', data: $data)->assertHasNoActionErrors();
+    Livewire::test(CreateProduct::class)->fillForm($data)->call('create')->assertHasNoFormErrors();
     $this->assertDatabaseHas('licensekit_products', ['slug' => 'software']);
     $this->assertDatabaseCount('licensekit_activity_log', 1);
     $this->assertDatabaseHas('licensekit_activity_log', ['actor' => 'user:'.$admin->id, 'event' => 'product_created']);
-    Livewire::test(ManageProducts::class)->callAction('create', data: [...$data, 'slug' => 'Bad Slug'])->assertHasActionErrors();
+    Livewire::test(CreateProduct::class)->fillForm([...$data, 'slug' => 'Bad Slug'])->call('create')->assertHasFormErrors(['slug']);
     $this->assertDatabaseCount('licensekit_products', 1);
 });
 
 test('permission removal after component mount rejects create', function () {
     adminUser();
-    $component = Livewire::test(ManageProducts::class)->mountAction('create');
+    $component = Livewire::test(CreateProduct::class)->fillForm(['name' => 'Software', 'slug' => 'software', 'status' => 'active', 'plans' => []]);
     Gate::define('licensekit.admin', fn () => false);
-    $component->callMountedAction()->assertForbidden();
+    $component->call('create')->assertForbidden();
     $this->assertDatabaseCount('licensekit_products', 0);
 });
 

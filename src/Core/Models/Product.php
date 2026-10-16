@@ -61,6 +61,12 @@ class Product extends Model
             && $this->free_from->lessThanOrEqualTo(now()) && $this->free_until->isFuture();
     }
 
+    /** @return HasMany<License, $this> */
+    public function licenses(): HasMany
+    {
+        return $this->hasMany(License::class);
+    }
+
     /** @return HasMany<LicensePlan, $this> */
     public function plans(): HasMany
     {

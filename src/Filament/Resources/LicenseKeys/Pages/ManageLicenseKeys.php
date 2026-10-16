@@ -3,9 +3,13 @@
 namespace LicenseKit\Filament\Resources\LicenseKeys\Pages;
 
 use Filament\Resources\Pages\ManageRecords;
+use Filament\Schemas\Components\Tabs\Tab;
+use Illuminate\Database\Eloquent\Builder;
+use LicenseKit\Core\Models\LicenseKey;
 use LicenseKit\Filament\Actions\LicensingActions;
 use LicenseKit\Filament\Concerns\DisplaysLicensingErrors;
 use LicenseKit\Filament\Concerns\ShowsResult;
+use LicenseKit\Filament\Enums\KeyStatus;
 use LicenseKit\Filament\Resources\LicenseKeys\LicenseKeyResource;
 
 class ManageLicenseKeys extends ManageRecords
@@ -23,5 +27,17 @@ class ManageLicenseKeys extends ManageRecords
     protected function getHeaderActions(): array
     {
         return [LicensingActions::createKeys()];
+    }
+
+    public function getTabs(): array
+    {
+        $tabs = ['all' => Tab::make('All')->badge(fn (): int => LicenseKey::query()->count())->deferBadge()];
+        foreach (KeyStatus::cases() as $status) {
+            $tabs[$status->value] = Tab::make($status->getLabel())->icon($status->getIcon())
+                ->badge(fn (): int => $status->scope(LicenseKey::query())->count())->badgeColor($status->getColor())->deferBadge()
+                ->modifyQueryUsing(fn (Builder $query): Builder => $status->scope($query));
+        }
+
+        return $tabs;
     }
 }

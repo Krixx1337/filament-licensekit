@@ -10,7 +10,7 @@ use LicenseKit\Core\Models\LicensePlan;
 use LicenseKit\Core\Models\Product;
 use LicenseKit\Filament\Resources\LicenseKeys\Pages\ManageLicenseKeys;
 use LicenseKit\Filament\Resources\Licenses\Pages\ManageLicenses;
-use LicenseKit\Filament\Resources\Products\Pages\ManageProducts;
+use LicenseKit\Filament\Resources\Products\Pages\ListProducts;
 use LicenseKit\Tests\Filament\Fixtures\UlidAdminUser;
 use LicenseKit\Tests\Filament\Fixtures\User;
 use LicenseKit\Tests\Filament\Fixtures\UuidAdminUser;
@@ -81,7 +81,7 @@ test('product add time action previews and extends running licenses', function (
     $running = License::factory()->create(['product_id' => $product->id, 'user_id' => User::factory()->create()->id, 'expires_at' => now()->addDay()]);
     $expired = License::factory()->create(['product_id' => $product->id, 'user_id' => User::factory()->create()->id, 'expires_at' => now()->subHour()]);
 
-    Livewire::test(ManageProducts::class)->mountTableAction('add_time', $product)
+    Livewire::test(ListProducts::class)->mountTableAction('add_time', $product)
         ->assertFormFieldHidden('since')
         ->setTableActionData(['duration' => 2, 'unit' => '3600'])
         ->callMountedTableAction()->assertHasNoTableActionErrors()->assertNotified('Added time to 1 license');
@@ -96,7 +96,7 @@ test('product add time action can include recently expired licenses', function (
     $product = Product::factory()->create();
     $expired = License::factory()->create(['product_id' => $product->id, 'user_id' => User::factory()->create()->id, 'expires_at' => now()->subHour()]);
 
-    Livewire::test(ManageProducts::class)->callTableAction('add_time', $product, data: [
+    Livewire::test(ListProducts::class)->callTableAction('add_time', $product, data: [
         'duration' => 1, 'unit' => '86400', 'include_expired' => true, 'since' => now()->subHours(3)->setTimezone(config('app.timezone'))->format('Y-m-d H:i'),
     ])->assertHasNoTableActionErrors();
 
