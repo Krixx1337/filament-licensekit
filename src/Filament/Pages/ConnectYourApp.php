@@ -136,7 +136,8 @@ class ConnectYourApp extends LicenseKitPage
             Section::make('3. Example code')->icon(Heroicon::OutlinedCodeBracket)
                 ->description('Copy one into your app. Only run your software while the heartbeat says access is true.')
                 ->schema([Tabs::make('languages')->tabs(collect(['Python' => 'client.py', 'C#' => 'Client.cs', 'C++' => 'client.cpp', 'curl (testing only)' => 'client.sh'])
-                    ->map(fn (string $file, string $language): Tab => Tab::make($language)->schema([
+                    // Explicit keys: Filament keys tabs by label slug, and "C#" and "C++" both become "c".
+                    ->map(fn (string $file, string $language): Tab => Tab::make($language)->key('snippet-'.str_replace('.', '-', strtolower($file)))->schema([
                         TextEntry::make('snippet_'.md5($file))->hiddenLabel()->markdown()
                             ->state("```\n".$this->snippet($file, $base, $publicKey)."\n```")
                             ->copyable()->copyableState($this->snippet($file, $base, $publicKey))->copyMessage('Code copied'),

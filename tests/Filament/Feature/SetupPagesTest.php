@@ -14,7 +14,9 @@ test('connect your app shows readiness, key, addresses and code for the chosen p
     Livewire::withQueryParams(['product' => $beta->id])->test(ConnectYourApp::class)
         ->assertSee(['Loader API', 'Signing key', 'Ready', 'First app login', 'Not yet', '1. Copy your public key'])
         ->assertSee(url('api/licensekit/beta/login'))->assertDontSee(url('api/licensekit/alpha/login'))
-        ->assertSee(['Python', 'C#', 'pip install requests pynacl', 'What customers may see']);
+        ->assertSee(['Python', 'C#', 'pip install requests pynacl', 'What customers may see'])
+        // C# and C++ once shared a tab key, so they opened and closed together.
+        ->assertSee(['snippet-client-cs', 'snippet-client-cpp']);
 });
 
 test('connect your app asks for a product first', function () {
