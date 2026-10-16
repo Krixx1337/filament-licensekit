@@ -55,6 +55,7 @@ class ManagementQueries
     /** @return Builder<Batch> */
     private function batchesFor(ManagementAuthorization $context): Builder
     {
-        return Batch::where('api_connection_id', $context->client->id);
+        return Batch::where(fn (Builder $query) => $query->where('api_connection_id', $context->client->id)
+            ->when($context->client->user_id !== null, fn (Builder $query) => $query->orWhere('reseller_id', $context->client->user_id)));
     }
 }

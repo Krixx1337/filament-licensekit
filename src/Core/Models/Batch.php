@@ -2,15 +2,19 @@
 
 namespace LicenseKit\Core\Models;
 
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use LicenseKit\Core\Casts\UtcDateTime;
+use LicenseKit\Core\Users\ConfiguredUserModel;
 use LicenseKit\Database\Factories\Core\BatchFactory;
 
 /**
+ * @property int|string|null $reseller_id
+ * @property Model|null $reseller
  * @property int $id
  * @property string $source
  * @property string $created_by
@@ -29,9 +33,15 @@ use LicenseKit\Database\Factories\Core\BatchFactory;
  */
 class Batch extends Model
 {
-    protected $fillable = ['source', 'created_by', 'issuance_key', 'request_hash', 'reference', 'plan_id', 'quantity', 'duration_days', 'label', 'api_connection_id'];
+    protected $fillable = ['reseller_id', 'source', 'created_by', 'issuance_key', 'request_hash', 'reference', 'plan_id', 'quantity', 'duration_days', 'label', 'api_connection_id'];
 
     protected $table = 'licensekit_batches';
+
+    /** @return BelongsTo<Model&Authenticatable, $this> */
+    public function reseller(): BelongsTo
+    {
+        return $this->belongsTo(ConfiguredUserModel::className(), 'reseller_id');
+    }
 
     protected static function newFactory(): BatchFactory
     {

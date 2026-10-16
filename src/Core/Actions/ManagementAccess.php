@@ -5,6 +5,7 @@ namespace LicenseKit\Core\Actions;
 use LicenseKit\Core\Data\ManagementAuthorization;
 use LicenseKit\Core\Exceptions\LicensingException;
 use LicenseKit\Core\Models\ApiConnection;
+use LicenseKit\Core\Users\UserAccess;
 
 class ManagementAccess
 {
@@ -16,6 +17,9 @@ class ManagementAccess
         $connection = ApiConnection::where('token_hash', hash('sha256', $bearer))->where('is_active', true)->first();
         if ($connection === null) {
             throw new LicensingException('invalid_token', 401);
+        }
+        if ($connection->user_id !== null && ($connection->user === null || ! app(UserAccess::class)->available($connection->user))) {
+            throw new LicensingException('user_unavailable', 403);
         }
         $connection->forceFill(['last_used_at' => now()])->save();
 

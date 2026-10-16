@@ -5,7 +5,9 @@ namespace LicenseKit\Core\Actions;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use LicenseKit\Core\Models\ApiConnection;
+use LicenseKit\Core\Users\ConfiguredUserModel;
 
 class ManageApiConnections
 {
@@ -14,7 +16,8 @@ class ManageApiConnections
     /** @param array<string, mixed> $data */
     public function save(?ApiConnection $connection, array $data, Model $actor): ApiConnection
     {
-        $data = Validator::make($data, ['name' => ['required', 'string', 'max:255'], 'is_active' => ['required', 'boolean'],
+        $data = Validator::make($data, ['user_id' => ['nullable', Rule::exists(ConfiguredUserModel::className(), (new (ConfiguredUserModel::className()))->getKeyName())],
+            'name' => ['required', 'string', 'max:255'], 'is_active' => ['required', 'boolean'],
             'allowed_product_ids' => ['nullable', 'array', 'list'], 'allowed_product_ids.*' => ['integer', 'distinct', 'exists:licensekit_products,id'],
             'max_per_request' => ['required', 'integer', 'min:1', 'max:'.config('licensekit.max_batch_size')]])->validate();
 

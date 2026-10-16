@@ -63,6 +63,8 @@ class LicenseKeyResource extends LicensingResource
                 ->description(fn (LicenseKey $record): ?string => $record->redeemed_at?->diffForHumans())
                 ->url(fn (LicenseKey $record) => $record->license_id === null ? null : LicenseResource::getUrl('view', ['record' => $record->license_id])),
             TextColumn::make('batch_id')->label('Batch')->formatStateUsing(fn ($state, LicenseKey $record): string => $record->batch->label ?? 'Batch #'.$state)
+                ->description(fn (LicenseKey $record): ?string => $record->batch->reseller === null ? null
+                    : 'Sold by '.$record->batch->reseller->getAttribute(config('licensekit.user_label')))
                 ->toggleable()->visibleFrom('lg'),
             TextColumn::make('created_at')->label('Created')->since()->dateTimeTooltip(timezone: config('app.timezone'))->toggleable(isToggledHiddenByDefault: true),
         ])->filters([
@@ -85,7 +87,7 @@ class LicenseKeyResource extends LicensingResource
     /** @return Builder<LicenseKey> */
     public static function getEloquentQuery(): Builder
     {
-        return LicenseKey::query()->with(['batch.plan.product', 'license.user']);
+        return LicenseKey::query()->with(['batch.plan.product', 'batch.reseller', 'license.user']);
     }
 
     public static function getPages(): array

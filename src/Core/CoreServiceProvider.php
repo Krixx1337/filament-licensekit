@@ -18,6 +18,7 @@ use LicenseKit\Core\Models\LoaderSession;
 use LicenseKit\Core\Observers\UserObserver;
 use LicenseKit\Core\Users\ConfiguredUserModel;
 use LicenseKit\Livewire\MyLicenses;
+use LicenseKit\Livewire\ResellerBatches;
 use Livewire\Livewire;
 
 class CoreServiceProvider extends ServiceProvider
@@ -62,6 +63,7 @@ class CoreServiceProvider extends ServiceProvider
         $this->loadViewsFrom(__DIR__.'/../../resources/views', 'licensekit');
         $this->publishes([__DIR__.'/../../resources/views' => resource_path('views/vendor/licensekit')], 'licensekit-views');
         Livewire::component('licensekit.my-licenses', MyLicenses::class);
+        Livewire::component('licensekit.reseller-batches', ResellerBatches::class);
         if (config('licensekit.portal_api_enabled') === true && is_string(config('licensekit.portal_api_prefix'))) {
             $this->loadRoutesFrom(__DIR__.'/../../routes/portal.php');
         }

@@ -86,10 +86,11 @@ class LicenseInfolist
                 ]),
             Section::make('Keys redeemed')->icon(Heroicon::OutlinedKey)->columnSpanFull()->schema([
                 RepeatableEntry::make('keys')->hiddenLabel()->placeholder('No keys redeemed yet.')
-                    ->table([TableColumn::make('Key'), TableColumn::make('Batch'), TableColumn::make('Redeemed')])
+                    ->table([TableColumn::make('Key'), TableColumn::make('Batch'), TableColumn::make('Sold by'), TableColumn::make('Redeemed')])
                     ->schema([
                         TextEntry::make('key')->fontFamily(FontFamily::Mono)->copyable()->copyMessage('Key copied'),
                         TextEntry::make('batch_id')->formatStateUsing(fn ($state, LicenseKey $record): string => $record->batch->label ?? 'Batch #'.$state),
+                        TextEntry::make('batch.reseller.'.config('licensekit.user_label'))->placeholder('Your shop'),
                         TextEntry::make('redeemed_at')->since()->dateTimeTooltip(timezone: config('app.timezone')),
                     ]),
             ]),

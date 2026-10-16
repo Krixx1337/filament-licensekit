@@ -29,7 +29,6 @@ use LicenseKit\Core\Actions\LicenseDuration;
 use LicenseKit\Core\Actions\ManageKeys;
 use LicenseKit\Core\Actions\ManageLicenses;
 use LicenseKit\Core\Data\IssueContext;
-use LicenseKit\Core\Models\ApiConnection;
 use LicenseKit\Core\Models\Batch;
 use LicenseKit\Core\Models\License;
 use LicenseKit\Core\Models\LicenseKey;
@@ -154,8 +153,7 @@ class LicensingActions
                         ->helperText('Up to '.config('licensekit.max_batch_size').' at once.'),
                     TextInput::make('label')->label('Label (optional)')->maxLength(255)->placeholder('For example: October giveaway')
                         ->helperText('Helps you find this batch later.'),
-                    Select::make('connection_id')->label('Store connection (optional)')->options(fn () => ApiConnection::where('is_active', true)->pluck('name', 'id'))
-                        ->helperText('Only if these keys are for a connected store.'),
+                    self::userSelect('reseller_id')->label('Reseller (optional)')->required(false)->helperText('Who these keys are for.'),
                 ]),
                 Step::make('Review')->description('Check and generate')->icon(Heroicon::OutlinedCheckCircle)->schema([
                     Text::make(function (Get $get): string {
@@ -169,8 +167,8 @@ class LicensingActions
                 ]),
             ])->modalSubmitActionLabel('Generate keys')->action(function (array $data, $livewire): void {
                 $plan = LicensePlan::where('product_id', $data['product_id'])->whereKey($data['plan_id'])->firstOrFail();
-                $connection = empty($data['connection_id']) ? null : ApiConnection::whereKey($data['connection_id'])->firstOrFail();
-                $batch = app(Keys::class)->issue($plan, (int) $data['quantity'], new IssueContext(source: 'admin', actor: self::actor(), connection: $connection, label: $data['label'] ?? null));
+                $reseller = empty($data['reseller_id']) ? null : ConfiguredUserModel::query()->whereKey($data['reseller_id'])->firstOrFail();
+                $batch = app(Keys::class)->issue($plan, (int) $data['quantity'], new IssueContext(source: 'admin', actor: self::actor(), reseller: $reseller, label: $data['label'] ?? null));
                 $livewire->replaceMountedAction('result', ['text' => $batch->keys->pluck('key')->implode("\n")]);
             });
     }

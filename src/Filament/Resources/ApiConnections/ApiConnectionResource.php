@@ -15,6 +15,7 @@ use Filament\Tables\Table;
 use LicenseKit\Core\Actions\ManageApiConnections;
 use LicenseKit\Core\Models\ApiConnection;
 use LicenseKit\Core\Models\Product;
+use LicenseKit\Filament\Actions\LicensingActions;
 use LicenseKit\Filament\AdminAccess;
 use LicenseKit\Filament\Navigation;
 use LicenseKit\Filament\Resources\ApiConnections\Pages\ManageApiConnections as ManageConnectionsPage;
@@ -42,6 +43,8 @@ class ApiConnectionResource extends LicensingResource
     {
         return $schema->components([
             TextInput::make('name')->required()->maxLength(255),
+            LicensingActions::userSelect()->label('Owner (optional)')->required(false)
+                ->helperText('The reseller who runs this bot. Suspending their account stops this token.'),
             Toggle::make('is_active')->label('Active')->default(true),
             Toggle::make('all_products')->label('All current and future products')->default(true)->live()->dehydrated(false)
                 ->afterStateHydrated(fn ($component, ?ApiConnection $record) => $record === null ? null : $component->state($record->allowed_product_ids === null)),
@@ -55,6 +58,7 @@ class ApiConnectionResource extends LicensingResource
     public static function table(Table $table): Table
     {
         return $table->columns([TextColumn::make('name')->searchable(), IconColumn::make('is_active')->label('Active')->boolean(),
+            TextColumn::make('user.'.config('licensekit.user_label'))->label('Owner')->placeholder('Your shop'),
             TextColumn::make('max_per_request')->label('Max keys'), TextColumn::make('last_used_at')->since()->placeholder('Never')])
             ->recordActions([
                 EditAction::make()->using(fn (ApiConnection $record, array $data) => app(ManageApiConnections::class)->save($record, $data, AdminAccess::actor())),

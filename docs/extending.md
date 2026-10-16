@@ -15,7 +15,13 @@ $batch = app(Keys::class)->issue($plan, 10, new IssueContext(
 $license = app(ClaimLicense::class)->claim($customer, $batch->keys[0]->key);
 ```
 
-Plans are `LicensePlan`. `duration_days=null` means lifetime. Batch stores duration snapshot. Context accepts source, reference, actor, connection, label, optional customDays. Sources: admin/api/app. Omitted reference is generated.
+Plans are `LicensePlan`. `duration_days=null` means lifetime. Batch stores duration snapshot. Context accepts source, reference, actor, connection, label, optional customDays and reseller. Sources: admin/api/app. Omitted reference is generated.
+
+## Reseller ownership
+
+`IssueContext::reseller` accepts a host user model. If omitted, issuance uses the connection's `user_id`. `Batch::reseller()` and `ApiConnection::user()` resolve the configured host user model. The nullable foreign keys are `licensekit_batches.reseller_id` and `licensekit_api_connections.user_id`; deleting the user sets them to null. `created_by` still records who generated the batch, independently of who bought it.
+
+`ResellerBatches::paginate($user, $perPage = 25)` returns batches with `total_count`, `redeemed_count`, `unused_count` and `cancelled_count`, plus their plan and product. Page size must be between 1 and 100. `unusedKeys($user, $batch)` exports unused serials and returns 404 for a batch assigned to someone else. See [selling keys](selling-keys.md) for host PHP and Livewire examples.
 
 ## Access and devices
 

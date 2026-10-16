@@ -8,13 +8,15 @@ Open **Keys → Generate keys**. Choose the product and plan, how many keys you 
 
 **Key batches** shows each batch with its progress, such as "12 of 50 redeemed". From a batch's menu you can download its unused keys, or cancel them after a leak or a reseller dispute. Customers who already redeemed keep their time. To take access away from one customer after a refund, open their license and choose **Manage → Cancel license**. A cancelled license gets no paid or free access and cannot be renewed until you restore it.
 
-## Store and reseller connections
+## Manual Telegram reseller
 
-Open **Setup → Store connections → New store connection**. Choose which products it may sell, the most keys it can request at once, and whether it is active. A connection can create keys for its products and read only the batches it made.
+Create a normal website account for the reseller. In **Keys > Generate keys**, choose that account under **Reseller (optional)**. Download the batch as a `.txt` file and send it through your usual channel. No API token is needed.
 
-Copy token from one-time modal. Only SHA-256 hash is stored. Regenerate invalidates old token immediately. Disable connection to stop API access without changing keys/licenses.
+Give the account access to your reseller page to see purchases and download unused keys. **Key batches** filters by reseller, and the license page shows who sold each redeemed key.
 
-Enable `store_api_enabled`. Default prefix is `/api/licensekit/store`.
+## Bot reseller
+
+Open **Setup > Store connections > New store connection**. Choose **Owner (optional)**, allowed products and a request cap. Enable `store_api_enabled`, then copy the token from the one-time modal. Only its SHA-256 hash is stored. Regenerating invalidates the old token immediately.
 
 ```sh
 curl -X POST 'https://your-site.test/api/licensekit/store/batches' \
@@ -23,16 +25,41 @@ curl -X POST 'https://your-site.test/api/licensekit/store/batches' \
   -d '{"plan_id":1,"quantity":10,"reference":"order-123","label":"October sale"}'
 ```
 
-Use stable reference per order. Identical retries return original batch and complete keys even after plan edits. Changed plan/quantity/custom duration returns 409. Connections have separate reference namespaces.
+New batches belong to the connection owner automatically. The bot can read its own batches and all batches assigned to its owner, including manual purchases. Other resellers' batches stay private. With `user_suspended_column` configured, suspending the owner's website account blocks the token on its next request with `user_unavailable` and HTTP 403. An owner must also satisfy the host's email verification requirement. An ownerless connection reads only its own batches.
 
-Catalog reads respect current allowed products. Past batch/key reads remain limited to connection's own batches even after product permissions change.
+Use a stable reference per order. Identical retries return the original batch and keys. Changing the plan, quantity, custom duration or reseller returns `batch_conflict` with HTTP 409. Each connection has its own reference namespace. Catalog reads respect allowed products; past batch reads remain available after product permissions change.
 
-| Method | Endpoint under store prefix |
+| Method | Endpoint under `/api/licensekit/store` |
 |---|---|
 | GET | `/products`, `/plans` |
 | POST | `/batches` |
 | GET | `/batches`, `/batches/{batch}`, `/batches/{batch}/keys` |
 
-Lists paginate, default 25, max 100. Key statuses are `all`, `unused`, `redeemed`, `cancelled`. Quantity is bounded by connection cap and package `max_batch_size`.
+Lists paginate, default 25, maximum 100. Key statuses are `all`, `unused`, `redeemed`, `cancelled`. Quantity is bounded by the connection cap and `max_batch_size`. Disable the connection to stop its API access.
 
-Store in same Laravel app can call `Keys::issue()` with stable `IssueContext::reference`. See [extending](extending.md). Trusted app calls need no token.
+## Your own wholesale page
+
+After your host app accepts payment, issue keys for the logged-in user. Payments, wallets, pricing and route access stay in your app.
+
+```php
+use LicenseKit\Core\Actions\Keys;
+use LicenseKit\Core\Actions\ResellerBatches;
+use LicenseKit\Core\Data\IssueContext;
+
+$batch = app(Keys::class)->issue($plan, $qty, new IssueContext(
+    source: 'app', reference: $orderId, reseller: auth()->user(),
+));
+
+$batches = app(ResellerBatches::class)->paginate($user);
+$keys = app(ResellerBatches::class)->unusedKeys($user, $batch);
+```
+
+`paginate()` includes total, redeemed, unused and cancelled counts. `unusedKeys()` returns a list of serials and responds with 404 for another reseller's batch. Suspended users cannot read or export inventory.
+
+Place this component on a host page protected by your authentication middleware:
+
+```blade
+<livewire:licensekit.reseller-batches />
+```
+
+It uses the configured LicenseKit guard and shows purchases with a `.txt` download for unused keys. Publish and style `resources/views/vendor/licensekit/reseller-batches.blade.php` with `php artisan vendor:publish --tag=licensekit-views`. No reseller role or panel access is required.

@@ -26,8 +26,9 @@ class Keys
             'label' => ['nullable', 'string', 'max:255'], 'custom_days' => ['nullable', 'integer', 'min:1', 'max:3650'],
         ])->validate();
         $identity = hash('sha256', json_encode([$context->source, $context->connection?->id, $reference], JSON_THROW_ON_ERROR));
-        $requestHash = hash('sha256', json_encode([$plan->id, $quantity, $context->customDays], JSON_THROW_ON_ERROR));
-        $operation = function () use ($plan, $quantity, $context, $reference, $identity, $requestHash): Batch {
+        $resellerId = $context->reseller?->getKey() ?? $context->connection?->user_id;
+        $requestHash = hash('sha256', json_encode([$plan->id, $quantity, $context->customDays, $resellerId], JSON_THROW_ON_ERROR));
+        $operation = function () use ($plan, $quantity, $context, $reference, $identity, $requestHash, $resellerId): Batch {
             $batch = Batch::where('issuance_key', $identity)->first();
             if ($batch !== null) {
                 if ($batch->request_hash !== $requestHash) {
@@ -43,7 +44,7 @@ class Keys
             $days = LicenseDuration::days($context->customDays ?? $plan->getRawOriginal('duration_days'));
             $batch = Batch::create(['source' => $context->source, 'reference' => $reference, 'issuance_key' => $identity,
                 'plan_id' => $plan->id, 'quantity' => $quantity, 'duration_days' => $days, 'request_hash' => $requestHash,
-                'label' => $context->label, 'api_connection_id' => $context->connection?->id,
+                'reseller_id' => $resellerId, 'label' => $context->label, 'api_connection_id' => $context->connection?->id,
                 'created_by' => $context->actor === null ? (($context->connection === null ? 'App' : $context->connection->name)) : (string) $context->actor
                     ->getAttribute(config('licensekit.user_label'))]);
             $this->generate($plan, $quantity, $batch->id);

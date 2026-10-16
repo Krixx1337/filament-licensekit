@@ -14,5 +14,6 @@ final readonly class IssueContext
         public ?ApiConnection $connection = null,
         public ?string $label = null,
         public ?int $customDays = null,
+        public ?Model $reseller = null,
     ) {}
 }

@@ -30,6 +30,7 @@ return new class extends Migration
         });
         Schema::create('licensekit_api_connections', function (Blueprint $table): void {
             $table->id();
+            $table->foreignIdFor(ConfiguredUserModel::className(), 'user_id')->nullable()->constrained()->nullOnDelete();
             $table->string('name');
             $table->boolean('is_active')->default(true);
             $table->string('token_hash', 64)->nullable()->unique();
@@ -41,6 +42,7 @@ return new class extends Migration
         Schema::create('licensekit_batches', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('api_connection_id')->nullable()->constrained('licensekit_api_connections')->nullOnDelete();
+            $table->foreignIdFor(ConfiguredUserModel::className(), 'reseller_id')->nullable()->constrained()->nullOnDelete();
             $table->string('created_by');
             $table->string('source', 8);
             $table->string('issuance_key', 64)->unique();
@@ -52,6 +54,7 @@ return new class extends Migration
             $table->string('label')->nullable();
             $table->timestamps();
             $table->index(['api_connection_id', 'id']);
+            $table->index(['reseller_id', 'id']);
         });
         Schema::create('licensekit_licenses', function (Blueprint $table): void {
             $table->id();

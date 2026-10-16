@@ -19,6 +19,12 @@ class ViewLicense extends ViewRecord
 
     protected static string $resource = LicenseResource::class;
 
+    public function mount(int|string $record): void
+    {
+        parent::mount($record);
+        $this->getRecord()->load('keys.batch.reseller');
+    }
+
     public function getTitle(): string|Htmlable
     {
         $license = $this->getRecord();

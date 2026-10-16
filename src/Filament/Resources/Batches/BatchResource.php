@@ -45,8 +45,10 @@ class BatchResource extends LicensingResource
                     'admin' => 'Admin panel',
                     default => 'Your app',
                 }),
+            TextColumn::make('reseller.'.config('licensekit.user_label'))->label('Reseller')->placeholder('Your shop'),
             TextColumn::make('reference')->label('Order reference')->toggleable(isToggledHiddenByDefault: true),
         ])->filters([
+            SelectFilter::make('reseller_id')->label('Reseller')->relationship('reseller', config('licensekit.user_label'))->searchable(),
             SelectFilter::make('api_connection_id')->label('Store connection')->relationship('apiConnection', 'name')->searchable(),
         ])->recordActions([
             ActionGroup::make([LicensingActions::exportBatch(), LicensingActions::revokeBatch()]),
@@ -60,7 +62,7 @@ class BatchResource extends LicensingResource
     /** @return Builder<Batch> */
     public static function getEloquentQuery(): Builder
     {
-        return Batch::query()->with(['plan.product', 'apiConnection'])->withCount([
+        return Batch::query()->with(['plan.product', 'apiConnection', 'reseller'])->withCount([
             'keys as redeemed_count' => fn (Builder $query) => $query->whereNotNull('redeemed_at'),
             'keys as unused_count' => fn (Builder $query) => $query->whereNull('redeemed_at')->whereNull('cancelled_at'),
             'keys as cancelled_count' => fn (Builder $query) => $query->whereNotNull('cancelled_at'),
