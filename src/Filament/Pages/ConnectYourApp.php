@@ -8,6 +8,8 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Infolists\Components\CodeEntry;
 use Filament\Infolists\Components\KeyValueEntry;
+use Filament\Infolists\Components\RepeatableEntry;
+use Filament\Infolists\Components\RepeatableEntry\TableColumn;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Actions;
@@ -19,6 +21,7 @@ use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Schemas\Components\Text;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\FontFamily;
+use Filament\Support\Enums\TextSize;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Js;
 use LicenseKit\Core\Actions\AccessPolicy;
@@ -130,13 +133,18 @@ class ConnectYourApp extends LicenseKitPage
             ])->from('md'),
             Section::make('1. Copy your public key')->icon(Heroicon::OutlinedKey)
                 ->description('Paste it into your app. It proves that answers really come from your server.')
-                ->schema([TextEntry::make('public_key')->hiddenLabel()->state($publicKey ?? 'Not set up yet')->fontFamily(FontFamily::Mono)
-                    ->copyable($publicKey !== null)->copyMessage('Public key copied')]),
-            Section::make('2. Your app talks to these addresses')->icon(Heroicon::OutlinedGlobeAlt)->columns(['md' => 2])
-                ->description('Send every request as JSON with a random "nonce". The example code below does this for you.')
-                ->schema(collect(['login' => 'Sign in', 'heartbeat' => 'Check every minute', 'redeem' => 'Redeem a key', 'move-device' => 'Move to a new PC'])
-                    ->map(fn (string $label, string $path) => TextEntry::make('endpoint_'.$path)->label($label)->state('POST '.$base.'/'.$path)
-                        ->fontFamily(FontFamily::Mono)->copyable()->copyableState($base.'/'.$path)->copyMessage('Address copied'))->values()->all()),
+                ->schema([$this->chip('public_key', $publicKey, 'Public key copied')]),
+            Section::make('2. Your app talks to these addresses')->icon(Heroicon::OutlinedGlobeAlt)
+                ->description('Every address starts with the base address. The example code already uses it.')
+                ->schema([
+                    $this->chip('base', $base, 'Base address copied')->label('Base address')->hiddenLabel(false),
+                    RepeatableEntry::make('endpoints')->hiddenLabel()->contained(false)
+                        ->state(collect(['login' => 'Sign in', 'heartbeat' => 'Check access, every 60 seconds', 'redeem' => 'Redeem a key',
+                            'move-device' => 'Move the license to a new PC'])->map(fn (string $what, string $path): array => ['what' => $what, 'path' => 'POST /'.$path])
+                            ->values()->all())
+                        ->table([TableColumn::make('What it does'), TableColumn::make('Address')])
+                        ->schema([TextEntry::make('what'), TextEntry::make('path')->fontFamily(FontFamily::Mono)->badge()->color('gray')]),
+                ]),
             Section::make('3. Example code')->icon(Heroicon::OutlinedCodeBracket)
                 ->description('Pick your language. Only run your software while the heartbeat says access is true.')
                 ->schema([Tabs::make('languages')->tabs($this->codeTabs($base, $publicKey))]),
@@ -188,6 +196,14 @@ class ConnectYourApp extends LicenseKitPage
         }
 
         return $tabs;
+    }
+
+    /** A short copyable value shown as a chip with a copy icon. */
+    private function chip(string $name, ?string $value, string $copied): TextEntry
+    {
+        return TextEntry::make($name)->hiddenLabel()->state($value ?? 'Not set up yet')->fontFamily(FontFamily::Mono)->badge()->color('gray')->size(TextSize::Medium)
+            ->icon($value === null ? null : Heroicon::OutlinedClipboardDocument)->iconPosition('after')
+            ->copyable($value !== null)->copyMessage($copied)->tooltip($value === null ? null : 'Click to copy');
     }
 
     private function status(string $label, bool $good, string $yes, string $no): TextEntry

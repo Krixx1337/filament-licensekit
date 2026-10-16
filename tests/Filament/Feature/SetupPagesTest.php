@@ -15,7 +15,7 @@ test('connect your app shows readiness, key, addresses and code for the chosen p
 
     Livewire::withQueryParams(['product' => $beta->id])->test(ConnectYourApp::class)
         ->assertSee(['Loader API', 'Signing key', 'Ready', 'First app login', 'Not yet', '1. Copy your public key'])
-        ->assertSee(url('api/licensekit/beta/login'))->assertDontSee(url('api/licensekit/alpha/login'))
+        ->assertSee([url('api/licensekit/beta'), 'POST /login', 'POST /move-device'])->assertDontSee(url('api/licensekit/alpha'))
         ->assertSee(['Python', 'C#', 'What customers may see', 'Copy full example', 'Download client.py', 'Needs the requests and pynacl packages'])
         // Without phiki/phiki the code is not shown, only the copy and download buttons.
         ->assertDontSee('fi-in-code', false)
