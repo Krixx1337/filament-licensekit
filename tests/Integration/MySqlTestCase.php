@@ -1,13 +1,13 @@
 <?php
 
-namespace LicenseKit\Tests\Outages;
+namespace LicenseKit\Tests\Integration;
 
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Laravel\Sanctum\SanctumServiceProvider;
 use LicenseKit\LicenseKitServiceProvider;
 use LicenseKit\Tests\Core\Fixtures\ClientProtocolProvider;
-use LicenseKit\Tests\Outages\Fixtures\User;
+use LicenseKit\Tests\Integration\Fixtures\User;
 use Orchestra\Testbench\TestCase;
 use Symfony\Component\Process\Process;
 
@@ -41,7 +41,6 @@ class MySqlTestCase extends TestCase
         ]);
         $app['config']->set('auth.providers.users.model', User::class);
         $app['config']->set('licensekit.user.suspended_column', 'is_suspended');
-        $app['config']->set('licensekit.modules.outages', true);
         $app['config']->set('queue.default', 'null');
         $app['config']->set('session.driver', 'array');
         $app['config']->set('cache.default', 'array');

@@ -6,7 +6,6 @@ use Filament\Panel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\Queue;
 use LicenseKit\Core\Actions\ClaimLicense;
 use LicenseKit\Core\Actions\CreateBatch;
 use LicenseKit\Core\Actions\DeviceBindings;
@@ -29,14 +28,9 @@ use LicenseKit\Filament\Resources\AuditEvents\Pages\ManageAuditEvents;
 use LicenseKit\Filament\Resources\DeviceResetHistory\Pages\ManageDeviceResetHistory;
 use LicenseKit\Filament\Resources\Entitlements\Pages\ManageEntitlements as EntitlementsPage;
 use LicenseKit\Filament\Resources\LicensePlans\Pages\ManageLicensePlans;
-use LicenseKit\Filament\Resources\Outages\OutageResource;
 use LicenseKit\Filament\Resources\Products\Pages\ManageProducts;
 use LicenseKit\Filament\Resources\Products\ProductResource;
 use LicenseKit\LicenseKitPlugin;
-use LicenseKit\Modules\Outages\Actions\ManageOutages;
-use LicenseKit\Modules\Outages\Jobs\ApplyCompensation;
-use LicenseKit\Modules\Outages\Models\LicensingOperation;
-use LicenseKit\Modules\Outages\Models\Outage;
 use LicenseKit\Tests\Core\Fixtures\AdminPolicy;
 use LicenseKit\Tests\Filament\Fixtures\User;
 use Livewire\Livewire;
@@ -45,7 +39,7 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 function registerAdminPolicies(array $abilities): void
 {
     foreach ([Product::class, Provider::class, LicensePlan::class, LicenseKey::class, Entitlement::class,
-        LicensingBan::class, ApiClient::class, AuditEvent::class, DeviceResetHistory::class, Outage::class, LicensingOperation::class] as $model) {
+        LicensingBan::class, ApiClient::class, AuditEvent::class, DeviceResetHistory::class] as $model) {
         Gate::policy($model, AdminPolicy::class);
     }
     config(['testing.admin_abilities' => $abilities]);
@@ -98,11 +92,8 @@ test('all admin mutations deny policy refusal even when master gate allows', fun
     $client = ApiClient::factory()->create();
     $token = $client->createToken('existing')->accessToken;
     $ban = app(ManageLicensingBans::class)->create($user, $product, 'Fixture', $actor);
-    $outage = app(ManageOutages::class)->start($product, 'fixture-outage', 'Fixture', $actor);
-    $outage->operation->update(['status' => 'failed']);
     registerAdminPolicies([]);
     $audits = AuditEvent::count();
-    Queue::fake([ApplyCompensation::class]);
     $call = match ($operation) {
         'createKeys' => fn () => app(CreateBatch::class)->createFor($actor, $plan, 1, 'denied'),
         'claim' => fn () => app(ClaimLicense::class)->claimFor($actor, $user, $key),
@@ -118,12 +109,7 @@ test('all admin mutations deny policy refusal even when master gate allows', fun
         'update_client' => fn () => app(ManageApiClients::class)->save($client, ['name' => 'Denied'], $actor),
         'rotate_token' => fn () => app(ManageApiClients::class)->rotate($client, CarbonImmutable::now()->addYear(), $actor),
         'revoke_tokens' => fn () => app(ManageApiClients::class)->revoke($client, $actor),
-        'start_outage' => fn () => app(ManageOutages::class)->start($product, 'denied', 'Denied', $actor),
-        'stop_outage' => fn () => app(ManageOutages::class)->stop($outage, false, $actor),
-        'preview' => fn () => app(ManageOutages::class)->preview($product, CarbonImmutable::now(), $actor),
-        'add_time' => fn () => app(ManageOutages::class)->addTime($product, 60, CarbonImmutable::now(), 'denied', 'Denied', $actor),
-        'retry' => fn () => app(ManageOutages::class)->retry($outage->operation, $actor),
-        'cancel' => fn () => app(ManageOutages::class)->cancel($outage->operation, $actor),
+        'add_time' => fn () => app(ManageEntitlements::class)->addTimeToProduct($product, 60, $actor, 'Denied'),
         'create_catalog' => fn () => CatalogWrites::create(Product::class, ['name' => 'Denied', 'slug' => 'denied'], $actor),
         'update_catalog' => fn () => CatalogWrites::update($product, ['name' => 'Denied'], $actor),
     };
@@ -132,15 +118,13 @@ test('all admin mutations deny policy refusal even when master gate allows', fun
         ->and($key->fresh()->claimed_at)->toBeNull()->and($key->fresh()->revoked_at)->toBeNull()
         ->and($binding->fresh()->hwid)->not->toBeNull()
         ->and($ban->fresh()->lifted_at)->toBeNull()
-        ->and($token->fresh())->not->toBeNull()->and($outage->fresh()->stopped_at)->toBeNull()
-        ->and($outage->operation->fresh()->status)->toBe('failed')
+        ->and($token->fresh())->not->toBeNull()
         ->and($entitlement->fresh()->is_revoked)->toBeFalse()->and($entitlement->fresh()->is_blocked)->toBeFalse();
     $this->assertDatabaseCount('licensekit_license_keys', 1);
     $this->assertDatabaseCount('licensekit_api_clients', 1);
-    Queue::assertNothingPushed();
 })->with(['createKeys', 'claim', 'revoke_key', 'revoke', 'restoreAccess', 'block', 'unblock', 'reset',
     'create_ban', 'lift_ban', 'create_client', 'update_client',
-    'rotate_token', 'revoke_tokens', 'start_outage', 'stop_outage', 'preview', 'add_time', 'retry', 'cancel',
+    'rotate_token', 'revoke_tokens', 'add_time',
     'create_catalog', 'update_catalog']);
 
 test('policy permission loss after modal mount refuses creation without affecting resource browsing', function () {
@@ -236,30 +220,6 @@ test('catalog create and update use model policies without panel dependency', fu
     expect($product->fresh()->name)->toBe('Edited');
 });
 
-test('outage start stop preview credit retry and cancel use their exact policy abilities', function () {
-    $actor = adminUser();
-    Gate::define('licensekit.manage', fn () => false);
-    registerAdminPolicies(['startOutage']);
-    $product = Product::factory()->create();
-    $service = app(ManageOutages::class);
-    $outage = $service->start($product, 'incident', 'Maintenance', $actor);
-    config(['testing.admin_abilities' => ['stop']]);
-    $service->stop($outage, false, $actor);
-    expect($outage->fresh()->ended_at)->not->toBeNull();
-    config(['testing.admin_abilities' => ['addTime']]);
-    expect($service->preview($product, CarbonImmutable::now(), $actor))->toBe(0);
-    Queue::fake([ApplyCompensation::class]);
-    $operation = $service->addTime($product, 60, CarbonImmutable::now(), 'bonus', 'Goodwill', $actor);
-    $operation->update(['status' => 'failed']);
-    config(['testing.admin_abilities' => ['retry']]);
-    $service->retry($operation, $actor);
-    expect($operation->fresh()->status)->toBe('pending');
-    config(['testing.admin_abilities' => ['cancel']]);
-    $service->cancel($operation, $actor);
-    expect($operation->fresh()->status)->toBe('canceled');
-    Queue::assertPushed(ApplyCompensation::class, 2);
-});
-
 test('device policies receive target user and reject another record or stale suspended actor', function () {
     $actor = adminUser();
     registerAdminPolicies(['viewAny', 'resetHwid', 'inspectDevice']);
@@ -319,8 +279,6 @@ test('display checks refresh actor once while policies and resource eligibility 
     config(['testing.admin_abilities' => []]);
     expect(AdminAccess::can('viewAny', Product::class, ProductResource::class))->toBeFalse();
     expect(AdminAccess::allowed('UnregisteredResource'))->toBeFalse();
-    config(['licensekit.modules.outages' => false]);
-    expect(AdminAccess::allowed(OutageResource::class))->toBeFalse();
     Filament::setCurrentPanel(Panel::make()->id('no-plugin')->authGuard('staff'));
     expect(AdminAccess::allowed())->toBeFalse();
 });

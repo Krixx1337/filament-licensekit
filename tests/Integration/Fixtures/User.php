@@ -1,6 +1,6 @@
 <?php
 
-namespace LicenseKit\Tests\Outages\Fixtures;
+namespace LicenseKit\Tests\Integration\Fixtures;
 
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;

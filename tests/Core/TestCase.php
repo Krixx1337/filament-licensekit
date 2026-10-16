@@ -37,7 +37,6 @@ class TestCase extends OrchestraTestCase
         $app['config']->set('auth.providers.users.model', User::class);
         $app['config']->set('licensekit.user.suspended_column', 'is_suspended');
         $app['config']->set('host_client.enabled', $this->desktop);
-        $app['config']->set('licensekit.modules.free_access', $this->freeAccess);
         $app['config']->set('licensekit.management.enabled', $this->management);
         $app['config']->set('session.driver', 'array');
         $app['config']->set('cache.default', 'array');

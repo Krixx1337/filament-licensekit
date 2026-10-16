@@ -157,7 +157,7 @@ jobs:
           composer require --dev 'laravel/framework:13.*' 'orchestra/testbench:11.*' --no-update --no-interaction
           composer update --prefer-dist --no-interaction --no-progress
       - name: Run MySQL concurrency tests
-        run: php vendor/bin/pest tests/Outages/Integration
+        run: php vendor/bin/pest tests/Integration
         env:
           LICENSEKIT_MYSQL_TESTS: '1'
           DB_HOST: 127.0.0.1

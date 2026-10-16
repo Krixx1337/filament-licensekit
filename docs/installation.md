@@ -49,15 +49,11 @@ Product bans start on. Set `licensekit.features.licensing_bans` to `false` to st
 
 One account gets one PC per product. A second PC needs another account, or a reset.
 
-## Outages
+## Downtime and maintenance
 
-Outages are off:
+Turn on **Maintenance mode** on a product to stop the software for everyone, for example during a game update. Licenses keep their time.
 
-```php
-'modules' => ['outages' => false],
-```
-
-Set that to `true`, migrate, and rebuild the config, route, and Filament caches. Start outage and Add time then work on one product at a time. Add time can credit a day without an outage.
+Afterwards, use **Add time** on the product to give every running license the lost hours or days back. Paused licenses keep the time for later. You can also include licenses that expired after a chosen moment. It runs immediately and needs no queue worker.
 
 ## Optional Filament Shield
 
@@ -66,7 +62,7 @@ Shield is optional. Install [Filament Shield](https://github.com/bezhanSalleh/fi
 In `config/filament-shield.php`, merge this into `resources.manage`:
 
 ```php
-\LicenseKit\Filament\Resources\Products\ProductResource::class => ['viewAny', 'view', 'create', 'update', 'resetHwid', 'inspectDevice', 'startOutage', 'addTime'],
+\LicenseKit\Filament\Resources\Products\ProductResource::class => ['viewAny', 'view', 'create', 'update', 'resetHwid', 'inspectDevice', 'addTime'],
 \LicenseKit\Filament\Resources\LicensePlans\LicensePlanResource::class => ['viewAny', 'view', 'create', 'update', 'createKeys'],
 \LicenseKit\Filament\Resources\LicenseKeys\LicenseKeyResource::class => ['viewAny', 'view', 'claim', 'revoke', 'updateNote'],
 \LicenseKit\Filament\Resources\Batches\BatchResource::class => ['viewAny', 'view', 'exportUnclaimed', 'revokeUnclaimed'],
@@ -75,11 +71,9 @@ In `config/filament-shield.php`, merge this into `resources.manage`:
 \LicenseKit\Filament\Resources\ApiClients\ApiClientResource::class => ['viewAny', 'view', 'create', 'update', 'rotateToken', 'revokeTokens', 'retire'],
 \LicenseKit\Filament\Resources\AuditEvents\AuditEventResource::class => ['viewAny', 'view'],
 \LicenseKit\Filament\Resources\DeviceResetHistory\DeviceResetHistoryResource::class => ['viewAny', 'view'],
-\LicenseKit\Filament\Resources\Outages\OutageResource::class => ['viewAny', 'view', 'stop'],
-\LicenseKit\Filament\Resources\Compensations\CompensationResource::class => ['viewAny', 'view', 'retry', 'cancel'],
 ```
 
-Leave out LicensingBan when bans are off. Leave out Outages, Compensations, and Product `startOutage` / `addTime` when outages are off. Keep class-level `viewAny` and `create` in `policies.single_parameter_methods`. The other abilities need a record. `policies.merge=false` replaces the list for every resource in that config, so include your own resources too.
+Leave out LicensingBan when bans are off. Keep class-level `viewAny` and `create` in `policies.single_parameter_methods`. The other abilities need a record. `policies.merge=false` replaces the list for every resource in that config, so include your own resources too.
 
 ```sh
 php artisan shield:generate --all --panel=admin --no-interaction
@@ -100,16 +94,14 @@ foreach ([
     \LicenseKit\Core\Models\ApiClient::class => \App\Policies\ApiClientPolicy::class,
     \LicenseKit\Core\Models\AuditEvent::class => \App\Policies\AuditEventPolicy::class,
     \LicenseKit\Core\Models\DeviceResetHistory::class => \App\Policies\DeviceResetHistoryPolicy::class,
-    \LicenseKit\Modules\Outages\Models\Outage::class => \App\Policies\OutagePolicy::class,
-    \LicenseKit\Modules\Outages\Models\LicensingOperation::class => \App\Policies\LicensingOperationPolicy::class,
 ] as $model => $policy) {
     Gate::policy($model, $policy);
 }
 ```
 
-For a helper role, grant Entitlement `viewAny` / `view`, Product `resetHwid` / `inspectDevice`, and LicensingBan `viewAny` / `view` / `create` / `lift`. Add reset-history `viewAny` / `view` only if they should see past resets. Leave out key creation, plans, API clients, and outages.
+For a helper role, grant Entitlement `viewAny` / `view`, Product `resetHwid` / `inspectDevice`, and LicensingBan `viewAny` / `view` / `create` / `lift`. Add reset-history `viewAny` / `view` only if they should see past resets. Leave out key creation, plans, API clients, and product-wide Add time.
 
-Grant Entitlement `extend`, `pause`, and `resume` separately when staff should manage individual license time. These actions work with outages disabled and require a reason. See [individual license support](client.md#individual-license-support) for behavior and outage conflicts.
+Grant Entitlement `extend`, `pause`, and `resume` separately when staff should manage individual license time. These actions require a reason. See [individual license support](client.md#individual-license-support) for behavior.
 
 A missing policy method denies the action. `licensekit.manage` cannot override that. Clear caches after you change this.
 

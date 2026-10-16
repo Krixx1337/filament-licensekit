@@ -14,11 +14,10 @@ use LicenseKit\Core\Models\Entitlement;
 use LicenseKit\Core\Models\LicenseKey;
 use LicenseKit\Core\Models\Product;
 use LicenseKit\Core\Users\UserAccess;
-use LicenseKit\Support\OutageState;
 
 class ClaimLicense
 {
-    public function __construct(private SerialKey $serial, private EntitlementClock $clock, private UserAccess $users, private Audit $audit, private LicensingBans $bans, private OutageState $outages, private AccessRestrictions $restrictions) {}
+    public function __construct(private SerialKey $serial, private EntitlementClock $clock, private UserAccess $users, private Audit $audit, private LicensingBans $bans, private AccessRestrictions $restrictions) {}
 
     public function claimFor(Model $actor, Model $user, LicenseKey $key): Entitlement
     {
@@ -69,7 +68,6 @@ class ClaimLicense
         if ($key->claimed_at !== null) {
             throw new LicensingException('key_already_claimed', 409);
         }
-        $this->outages->assertClaim($key->plan->product_id);
         $this->bans->assertAllowed($user, $key->plan->product);
         $ownership = ['user_id' => $user->getKey(), 'product_id' => $key->plan->product_id];
         $entitlement = Entitlement::where($ownership)->lockForUpdate()->first();

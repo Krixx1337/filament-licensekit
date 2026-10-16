@@ -11,11 +11,10 @@ use LicenseKit\Core\Exceptions\LicensingException;
 use LicenseKit\Core\Models\Entitlement;
 use LicenseKit\Core\Models\Product;
 use LicenseKit\Core\Users\UserAccess;
-use LicenseKit\Support\OutageState;
 
 class AccessPolicy
 {
-    public function __construct(private UserAccess $users, private AccessRestrictions $restrictions, private EntitlementClock $clock, private ReadinessCheck $readiness, private LicensingBans $bans, private OutageState $outages) {}
+    public function __construct(private UserAccess $users, private AccessRestrictions $restrictions, private EntitlementClock $clock, private ReadinessCheck $readiness, private LicensingBans $bans) {}
 
     public function authorize(Model $user, Product $product, ?CarbonImmutable $freeUntil = null): AccessAuthorization
     {
@@ -51,7 +50,6 @@ class AccessPolicy
             throw new LicensingException('user_unavailable');
         }
         $this->bans->assertAllowed($user, $product);
-        $this->outages->assertAccess($product->id);
         if (! $product->is_enabled || $product->is_blocked) {
             throw new LicensingException('service_unavailable');
         }

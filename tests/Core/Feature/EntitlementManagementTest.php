@@ -97,17 +97,6 @@ test('extension accepts duration boundaries without timestamp overflow', functio
     expect($entitlement->fresh()->expires_at->toIso8601String())->toBe($expected);
 })->with([[1, '2038-01-19T03:14:08+00:00'], [315360000, '2048-01-17T03:14:07+00:00']]);
 
-test('clock changes fail closed when enabled outage tables are missing', function () {
-    $actor = testAdminActor();
-    $entitlement = Entitlement::factory()->create(['user_id' => User::factory()->create()->id]);
-    $before = $entitlement->fresh()->getAttributes();
-    config(['licensekit.modules.outages' => true]);
-
-    expect(fn () => app(ManageEntitlements::class)->extend($entitlement, 3600, $actor, 'Support'))->toThrow(LicensingException::class, 'licensing unavailable');
-
-    expect($entitlement->fresh()->getAttributes())->toBe($before);
-});
-
 test('clock changes reject unavailable licenses', function (string $operation, array $state) {
     $actor = testAdminActor();
     $entitlement = Entitlement::factory()->create(['user_id' => User::factory()->create()->id, ...$state]);

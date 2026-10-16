@@ -6,7 +6,7 @@ use LicenseKit\Core\Models\AuditEvent;
 use LicenseKit\Core\Models\Entitlement;
 use LicenseKit\Core\Models\LicensePlan;
 use LicenseKit\Tests\Core\Fixtures\ClientSessions;
-use LicenseKit\Tests\Outages\Fixtures\User;
+use LicenseKit\Tests\Integration\Fixtures\User;
 
 test('MySQL committed ban prevents usable sessions in either transaction order', function (string $operation, bool $banFirst) {
     $this->freezeTime();

@@ -1,6 +1,6 @@
 {
     "name": "licensekit/licensekit",
-    "description": "Software licensing APIs and Filament administration for Laravel, with optional outage compensation.",
+    "description": "Software licensing APIs and Filament administration for Laravel.",
     "keywords": ["laravel", "filament", "filament-plugin", "licensing", "license-keys", "hwid"],
     "homepage": "https://github.com/Krixx1337/filament-licensekit",
     "support": {

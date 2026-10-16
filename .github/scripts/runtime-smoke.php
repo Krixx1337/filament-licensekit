@@ -43,7 +43,6 @@ try {
             'database.connections.testing' => ['driver' => 'sqlite', 'database' => ':memory:', 'prefix' => '', 'foreign_key_constraints' => true],
             'cache.default' => 'array',
             'session.driver' => 'array',
-            'licensekit.modules.outages' => true,
             'licensekit.user.require_verified' => false,
         ]);
     });
@@ -65,7 +64,7 @@ try {
     }
     $migrator->run($migrator->paths());
 
-    foreach (['licensekit_products', 'licensekit_device_bindings', 'licensekit_outages', 'licensekit_compensation_entries'] as $table) {
+    foreach (['licensekit_products', 'licensekit_device_bindings'] as $table) {
         if (! Schema::hasTable($table)) {
             throw new RuntimeException('Missing migrated table: '.$table);
         }

@@ -44,9 +44,6 @@ class TestCase extends OrchestraTestCase
         $app['config']->set('auth.providers.users.model', User::class);
         $app['config']->set('auth.guards.staff', ['driver' => 'session', 'provider' => 'users']);
         $app['config']->set('licensekit.user.suspended_column', 'is_suspended');
-        $app['config']->set('licensekit.modules.outages', true);
-        $app['config']->set('licensekit.modules.free_access', $this->freeAccess);
-        $app['config']->set('licensekit.modules.downloads', true);
         $app['config']->set('session.driver', 'array');
         $app['config']->set('cache.default', 'array');
         $app['config']->set('view.paths', [__DIR__.'/../../vendor/orchestra/testbench-core/laravel/resources/views']);

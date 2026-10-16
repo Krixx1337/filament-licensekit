@@ -2,7 +2,10 @@
 
 namespace LicenseKit\Core\Actions;
 
+use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Query\Expression;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use LicenseKit\Core\Events\EntitlementAccessInvalidated;
@@ -11,11 +14,75 @@ use LicenseKit\Core\Models\Batch;
 use LicenseKit\Core\Models\Entitlement;
 use LicenseKit\Core\Models\LicenseKey;
 use LicenseKit\Core\Models\Product;
-use LicenseKit\Support\OutageState;
 
 class ManageEntitlements
 {
+    public const MAXIMUM_ADDED_SECONDS = 315360000;
+
     public function __construct(private Audit $audit) {}
+
+    /**
+     * Adds time to every running or paused license of a product, for example after downtime.
+     * Paused licenses bank the time. With $since, licenses that expired after that moment also get it.
+     */
+    public function addTimeToProduct(Product $product, int $seconds, Model $actor, ?string $reason = null, ?CarbonImmutable $since = null): int
+    {
+        if ($seconds < 1 || $seconds > self::MAXIMUM_ADDED_SECONDS) {
+            throw new LicensingException('invalid_duration', 422);
+        }
+        $since = $this->addTimeCutoff($since);
+        $reason = $this->optionalReason($reason);
+
+        return DB::transaction(function () use ($product, $seconds, $actor, $reason, $since): int {
+            $product = Product::whereKey($product->id)->lockForUpdate()->first() ?? throw new LicensingException('service_unavailable');
+            $this->authorize($actor, 'addTime', $product);
+            $now = CarbonImmutable::now('UTC')->format('Y-m-d H:i:s');
+            // $seconds is a validated integer, so interpolating it into the expression is safe.
+            $expiry = DB::getDriverName() === 'sqlite' ? "datetime(expires_at, '+{$seconds} seconds')" : "DATE_ADD(expires_at, INTERVAL {$seconds} SECOND)";
+            $running = $this->addTimeTargets($product, $since)->whereNull('paused_at')
+                ->update(['expires_at' => new Expression($expiry), 'updated_at' => $now]); // @phpstan-ignore argument.type (validated integer, see above)
+            $paused = $this->addTimeTargets($product, $since)->whereNotNull('paused_at')
+                ->increment('remaining_seconds', $seconds, ['updated_at' => $now]);
+            $this->audit->record('user:'.$actor->getKey(), 'product_time_added', $product, [],
+                ['seconds' => $seconds, 'since' => $since->toIso8601String(), 'license_count' => $running + $paused], $reason);
+
+            return $running + $paused;
+        }, 3);
+    }
+
+    /** Number of licenses addTimeToProduct would currently change. */
+    public function previewAddTimeToProduct(Product $product, ?CarbonImmutable $since = null): int
+    {
+        return $this->addTimeTargets($product, $this->addTimeCutoff($since))->count();
+    }
+
+    /** @return Builder<Entitlement> */
+    private function addTimeTargets(Product $product, CarbonImmutable $since): Builder
+    {
+        return Entitlement::query()->where('product_id', $product->id)->whereNotNull('user_id')
+            ->where('is_lifetime', false)->where('is_revoked', false)
+            ->where(fn ($query) => $query->whereNotNull('paused_at')->orWhere('expires_at', '>', $since->format('Y-m-d H:i:s')));
+    }
+
+    private function addTimeCutoff(?CarbonImmutable $since): CarbonImmutable
+    {
+        $now = CarbonImmutable::now('UTC')->startOfSecond();
+        if ($since !== null && $since->isAfter($now)) {
+            throw new LicensingException('invalid_eligibility_date', 422);
+        }
+
+        return ($since ?? $now)->utc()->startOfSecond();
+    }
+
+    private function optionalReason(?string $reason): ?string
+    {
+        $reason = trim($reason ?? '');
+        if (mb_strlen($reason) > 2000) {
+            throw new LicensingException('invalid_reason', 422);
+        }
+
+        return $reason === '' ? null : $reason;
+    }
 
     public function extend(Entitlement $entitlement, int $seconds, Model $actor, string $reason): void
     {
@@ -53,7 +120,6 @@ class ManageEntitlements
             if ($entitlement->user_id === null || $entitlement->is_lifetime || $entitlement->is_revoked) {
                 throw new LicensingException('cannot_'.$ability.'_entitlement', 409);
             }
-            app(OutageState::class)->assertClockChange($entitlement->product_id);
             $before = $entitlement->only(['expires_at', 'paused_at', 'remaining_seconds']);
             $clock = app(EntitlementClock::class);
             match ($ability) {

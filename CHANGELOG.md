@@ -3,6 +3,7 @@
 ## Unreleased
 
 - **Simplification (breaking):** removed historical imports (`ImportLicensing`, snapshot DTOs, `licensekit_import_records`, `imports.*` config) and replaceable key normalization (`KeyNormalizer`, `CanonicalKeys`, `key_normalizer` config). `SerialKey::normalize()` is the single key parser again, and the key column is back to the standard 29-character format. Initial migration changed; rebuild disposable databases.
+- **Simplification (breaking):** replaced the optional Outages module (incidents, compensation ledger, queued `ApplyCompensation` job, retry/cancel, `Service down` and `Added time` pages, `modules.outages` config and its migration) with a synchronous product **Add time** action (`ManageEntitlements::addTimeToProduct()`), which extends running licenses, banks time on paused ones and can include licenses that expired after a chosen moment. The product block toggle is now labelled **Maintenance mode**.
 - **Simplification (breaking):** removed product groups (`ProductGroup`, its admin page, product/plan group filters, `product_group_id`, and the Management API `product_group_id`/`group_name` fields). Initial migration changed; rebuild disposable databases.
 
 - Reseller-owned batch access across clients and host PHP through `ResellerInventory`, with licensing counts and paginated key status reads. Existing key-list responses now use resource pagination, default 25 keys per page. Sales and delivery remain host-owned.

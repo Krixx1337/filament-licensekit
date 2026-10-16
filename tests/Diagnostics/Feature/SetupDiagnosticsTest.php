@@ -42,7 +42,6 @@ test('invalid setup still boots Artisan and diagnostics while APIs fail closed w
     'customer cooldown' => [['licensekit.device_binding.customer_reset.cooldown_days' => -1], 'licensekit.device_binding.customer_reset.cooldown_days must be a nonnegative integer.'],
     'customer reason flag' => [['licensekit.device_binding.customer_reset.require_reason' => 'false'], 'licensekit.device_binding.customer_reset.require_reason must be true or false.'],
     'ban flag' => [['licensekit.features.licensing_bans' => 'false'], 'licensekit.features.licensing_bans must be true or false.'],
-    'outage flag' => [['licensekit.modules.outages' => 'true'], 'licensekit.modules.outages must be true or false.'],
     'management flag' => [['licensekit.management.enabled' => 'true'], 'Invalid licensekit.management.enabled.'],
     'empty display column' => [['licensekit.user.display_column' => ' '], 'licensekit.user.display_column must be a nonempty column name.'],
     'invalid display column' => [['licensekit.user.display_column' => []], 'licensekit.user.display_column must be a nonempty column name.'],

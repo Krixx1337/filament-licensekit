@@ -46,7 +46,7 @@ public function bypassHwid($user, Product $product): bool
 
 Use your host application's role or permission check in place of `is_admin`. With Shield/Spatie permissions, you can check `$user->hasPermissionTo('bypass_hwid')`. Create and assign that permission in the host application; LicenseKit does not generate a Shield checkbox. `licensekit.manage` alone does not grant immunity. Laravel Gate hooks, including host super-admin hooks, still apply.
 
-Both exemptions affect direct `DeviceBindings::bind()`/`verify()` and `LicensedDevices::bind()`/`verify()`/`upgrade()`. These calls still require a valid HWID array and run your handler's `assertAllowed()` with the saved baseline when present. Account checks, licensing bans, product restrictions, outages, and license requirements still apply. Staff immunity grants no entitlement.
+Both exemptions affect direct `DeviceBindings::bind()`/`verify()` and `LicensedDevices::bind()`/`verify()`/`upgrade()`. These calls still require a valid HWID array and run your handler's `assertAllowed()` with the saved baseline when present. Account checks, licensing bans, product restrictions, maintenance mode, and license requirements still apply. Staff immunity grants no entitlement.
 
 Exempt calls accept different PCs without creating or changing a device binding. `verify()` succeeds without a saved PC, and `upgrade()` returns the normalized presented HWID without changing a baseline or emitting an upgrade audit/event. Existing bindings and reset cooldowns remain stored. Customer and admin reset tools keep their existing behavior.
 
@@ -114,7 +114,7 @@ While paused, paid access, host-provided free access, and key claims fail with `
 
 Pause dispatches `EntitlementAccessInvalidated` inside the transaction. Your host app must listen to that event to invalidate its sessions. Bind and verify also reject paused licenses. Keep listener database writes in the same transaction; defer external side effects until commit.
 
-An unfinished product outage or pending, processing, or failed compensation prevents individual clock changes with `operation_conflict`, HTTP 409. Finish the outage and finish or cancel compensation first. Stored operations still prevent changes when the outage module is disabled. Paused licenses are excluded from product-wide credits, including historical manual credits.
+Product-wide **Add time** adds the time to a paused license's banked balance instead of its end date.
 
 ## Reset
 
@@ -137,7 +137,7 @@ Successful resets stay on the HWID reset history page in the admin, including th
 
 ## Claim events and provenance
 
-`EntitlementGranted` remains synchronous inside the claim transaction. Its listeners can change licensing state, and a listener exception rolls back the claim. The outage module depends on this behavior. The optional `claim` property contains immutable `ClaimProvenance`: key/batch IDs, issuer/reference, stable `claim:{keyId}` operation identity, entitlement/user/product IDs, UTC claim time, and before/after expiry/lifetime values. No serial is included. At this hook, the key's entitlement link has not yet been written.
+`EntitlementGranted` remains synchronous inside the claim transaction. Its listeners can change licensing state, and a listener exception rolls back the claim. The optional `claim` property contains immutable `ClaimProvenance`: key/batch IDs, issuer/reference, stable `claim:{keyId}` operation identity, entitlement/user/product IDs, UTC claim time, and before/after expiry/lifetime values. No serial is included. At this hook, the key's entitlement link has not yet been written.
 
 `LicenseClaimed` carries completed `ClaimProvenance` in its `claim` property. It dispatches after the outermost transaction commits and after key linkage is saved. Its after-state includes synchronous grant-listener changes. Rollback discards it. Data consists of scalar values and immutable timestamps rather than mutable Eloquent models.
 

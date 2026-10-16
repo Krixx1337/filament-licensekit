@@ -8,9 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use LicenseKit\Core\Actions\AdminAuthorization;
 use LicenseKit\Core\Users\UserAccess;
-use LicenseKit\Filament\Resources\Compensations\CompensationResource;
 use LicenseKit\Filament\Resources\LicensingBans\LicensingBanResource;
-use LicenseKit\Filament\Resources\Outages\OutageResource;
 use LicenseKit\LicenseKitPlugin;
 
 class AdminAccess
@@ -28,8 +26,7 @@ class AdminAccess
         }
         $plugin = $panel->getPlugin('licensekit');
         if (! $plugin instanceof LicenseKitPlugin
-            || ($resource === LicensingBanResource::class && config('licensekit.features.licensing_bans') !== true)
-            || (in_array($resource, [OutageResource::class, CompensationResource::class], true) && ! $plugin->hasOutages())) {
+            || ($resource === LicensingBanResource::class && config('licensekit.features.licensing_bans') !== true)) {
             return null;
         }
         $user = Filament::auth()->user();

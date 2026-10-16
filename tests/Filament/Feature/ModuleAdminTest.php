@@ -1,11 +1,9 @@
 <?php
 
 use Filament\Facades\Filament;
-use Filament\Panel;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
-use LicenseKit\Core\Actions\Audit;
 use LicenseKit\Core\Actions\CreateBatch;
 use LicenseKit\Core\Models\ApiClient;
 use LicenseKit\Core\Models\DeviceBinding;
@@ -13,28 +11,14 @@ use LicenseKit\Core\Models\Entitlement;
 use LicenseKit\Core\Models\LicensePlan;
 use LicenseKit\Core\Models\Product;
 use LicenseKit\Filament\Resources\ApiClients\Pages\ManageApiClients;
-use LicenseKit\Filament\Resources\Compensations\Pages\ManageCompensations;
 use LicenseKit\Filament\Resources\Entitlements\Pages\ManageEntitlements;
 use LicenseKit\Filament\Resources\LicenseKeys\Pages\ManageLicenseKeys;
-use LicenseKit\Filament\Resources\Outages\Pages\ManageOutages;
 use LicenseKit\Filament\Resources\Products\Pages\ManageProducts;
-use LicenseKit\Modules\Outages\Jobs\ApplyCompensation;
-use LicenseKit\Modules\Outages\Models\CompensationEntry;
-use LicenseKit\Modules\Outages\Models\LicensingOperation;
-use LicenseKit\Modules\Outages\Models\Outage;
 use LicenseKit\Tests\Core\Fixtures\ClientSessions;
 use LicenseKit\Tests\Filament\Fixtures\UlidAdminUser;
 use LicenseKit\Tests\Filament\Fixtures\User;
 use LicenseKit\Tests\Filament\Fixtures\UuidAdminUser;
 use Livewire\Livewire;
-
-test('optional pages render only on panels registering the plugin', function () {
-    $user = adminUser();
-    $this->get('/full/licensekit/outages')->assertOk();
-    $this->get('/full/licensekit/product-releases')->assertNotFound();
-    Filament::setCurrentPanel(Panel::make()->id('unregistered')->authGuard('staff'));
-    Livewire::test(ManageOutages::class)->assertForbidden();
-});
 
 test('entitlement status uses audited actions without package session termination', function () {
     adminUser();
@@ -65,17 +49,6 @@ test('issuance token rotates as private download and can be revoked', function (
     expect($client->tokens()->count())->toBe(0);
 });
 
-test('outage administration starts and resumes scoped maintenance', function () {
-    adminUser();
-    Filament::setCurrentPanel(Filament::getPanel('full'));
-    Livewire::test(ManageOutages::class)->assertActionDoesNotExist('add_time')->callAction('start_outage', data: ['product_id' => Product::factory()->create()->id, 'reference' => 'maintenance', 'reason' => 'Deploy', 'pause' => true, 'block' => true])->assertHasNoActionErrors();
-    Livewire::test(ManageCompensations::class)->assertActionExists('add_time');
-    $outage = Outage::first();
-    expect($outage->product_id)->not->toBeNull();
-    Livewire::test(ManageOutages::class)->callTableAction('stop_outage', $outage, data: ['compensate' => 'no'])->assertHasNoActionErrors();
-    expect($outage->fresh()->ended_at)->not->toBeNull();
-});
-
 test('unavailable administrator is rejected before rendering or writing', function () {
     $admin = adminUser();
     $admin->update(['is_suspended' => true]);
@@ -98,74 +71,6 @@ test('string host user IDs survive administrative claims and audit actors', func
     $this->assertDatabaseHas('licensekit_entitlements', ['user_id' => $customer->getKey()]);
     $this->assertDatabaseHas('licensekit_audit_events', ['event' => 'key_claimed', 'actor' => 'user:'.$admin->getKey()]);
 })->with([[UuidAdminUser::class], [UlidAdminUser::class]]);
-
-test('product outage and custom credit actions target selected product', function () {
-    $this->travelTo(now()->startOfSecond());
-    adminUser();
-    Filament::setCurrentPanel(Filament::getPanel('full'));
-    $entitlement = Entitlement::factory()->create(['user_id' => User::factory()->create()->id]);
-    $original = $entitlement->expires_at;
-    $product = $entitlement->product;
-    Livewire::test(ManageProducts::class)->callTableAction('add_time', $product,
-        data: ['product_id' => $product->id, 'reference' => 'product-compensation', 'reason' => 'Compensation', 'duration' => 1, 'unit' => '86400'])->assertHasNoActionErrors();
-    $operation = LicensingOperation::firstOrFail();
-    (new ApplyCompensation($operation->id))->handle(app(Audit::class));
-    expect($entitlement->fresh()->expires_at->equalTo($original->addDay()))->toBeTrue();
-    Livewire::test(ManageProducts::class)->callTableAction('start_outage', $product,
-        data: ['product_id' => $product->id, 'reference' => 'product-outage', 'reason' => 'Deploy', 'block' => true])->assertHasNoActionErrors();
-    expect(Outage::firstOrFail()->product_id)->toBe($product->id);
-});
-
-test('active only credit selects licenses at confirmation and ignores hidden incident date', function () {
-    $this->travelTo(now()->startOfSecond());
-    adminUser();
-    Filament::setCurrentPanel(Filament::getPanel('full'));
-    $product = Product::factory()->create();
-    $expiring = Entitlement::factory()->create(['user_id' => User::factory()->create()->id, 'product_id' => $product->id, 'expires_at' => now()->addMinute()]);
-    $component = Livewire::test(ManageProducts::class)->mountTableAction('add_time', $product)->assertFormFieldHidden('eligible_at');
-    $this->travel(2)->minutes();
-    $active = Entitlement::factory()->create(['user_id' => User::factory()->create()->id, 'product_id' => $product->id]);
-
-    $component->fillForm(['duration' => 1, 'unit' => '86400', 'reference' => 'active-credit', 'reason' => 'Goodwill', 'eligible_at' => now()->subDay()->format('Y-m-d H:i:s')])->callMountedTableAction()->assertHasNoActionErrors();
-
-    $operation = LicensingOperation::firstOrFail();
-    expect($operation->eligible_at->equalTo(now()))->toBeTrue();
-    expect(CompensationEntry::where('operation_id', $operation->id)->pluck('entitlement_id')->all())->toBe([$active->id]);
-    expect($expiring->fresh()->expires_at->isPast())->toBeTrue();
-});
-
-test('incident credit preserves selected cutoff and extends recently expired licenses', function () {
-    $this->travelTo(now()->startOfSecond());
-    adminUser();
-    Filament::setCurrentPanel(Filament::getPanel('full'));
-    $product = Product::factory()->create();
-    $cutoff = now()->subDay()->format('Y-m-d H:i:s');
-    $expired = Entitlement::factory()->create(['user_id' => User::factory()->create()->id, 'product_id' => $product->id, 'created_at' => now()->subDays(2), 'expires_at' => now()->subHours(20)]);
-    Entitlement::factory()->create(['user_id' => User::factory()->create()->id, 'product_id' => $product->id]);
-    $component = Livewire::test(ManageProducts::class)->mountTableAction('add_time', $product)
-        ->fillForm(['targets' => 'incident', 'eligible_at' => $cutoff])->assertFormFieldVisible('eligible_at');
-    $this->travel(1)->hours();
-
-    $component->fillForm(['duration' => 1, 'unit' => '86400', 'reference' => 'incident-credit', 'reason' => 'Recovery'])->callMountedTableAction()->assertHasNoActionErrors();
-
-    $operation = LicensingOperation::firstOrFail();
-    expect($operation->eligible_at->format('Y-m-d H:i:s'))->toBe($cutoff);
-    expect(CompensationEntry::where('operation_id', $operation->id)->pluck('entitlement_id')->all())->toBe([$expired->id]);
-    (new ApplyCompensation($operation->id))->handle(app(Audit::class));
-    expect($expired->fresh()->expires_at->equalTo(now()->addHours(3)))->toBeTrue();
-});
-
-test('incident credit rejects missing and future dates without creating an operation', function (string $date) {
-    $this->freezeTime();
-    adminUser();
-    Filament::setCurrentPanel(Filament::getPanel('full'));
-    $product = Product::factory()->create();
-    $date = $date === 'future' ? now()->addDay()->format('Y-m-d H:i:s') : $date;
-
-    Livewire::test(ManageProducts::class)->callTableAction('add_time', $product, data: ['targets' => 'incident', 'eligible_at' => $date, 'duration' => 1, 'unit' => '86400', 'reference' => 'invalid-credit', 'reason' => 'Recovery'])->assertHasActionErrors(['eligible_at']);
-
-    $this->assertDatabaseCount('licensekit_compensation_operations', 0);
-})->with(['', 'future']);
 
 test('HWID reset action invalidates desktop binding and token with support reason', function () {
     adminUser();
@@ -229,3 +134,32 @@ test('entitlement table shows generic binding state with one binding query per r
         ->assertTableColumnDoesNotExist('binding.hwid.contract')
         ->assertTableColumnDoesNotExist('binding.hwid.version');
 })->with(['per_product', 'global'])->with([true, false])->with([1, 10]);
+
+test('product add time action previews and extends running licenses', function () {
+    adminUser();
+    $this->travelTo(now('UTC')->startOfSecond());
+    $product = Product::factory()->create();
+    $running = Entitlement::factory()->create(['product_id' => $product->id, 'user_id' => User::factory()->create()->id, 'expires_at' => now()->addDay()]);
+    $expired = Entitlement::factory()->create(['product_id' => $product->id, 'user_id' => User::factory()->create()->id, 'expires_at' => now()->subHour()]);
+
+    Livewire::test(ManageProducts::class)->mountTableAction('add_time', $product)
+        ->assertFormFieldHidden('since')
+        ->setTableActionData(['duration' => 2, 'unit' => '3600'])
+        ->callMountedTableAction()->assertHasNoTableActionErrors()->assertNotified('Added time to 1 license');
+
+    expect($running->fresh()->expires_at->equalTo(now()->addDay()->addHours(2)))->toBeTrue()
+        ->and($expired->fresh()->expires_at->equalTo(now()->subHour()))->toBeTrue();
+});
+
+test('product add time action can include recently expired licenses', function () {
+    adminUser();
+    $this->travelTo(now('UTC')->startOfSecond());
+    $product = Product::factory()->create();
+    $expired = Entitlement::factory()->create(['product_id' => $product->id, 'user_id' => User::factory()->create()->id, 'expires_at' => now()->subHour()]);
+
+    Livewire::test(ManageProducts::class)->callTableAction('add_time', $product, data: [
+        'duration' => 1, 'unit' => '86400', 'include_expired' => true, 'since' => now()->subHours(3)->setTimezone(config('app.timezone'))->format('Y-m-d H:i'),
+    ])->assertHasNoTableActionErrors();
+
+    expect($expired->fresh()->expires_at->equalTo(now()->subHour()->addDay()))->toBeTrue();
+});

@@ -1,6 +1,5 @@
 <?php
 
-use Filament\Facades\Filament;
 use Filament\Panel;
 use Illuminate\Support\Facades\Gate;
 use LicenseKit\Core\Actions\CreateBatch;
@@ -9,15 +8,12 @@ use LicenseKit\Core\Models\Batch;
 use LicenseKit\Core\Models\LicensePlan;
 use LicenseKit\Filament\Resources\ApiClients\ApiClientResource;
 use LicenseKit\Filament\Resources\AuditEvents\AuditEventResource;
-use LicenseKit\Filament\Resources\Compensations\CompensationResource;
 use LicenseKit\Filament\Resources\DeviceResetHistory\DeviceResetHistoryResource;
 use LicenseKit\Filament\Resources\Entitlements\EntitlementResource;
 use LicenseKit\Filament\Resources\LicenseKeys\LicenseKeyResource;
 use LicenseKit\Filament\Resources\LicenseKeys\Pages\ManageLicenseKeys;
 use LicenseKit\Filament\Resources\LicensePlans\LicensePlanResource;
 use LicenseKit\Filament\Resources\LicensePlans\Pages\ManageLicensePlans;
-use LicenseKit\Filament\Resources\Outages\OutageResource;
-use LicenseKit\Filament\Resources\Outages\Pages\ManageOutages;
 use LicenseKit\Filament\Resources\Products\Pages\ManageProducts;
 use LicenseKit\LicenseKitPlugin;
 use LicenseKit\Tests\Filament\Fixtures\User;
@@ -31,7 +27,6 @@ test('core resources require panel registration and host gate', function () {
     foreach (['license-plans', 'license-keys', 'entitlements', 'api-clients', 'audit-events', 'device-reset-history', 'bans'] as $slug) {
         $this->get('/admin/licensekit/'.$slug)->assertOk();
     }
-    $this->get('/admin/licensekit/outages')->assertOk();
 });
 
 test('product creation validates catalog settings and records panel actor once', function () {
@@ -60,13 +55,9 @@ test('key creation action uses package backend', function () {
     $this->assertDatabaseCount('licensekit_license_keys', 2);
 });
 
-test('optional resources follow global flags and unsupported tenancy is rejected', function () {
-    config(['licensekit.modules.outages' => false, 'licensekit.modules.downloads' => false]);
+test('resources register on non-tenant panels and unsupported tenancy is rejected', function () {
     $core = Panel::make()->id('core')->authGuard('staff')->plugin(LicenseKitPlugin::make());
-    config(['licensekit.modules.outages' => true, 'licensekit.modules.downloads' => true]);
-    $full = Panel::make()->id('full')->authGuard('staff')->plugin(LicenseKitPlugin::make());
     expect($core->getResources())->toHaveCount(9);
-    expect($full->getResources())->toHaveCount(11);
     $tenant = Panel::make()->id('tenant')->tenant(User::class)->plugin(LicenseKitPlugin::make());
     expect($tenant->getResources())->toBe([]);
     expect(fn () => $tenant->getPlugin('licensekit')->boot($tenant))->toThrow(LicensingException::class, 'licensing unavailable');
@@ -75,8 +66,6 @@ test('optional resources follow global flags and unsupported tenancy is rejected
         ->and(LicenseKeyResource::getNavigationLabel())->toBe('Keys')
         ->and(ApiClientResource::getNavigationLabel())->toBe('API clients')
         ->and(AuditEventResource::getNavigationLabel())->toBe('Change log')
-        ->and(OutageResource::getNavigationLabel())->toBe('Service down')
-        ->and(CompensationResource::getNavigationLabel())->toBe('Added time')
         ->and(DeviceResetHistoryResource::getNavigationLabel())->toBe('HWID reset history');
 });
 
@@ -111,12 +100,4 @@ test('batch labels render as escaped text in the key table', function () {
     $batch = app(CreateBatch::class)->create($plan, 1, 'giveaway', 'test', label: $label);
     Livewire::test(ManageLicenseKeys::class)->assertCanSeeTableRecords($batch->keys)
         ->assertSee($label)->assertDontSee($label, escape: false);
-});
-
-test('disabled optional tools cannot render through previously registered resources', function () {
-    adminUser();
-    $panel = Filament::getPanel('full');
-    Filament::setCurrentPanel($panel);
-    config(['licensekit.modules.outages' => false]);
-    Livewire::test(ManageOutages::class)->assertForbidden();
 });

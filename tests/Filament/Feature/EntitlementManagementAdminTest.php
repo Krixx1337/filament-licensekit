@@ -4,7 +4,6 @@ use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Gate;
 use LicenseKit\Core\Models\Entitlement;
 use LicenseKit\Filament\Resources\Entitlements\Pages\ManageEntitlements;
-use LicenseKit\Modules\Outages\Actions\ManageOutages;
 use LicenseKit\Tests\Core\Fixtures\AdminPolicy;
 use LicenseKit\Tests\Filament\Fixtures\User;
 use Livewire\Livewire;
@@ -80,18 +79,6 @@ test('staff clock actions reauthorize after mounting', function () {
     Gate::define('licensekit.manage', fn (): bool => false);
 
     $component->callMountedTableAction(['reason' => 'Vacation'])->assertForbidden();
-
-    expect($entitlement->fresh()->paused_at)->toBeNull();
-});
-
-test('staff sees actionable notification for unsettled product operation', function () {
-    $actor = adminUser();
-    $entitlement = Entitlement::factory()->create(['user_id' => User::factory()->create()->id]);
-    app(ManageOutages::class)->start($entitlement->product, 'deployment', 'Deployment', $actor);
-
-    Livewire::test(ManageEntitlements::class)
-        ->callTableAction('pause', $entitlement, data: ['reason' => 'Vacation'])
-        ->assertNotified('Finish the product outage or finish/cancel compensation before trying again.');
 
     expect($entitlement->fresh()->paused_at)->toBeNull();
 });

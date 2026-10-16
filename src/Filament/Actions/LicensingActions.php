@@ -13,7 +13,6 @@ use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Text;
 use Filament\Schemas\Components\Utilities\Get;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use LicenseKit\Core\Actions\ClaimLicense;
 use LicenseKit\Core\Actions\CreateBatch;
@@ -26,8 +25,6 @@ use LicenseKit\Core\Models\LicensePlan;
 use LicenseKit\Core\Models\Product;
 use LicenseKit\Core\Users\ConfiguredUserModel;
 use LicenseKit\Filament\AdminAccess;
-use LicenseKit\Modules\Outages\Actions\ManageOutages;
-use LicenseKit\Modules\Outages\Models\Outage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class LicensingActions
@@ -191,60 +188,49 @@ class LicensingActions
         ])->before(fn (Entitlement $record) => AdminAccess::authorize('inspectDevice', $record->product, context: [$record->user]))->modalSubmitAction(false)->modalCancelActionLabel('Close');
     }
 
-    /** @return array<int|string, string> */
-    public static function productOptions(string $ability): array
-    {
-        return Product::orderBy('name')->get()->filter(fn (Product $product): bool => AdminAccess::can($ability, $product))->pluck('name', 'id')->all();
-    }
-
-    public static function startOutage(): Action
-    {
-        return Action::make('start_outage')->authorize(fn (?Product $record): bool => $record !== null ? AdminAccess::can('startOutage', $record) : self::productOptions('startOutage') !== [])->label('Mark service down')->schema([
-            Select::make('product_id')->options(fn (): array => self::productOptions('startOutage'))->required()->default(fn (?Model $record) => $record instanceof Product ? $record->getKey() : null),
-            TextInput::make('reference')->default(fn (): string => (string) Str::uuid())->required()->maxLength(128),
-            Textarea::make('reason')->required()->maxLength(2000),
-            Toggle::make('block')->label('Block access')->default(false),
-        ])->action(fn (array $data) => app(ManageOutages::class)->start(Product::whereKey($data['product_id'])->firstOrFail(), $data['reference'], $data['reason'], self::actor(), $data['block']));
-    }
-
-    public static function stopOutage(): Action
-    {
-        return Action::make('stop_outage')->authorize(fn (Outage $record): bool => AdminAccess::can('stop', $record))->label('Mark service back')->visible(fn (Outage $record): bool => $record->ended_at === null && $record->stopped_at === null)
-            ->schema([Select::make('compensate')->options(['yes' => 'Restore paid time', 'no' => 'End without adding time'])->required()])
-            ->action(fn (Outage $record, array $data) => app(ManageOutages::class)->stop($record, $data['compensate'] === 'yes', self::actor()));
-    }
-
     public static function addTime(): Action
     {
-        return Action::make('add_time')->authorize(fn (?Product $record): bool => $record !== null ? AdminAccess::can('addTime', $record) : self::productOptions('addTime') !== [])->label('Add time')->modalDescription('Adds duration to existing expiry. For expired licenses, some or all of the added time may already have elapsed.')->schema([
-            Select::make('product_id')->options(fn (): array => self::productOptions('addTime'))->required()->live()->default(fn (?Model $record) => $record instanceof Product ? $record->getKey() : null),
-            TextInput::make('duration')->integer()->minValue(1)->maxValue(5256000)->default(1)->required(),
-            Select::make('unit')->options(['86400' => 'Days', '3600' => 'Hours', '60' => 'Minutes'])->default('86400')->required(),
-            Select::make('targets')->label('Target licenses')->options(['active' => 'Currently active licenses', 'incident' => 'Licenses from an earlier date'])->default('active')->required()->in(['active', 'incident'])->live(),
-            DateTimePicker::make('eligible_at')->label('Incident started at (UTC)')->timezone('UTC')->maxDate(fn () => now('UTC'))->required(fn (Get $get): bool => $get('targets') === 'incident')->visible(fn (Get $get): bool => $get('targets') === 'incident')->live()
-                ->helperText('Uses current records: licenses created by this date whose current expiry is after it. Later renewals can affect selection; newer, lifetime and revoked licenses are excluded.'),
-            Text::make(function (Get $get): string {
-                $product = Product::whereKey($get('product_id'))->first();
-                if ($product === null) {
-                    return 'Select product to preview.';
-                }
-                $eligibleAt = CarbonImmutable::now('UTC');
-                if ($get('targets') === 'incident') {
-                    if (Validator::make(['eligible_at' => $get('eligible_at')], ['eligible_at' => ['required', 'date', 'before_or_equal:'.$eligibleAt->format('Y-m-d H:i:s')]])->fails()) {
-                        return 'Select an incident start date at or before now to preview.';
+        return Action::make('add_time')->label('Add time')
+            ->authorize(fn (Product $record): bool => AdminAccess::can('addTime', $record))
+            ->modalHeading(fn (Product $record): string => 'Add time to '.$record->name)
+            ->modalDescription('Use this after downtime or as a goodwill gift. Every running license gets the time added to its end date. Paused licenses keep it for later.')
+            ->schema([
+                TextInput::make('duration')->label('How much time')->integer()->minValue(1)->default(1)->required()->live(),
+                Select::make('unit')->label('Unit')->options(['86400' => 'Days', '3600' => 'Hours'])->default('86400')->required()->live(),
+                Toggle::make('include_expired')->label('Also include licenses that expired recently')->default(false)->live(),
+                DateTimePicker::make('since')->label('Expired after')->seconds(false)->maxDate(fn () => now())
+                    ->required(fn (Get $get): bool => (bool) $get('include_expired'))->visible(fn (Get $get): bool => (bool) $get('include_expired'))->live()
+                    ->helperText('Licenses that ran out after this moment get the time too, counted from their old end date.'),
+                Text::make(function (Get $get, Product $record): string {
+                    $since = self::addTimeSince($get('include_expired'), $get('since'));
+                    if ($since === false) {
+                        return 'Pick when the downtime started to see how many licenses this affects.';
                     }
-                    $eligibleAt = CarbonImmutable::parse($get('eligible_at'), 'UTC');
-                }
-                $count = app(ManageOutages::class)->preview($product, $eligibleAt, self::actor());
+                    $count = app(ManageEntitlements::class)->previewAddTimeToProduct($record, $since);
 
-                return 'Currently eligible: '.$count.'. Count is rechecked on confirmation.';
-            }),
-            TextInput::make('reference')->default(fn (): string => (string) Str::uuid())->required()->maxLength(128),
-            Textarea::make('reason')->required()->maxLength(2000),
-        ])->action(function (array $data): void {
-            $eligibleAt = $data['targets'] === 'incident' ? CarbonImmutable::parse($data['eligible_at'], 'UTC') : CarbonImmutable::now('UTC');
-            $operation = app(ManageOutages::class)->addTime(Product::whereKey($data['product_id'])->firstOrFail(), (int) $data['duration'] * (int) $data['unit'], $eligibleAt, $data['reference'], $data['reason'], self::actor());
-            Notification::make()->title('Added time queued for '.$operation->target_count.' licenses')->success()->send();
-        });
+                    return 'This will add time to '.$count.' '.($count === 1 ? 'license' : 'licenses').'.';
+                }),
+                Textarea::make('reason')->label('Note (optional)')->maxLength(2000),
+            ])
+            ->action(function (Product $record, array $data): void {
+                $since = self::addTimeSince($data['include_expired'] ?? false, $data['since'] ?? null);
+                $seconds = (int) $data['duration'] * (int) $data['unit'];
+                $count = app(ManageEntitlements::class)->addTimeToProduct($record, $seconds, self::actor(), $data['reason'] ?? null, $since ?: null);
+                Notification::make()->title('Added time to '.$count.' '.($count === 1 ? 'license' : 'licenses'))->success()->send();
+            });
+    }
+
+    /** @return CarbonImmutable|null|false null = only running licenses; false = date still missing */
+    private static function addTimeSince(mixed $includeExpired, mixed $since): CarbonImmutable|null|false
+    {
+        if (! $includeExpired) {
+            return null;
+        }
+        if (! is_string($since) || $since === '') {
+            return false;
+        }
+        $since = CarbonImmutable::parse($since, config('app.timezone'))->utc();
+
+        return $since->isFuture() ? false : $since;
     }
 }

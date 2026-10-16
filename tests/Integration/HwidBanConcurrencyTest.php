@@ -7,7 +7,7 @@ use LicenseKit\Core\Models\DeviceResetHistory;
 use LicenseKit\Core\Models\Entitlement;
 use LicenseKit\Core\Models\Product;
 use LicenseKit\Tests\Core\Fixtures\StructuredHwid;
-use LicenseKit\Tests\Outages\Fixtures\User;
+use LicenseKit\Tests\Integration\Fixtures\User;
 
 test('MySQL competing rebinds keep the cleared device on the reset row', function () {
     $user = User::factory()->create();

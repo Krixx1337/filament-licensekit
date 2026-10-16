@@ -4,7 +4,7 @@ use LicenseKit\Core\Actions\CreateBatch;
 use LicenseKit\Core\Models\Batch;
 use LicenseKit\Core\Models\LicenseKey;
 use LicenseKit\Core\Models\LicensePlan;
-use LicenseKit\Tests\Outages\Fixtures\User;
+use LicenseKit\Tests\Integration\Fixtures\User;
 
 test('concurrent creation on different plans preserves batch ownership', function (bool $sameProduct) {
     $plan = LicensePlan::factory()->create();
@@ -19,7 +19,7 @@ test('concurrent creation on different plans preserves batch ownership', functio
 })->with([true, false]);
 
 test('batch revocation serializes against customer claims in both transaction orders', function (bool $revokeFirst) {
-    $actor = outageAdmin();
+    $actor = integrationAdmin();
     $user = User::factory()->create();
     $plan = LicensePlan::factory()->create();
     $batch = app(CreateBatch::class)->createFor($actor, $plan, 1, 'batch');

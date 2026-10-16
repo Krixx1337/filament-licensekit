@@ -38,6 +38,6 @@ body:
     id: reproduction
     attributes:
       label: Steps to reproduce
-      description: Provide steps or a minimal code example, including relevant LicenseKit configuration and enabled modules.
+      description: Provide steps or a minimal code example, including relevant LicenseKit configuration.
     validations:
       required: true

@@ -4,7 +4,7 @@ use LicenseKit\Core\Actions\ManagementOperations;
 use LicenseKit\Core\Exceptions\LicensingException;
 use LicenseKit\Core\Models\ApiClient;
 use LicenseKit\Core\Models\LicensePlan;
-use LicenseKit\Tests\Outages\Fixtures\User;
+use LicenseKit\Tests\Integration\Fixtures\User;
 
 test('simultaneous management retries create one batch', function (string $operation, string $table) {
     $plan = LicensePlan::factory()->create();

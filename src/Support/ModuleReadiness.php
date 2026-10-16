@@ -25,15 +25,6 @@ final class ModuleReadiness implements ReadinessCheck
         if ($errors !== []) {
             return $errors;
         }
-        foreach (['outages' => ['licensekit_outages', 'licensekit_compensation_operations', 'licensekit_compensation_entries']] as $module => $tables) {
-            if (Modules::enabled($module)) {
-                foreach ($tables as $table) {
-                    if (! Schema::hasTable($table)) {
-                        $errors[] = 'Missing '.$module.' table: '.$table.'. Enable the module and run php artisan migrate.';
-                    }
-                }
-            }
-        }
         foreach (['licensekit_entitlements' => ['paused_at', 'remaining_seconds'], 'licensekit_device_reset_history' => ['before_hwid'], 'licensekit_license_keys' => ['note', 'batch_id'], 'licensekit_api_clients' => ['owner_user_id', 'retired_at'], 'licensekit_batches' => ['issuer', 'reference', 'quantity', 'duration_days', 'label', 'api_client_id', 'created_by_user_id', 'reseller_user_id']] as $table => $columns) {
             if (! Schema::hasTable($table)) {
                 $errors[] = 'Missing core table: '.$table.'. Run php artisan migrate with the installed LicenseKit version.';

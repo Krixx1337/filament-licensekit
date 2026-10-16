@@ -108,11 +108,6 @@ class AdminPolicy
         return $this->allowed(__FUNCTION__, $record, $target);
     }
 
-    public function startOutage(Model $actor, Model $record, ?Model $target = null): bool
-    {
-        return $this->allowed(__FUNCTION__, $record, $target);
-    }
-
     public function addTime(Model $actor, Model $record, ?Model $target = null): bool
     {
         return $this->allowed(__FUNCTION__, $record, $target);

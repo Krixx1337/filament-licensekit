@@ -5,7 +5,6 @@ use LicenseKit\Core\Actions\DefaultHwidHandler;
 return [
     'local_integrations' => [],
     'features' => ['licensing_bans' => true],
-    'modules' => ['outages' => false],
     'device_binding' => ['scope' => 'per_product', 'storage' => 'plain', 'customer_reset' => ['enabled' => true, 'cooldown_days' => 7, 'require_reason' => false]],
     'management' => [
         'enabled' => false,

@@ -14,7 +14,6 @@ test('reset history is always registered and read only for licensed administrato
     $user = User::factory()->create();
     $this->actingAs($user, 'staff')->get('/admin/licensekit/device-reset-history')->assertForbidden();
     adminUser();
-    config(['licensekit.modules.outages' => false, 'licensekit.modules.downloads' => false, 'licensekit.modules.free_access' => false]);
     $history = DeviceResetHistory::factory()->create();
     $this->get('/admin/licensekit/device-reset-history')->assertOk();
     expect(DeviceResetHistoryResource::canCreate())->toBeFalse()->and(DeviceResetHistoryResource::canEdit($history))->toBeFalse()

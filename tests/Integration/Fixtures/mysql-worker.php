@@ -4,7 +4,6 @@ require __DIR__.'/../../../vendor/autoload.php';
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
-use LicenseKit\Core\Actions\Audit;
 use LicenseKit\Core\Actions\ClaimLicense;
 use LicenseKit\Core\Actions\CreateBatch;
 use LicenseKit\Core\Actions\DeviceBindings;
@@ -20,14 +19,10 @@ use LicenseKit\Core\Models\Batch;
 use LicenseKit\Core\Models\Entitlement;
 use LicenseKit\Core\Models\LicensePlan;
 use LicenseKit\Core\Models\Product;
-use LicenseKit\Modules\Outages\Actions\ManageOutages;
-use LicenseKit\Modules\Outages\Jobs\ApplyCompensation;
-use LicenseKit\Modules\Outages\Models\LicensingOperation;
-use LicenseKit\Modules\Outages\Models\Outage;
 use LicenseKit\Tests\Core\Fixtures\ClientSessions;
 use LicenseKit\Tests\Core\Fixtures\StructuredHwid;
-use LicenseKit\Tests\Outages\Fixtures\User;
-use LicenseKit\Tests\Outages\MySqlTestCase;
+use LicenseKit\Tests\Integration\Fixtures\User;
+use LicenseKit\Tests\Integration\MySqlTestCase;
 
 $case = new MySqlTestCase('worker');
 $case->createApplication();
@@ -113,19 +108,6 @@ $run = fn () => match ($operation) {
 
         return $product->id;
     }),
-    'start' => app(ManageOutages::class)->start(Product::findOrFail($payload['product_id']), 'outage', 'Deployment', User::findOrFail($payload['actor_id']))->id,
-    'stop' => app(ManageOutages::class)->stop(Outage::findOrFail($payload['outage_id']), true, User::findOrFail($payload['actor_id']))->id,
-    'cancel' => (function () use ($payload): int {
-        app(ManageOutages::class)->cancel(LicensingOperation::findOrFail($payload['operation_id']), User::findOrFail($payload['actor_id']));
-
-        return $payload['operation_id'];
-    })(),
-    'apply' => (function () use ($payload): int {
-        (new ApplyCompensation($payload['operation_id']))->handle(app(Audit::class));
-
-        return $payload['operation_id'];
-    })(),
-    'credit' => app(ManageOutages::class)->addTime(Product::findOrFail($payload['product_id']), 3600, CarbonImmutable::parse($payload['at']), 'compensation', 'Deployment', User::findOrFail($payload['actor_id']))->id,
     'claim' => app(ClaimLicense::class)->claim(User::findOrFail($payload['user_id']), $payload['key'])->id,
     'competing-claim' => app(ClaimLicense::class)->claim(User::findOrFail($payload['user_ids'][$worker - 1]), $payload['key'])->id,
     'issue' => app(CreateBatch::class)->create(LicensePlan::findOrFail($payload['plan_id']), 2, 'order', 'test')->id,

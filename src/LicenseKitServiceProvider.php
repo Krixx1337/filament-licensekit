@@ -14,7 +14,6 @@ use LicenseKit\Core\CoreServiceProvider;
 use LicenseKit\Core\Http\Middleware\JsonResponse;
 use LicenseKit\Core\Http\Middleware\RequireApiClient;
 use LicenseKit\Http\Middleware\EnsureConfigured;
-use LicenseKit\Modules\Outages\OutagesServiceProvider;
 use LicenseKit\Support\ModuleReadiness;
 
 class LicenseKitServiceProvider extends ServiceProvider
@@ -29,11 +28,6 @@ class LicenseKitServiceProvider extends ServiceProvider
         }
         $this->app->bind(ReadinessCheck::class, ModuleReadiness::class);
         $this->app->register(CoreServiceProvider::class);
-        $this->app->booting(function (): void {
-            if (config('licensekit.modules.outages') === true) {
-                $this->app->register(OutagesServiceProvider::class);
-            }
-        });
     }
 
     public function boot(): void

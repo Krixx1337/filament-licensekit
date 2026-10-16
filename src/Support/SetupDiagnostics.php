@@ -28,11 +28,6 @@ final class SetupDiagnostics
         } catch (InvalidArgumentException $exception) {
             $errors[] = $exception->getMessage().' Check licensekit.user.guard and auth.guards/auth.providers.';
         }
-        foreach (['outages'] as $module) {
-            if (! is_bool(config('licensekit.modules.'.$module))) {
-                $errors[] = 'licensekit.modules.'.$module.' must be true or false.';
-            }
-        }
         $handler = config('licensekit.hwid_handler');
         if (! is_string($handler) || ! is_a($handler, HwidHandler::class, true)) {
             $errors[] = 'licensekit.hwid_handler must implement HwidHandler.';
