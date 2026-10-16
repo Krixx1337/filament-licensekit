@@ -5,6 +5,7 @@ namespace LicenseKit;
 use Filament\Contracts\Plugin;
 use Filament\Panel;
 use LicenseKit\Filament\Middleware\EnsurePanelSetup;
+use LicenseKit\Filament\Navigation;
 use LicenseKit\Filament\Pages\ConnectYourApp;
 use LicenseKit\Filament\Pages\Dashboard;
 use LicenseKit\Filament\Pages\SetupNeeded;
@@ -34,6 +35,10 @@ final class LicenseKitPlugin implements Plugin
         $panel->resources([ProductResource::class, LicenseKeyResource::class, BatchResource::class, LicenseResource::class,
             ApiConnectionResource::class, ActivityEntryResource::class, DeviceBanResource::class]);
         $panel->pages([Dashboard::class, ConnectYourApp::class, SetupNeeded::class, TeamAccess::class]);
+        if ($panel->getNavigationGroups() === []) {
+            // Keep the LicenseKit groups in a sensible order unless the host already orders its groups.
+            $panel->navigationGroups([Navigation::LICENSING, Navigation::PROTECTION, Navigation::SETUP]);
+        }
         $panel->authMiddleware([EnsurePanelSetup::class], isPersistent: true);
     }
 

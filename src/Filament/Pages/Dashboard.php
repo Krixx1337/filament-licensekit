@@ -2,41 +2,59 @@
 
 namespace LicenseKit\Filament\Pages;
 
-use LicenseKit\Core\Models\Batch;
-use LicenseKit\Core\Models\License;
-use LicenseKit\Core\Models\LicenseKey;
-use LicenseKit\Core\Models\LoaderSession;
+use Filament\Forms\Components\Select;
+use Filament\Pages\Dashboard as BaseDashboard;
+use Filament\Pages\Dashboard\Concerns\HasFiltersForm;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
 use LicenseKit\Core\Models\Product;
-use LicenseKit\Filament\Resources\LicenseKeys\LicenseKeyResource;
-use LicenseKit\Filament\Resources\Products\ProductResource;
+use LicenseKit\Filament\AdminAccess;
+use LicenseKit\Filament\Navigation;
+use LicenseKit\Filament\Widgets\GetStarted;
+use LicenseKit\Filament\Widgets\LicensesByStatusChart;
+use LicenseKit\Filament\Widgets\LicenseStats;
+use LicenseKit\Filament\Widgets\NeedsAttention;
+use LicenseKit\Filament\Widgets\RecentActivity;
+use LicenseKit\Filament\Widgets\RedemptionsChart;
 
-class Dashboard extends LicenseKitPage
+class Dashboard extends BaseDashboard
 {
+    use HasFiltersForm;
+
+    protected static string $routePath = 'licensekit/dashboard';
+
     protected static ?string $slug = 'licensekit/dashboard';
 
+    protected static string|\UnitEnum|null $navigationGroup = Navigation::LICENSING;
+
     protected static ?string $navigationLabel = 'Dashboard';
+
+    protected static ?string $title = 'Dashboard';
 
     protected static ?int $navigationSort = 10;
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-home';
 
-    protected string $view = 'licensekit::dashboard';
-
-    /** @return array<string, int> */
-    public function stats(): array
+    public static function canAccess(): bool
     {
-        return ['Products' => Product::count(), 'Keys generated' => LicenseKey::count(),
-            'Keys redeemed today' => LicenseKey::where('redeemed_at', '>=', now()->setTimezone(config('app.timezone'))->startOfDay()->utc())->count(),
-            'Active paid licenses' => License::where('status', 'active')->where(fn ($q) => $q->where('is_lifetime', true)->orWhere('expires_at', '>', now()))->count()];
+        return AdminAccess::isSupport();
     }
 
-    /** @return list<array{done: bool, label: string, url: string}> */
-    public function steps(): array
+    public function filtersForm(Schema $schema): Schema
     {
-        return [
-            ['done' => Product::exists(), 'label' => 'Create your first product and plan', 'url' => ProductResource::getUrl()],
-            ['done' => Batch::exists(), 'label' => 'Generate your first keys', 'url' => LicenseKeyResource::getUrl()],
-            ['done' => LoaderSession::exists(), 'label' => 'Connect your app', 'url' => ConnectYourApp::getUrl()],
-        ];
+        return $schema->components([Section::make()->schema([
+            Select::make('product_id')->label('Product')->placeholder('All products')->options(fn (): array => Product::query()->orderBy('name')->pluck('name', 'id')->all()),
+            Select::make('period')->label('Period')->options(['7' => 'Last 7 days', '30' => 'Last 30 days', '90' => 'Last 90 days'])->default('30')->selectablePlaceholder(false),
+        ])->columns(['md' => 2])->columnSpanFull()]);
+    }
+
+    public function getWidgets(): array
+    {
+        return [GetStarted::class, LicenseStats::class, RedemptionsChart::class, LicensesByStatusChart::class, NeedsAttention::class, RecentActivity::class];
+    }
+
+    public function getColumns(): int|array
+    {
+        return ['md' => 3];
     }
 }
