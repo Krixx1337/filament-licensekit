@@ -7,7 +7,6 @@ use Filament\Actions\ActionGroup;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Infolists\Components\CodeEntry;
-use Filament\Infolists\Components\Entry;
 use Filament\Infolists\Components\KeyValueEntry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
@@ -152,49 +151,43 @@ class ConnectYourApp extends LicenseKitPage
     }
 
     /**
-     * A short usage preview per language, with the full client one click away. The full client matters:
-     * it checks each answer's signature, nonce and time, which stops a fake server from granting access.
+     * The full client per language, one click away; with phiki/phiki installed, a highlighted five-line preview too.
+     * The full client matters: it checks each answer's signature, nonce and time, which stops a fake server from granting access.
      *
      * @return list<Tab>
      */
     private function codeTabs(string $base, ?string $publicKey): array
     {
-        $languages = ['python' => ['Python', 'client.py', 'python'], 'csharp' => ['C#', 'Client.cs', 'csharp'],
-            'cpp' => ['C++', 'client.cpp', 'cpp'], 'curl' => ['curl (testing only)', 'client.sh', 'shellscript']];
+        $languages = [
+            'python' => ['Python', 'client.py', 'python', 'A ready-made Python client. Needs the requests and pynacl packages.'],
+            'csharp' => ['C#', 'Client.cs', 'csharp', 'A ready-made C# client. Needs the NSec.Cryptography package.'],
+            'cpp' => ['C++', 'client.cpp', 'cpp', 'A ready-made C++17 client. Needs cpr, libsodium and nlohmann/json.'],
+            'curl' => ['curl (testing only)', 'client.sh', 'shellscript', 'One test login from a terminal. It does not check signatures, so never ship it in your app.'],
+        ];
+        $highlight = class_exists(Phiki::class);
         $tabs = [];
-        foreach ($languages as $key => [$label, $file, $grammar]) {
+        foreach ($languages as $key => [$label, $file, $grammar, $about]) {
             $full = $this->snippet($file, $base, $publicKey);
             $usage = __DIR__.'/../../../resources/snippets/usage/'.$file;
             $preview = is_file($usage) ? trim(str_replace("\r\n", "\n", (string) file_get_contents($usage))) : $full;
-            $schema = [$this->code('code_'.$key, $preview, $grammar)];
-            if ($preview !== $full) {
-                array_unshift($schema, Text::make('How your app uses it. The full example adds the call() function, which checks that every answer really came from your server.'));
-                $schema[] = Actions::make([
-                    Action::make('copy_'.$key)->label('Copy full example')->icon(Heroicon::OutlinedClipboardDocument)->color('gray')
-                        ->alpineClickHandler('window.navigator.clipboard.writeText('.Js::from($full).'); $tooltip('.Js::from('Full example copied')
-                            .', { theme: $store.theme, timeout: 2000 })'),
-                    Action::make('download_'.$key)->label('Download '.$file)->icon(Heroicon::OutlinedArrowDownTray)->color('gray')
-                        ->action(fn () => response()->streamDownload(function () use ($full): void {
-                            echo $full;
-                        }, $file, ['Cache-Control' => 'private, no-store'])),
-                ])->key('code_actions_'.$key);
+            $schema = [Text::make($about.($key === 'curl' ? '' : ' It signs in, redeems keys, sends the heartbeat and checks that every answer really came from your server.'))];
+            // Without phiki/phiki a plain code block looks rough, so the code is only shown when it can be highlighted.
+            if ($highlight) {
+                $schema[] = CodeEntry::make('code_'.$key)->hiddenLabel()->state($preview)->grammar($grammar)->copyable()->copyMessage('Copied');
             }
+            $schema[] = Actions::make([
+                Action::make('copy_'.$key)->label($key === 'curl' ? 'Copy command' : 'Copy full example')->icon(Heroicon::OutlinedClipboardDocument)
+                    ->alpineClickHandler('window.navigator.clipboard.writeText('.Js::from($full).'); $tooltip('.Js::from('Copied').', { theme: $store.theme, timeout: 2000 })'),
+                Action::make('download_'.$key)->label('Download '.$file)->icon(Heroicon::OutlinedArrowDownTray)->color('gray')
+                    ->action(fn () => response()->streamDownload(function () use ($full): void {
+                        echo $full;
+                    }, $file, ['Cache-Control' => 'private, no-store'])),
+            ])->key('code_actions_'.$key);
             // Explicit keys: Filament keys tabs by label slug, and "C#" and "C++" both become "c".
             $tabs[] = Tab::make($label)->key('snippet-'.$key)->schema($schema);
         }
 
         return $tabs;
-    }
-
-    /** Highlighted with CodeEntry when the host has installed phiki/phiki, otherwise a plain code block. */
-    private function code(string $name, string $code, string $grammar): Entry
-    {
-        if (class_exists(Phiki::class)) {
-            return CodeEntry::make($name)->hiddenLabel()->state($code)->grammar($grammar)->copyable()->copyMessage('Copied');
-        }
-
-        return TextEntry::make($name)->hiddenLabel()->markdown()->state("```\n".$code."\n```")
-            ->copyable()->copyableState($code)->copyMessage('Copied');
     }
 
     private function status(string $label, bool $good, string $yes, string $no): TextEntry

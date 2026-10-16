@@ -16,8 +16,9 @@ test('connect your app shows readiness, key, addresses and code for the chosen p
     Livewire::withQueryParams(['product' => $beta->id])->test(ConnectYourApp::class)
         ->assertSee(['Loader API', 'Signing key', 'Ready', 'First app login', 'Not yet', '1. Copy your public key'])
         ->assertSee(url('api/licensekit/beta/login'))->assertDontSee(url('api/licensekit/alpha/login'))
-        ->assertSee(['Python', 'C#', 'What customers may see', 'Copy full example', 'Download client.py'])
-        ->assertSee('only run your software while this is True')
+        ->assertSee(['Python', 'C#', 'What customers may see', 'Copy full example', 'Download client.py', 'Needs the requests and pynacl packages'])
+        // Without phiki/phiki the code is not shown, only the copy and download buttons.
+        ->assertDontSee('fi-in-code', false)
         // C# and C++ once shared a tab key, so they opened and closed together.
         ->assertSee(['snippet-csharp', 'snippet-cpp']);
 });
