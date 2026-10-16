@@ -15,14 +15,15 @@ Installer publishes configuration and creates a private Ed25519 key at `storage/
 
 ## First product and keys
 
-1. Open Dashboard, then Products. Create a product with an inline plan.
-2. Choose duration or Lifetime. Leave device locking on to bind licenses to first PC.
-3. Choose customer move cooldown or Never for support-only changes.
-4. Open Keys / Generate keys. Pick product, plan and quantity. Label is optional.
-5. Copy results or explicitly download `.txt`. Give license on Licenses issues and redeems for a customer in one action.
-6. Open Settings / Connect your app. Embed its public key and use a client example.
+The sidebar has three groups: **Licensing** (Dashboard, Licenses, Keys, Key batches, Products), **Protection** (Banned PCs, Activity log) and **Setup** (Connect your app, Store connections, Team access). The Dashboard shows a checklist until your first app login.
 
-Loaders should check signed heartbeat every 60 seconds and stop allowing access after access deadline or failed check. Sessions expire after 15 minutes without valid heartbeat.
+1. Open **Products → Create product**. Give it a name and at least one plan, such as Monthly (30 days) or Lifetime.
+2. Leave **Lock each license to one PC** on to stop key sharing, and choose how often customers may move to a new PC. Pick "Never" if only your team should move them.
+3. Open **Keys → Generate keys**. The wizard asks for the product and plan, how many keys and an optional label, then shows a summary. Copy the keys or download them as a `.txt` file.
+4. To give someone access without a key, use **Licenses → Give license**.
+5. Open **Setup → Connect your app**. Paste the public key into your app and start from one of the example clients.
+
+Your app should send a signed heartbeat every 60 seconds and stop when access ends or a check fails. A session expires after 15 minutes without a valid heartbeat.
 
 ## Customer website
 
@@ -50,11 +51,13 @@ If host user model implements Laravel's `MustVerifyEmail`, verification is requi
 
 ## Staff, time and access
 
-Every panel user is admin unless your host defines `licensekit.admin` and `licensekit.support`. Support can look up licenses, add time, pause/resume, suspend/unsuspend and reset devices. Admin also manages products, issuance, connections and bans. Native model policies can restrict further.
+Every panel user is an Admin until your app defines the `licensekit.admin` and `licensekit.support` gates. Support can look up licenses, add time, pause and resume, suspend and unsuspend, and reset a customer's PC. Admin can also manage products, generate keys, connect stores and ban PCs. **Setup → Team access** lists this for your team. Your normal model policies still apply on top.
 
-Store UTC; display app/panel local time. Notes are optional.
+On **Licenses**, the tabs (Active, Expiring soon, Paused, Suspended, Expired, Cancelled) sort customers by status, and the sidebar badge counts licenses that run out within 7 days. **Add time** is the main button on every license; everything else is in its **Manage** menu. Each change shows a confirmation and is written to the activity log.
 
-Maintenance stops loader access while license clocks continue. Add time afterwards to credit downtime; preview includes paused licenses and optionally recently expired licenses.
+Times are stored in UTC and shown in your app's timezone. Notes are optional.
+
+Maintenance mode stops app access while license clocks keep running. Afterwards, use **Add time** on the product to make up for the downtime. The preview counts paused licenses and, if you choose, licenses that expired recently.
 
 Free window includes start and excludes end. Accounts and device rules still apply. Paid clocks continue; paused customers keep saved time. Suspended and cancelled licenses remain denied.
 

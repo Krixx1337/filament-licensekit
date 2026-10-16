@@ -25,7 +25,7 @@ Register in your existing non-tenant Filament panel:
 $panel->plugin(\LicenseKit\LicenseKitPlugin::make());
 ```
 
-Open Dashboard. Create a product and plan, generate keys, then open Settings / Connect your app for endpoints, signing public key and client examples.
+Open the Dashboard and follow its three-step checklist: create a product with a plan, generate keys, then open **Setup → Connect your app** for the addresses, the public key and example code.
 
 Add to an authenticated Blade page:
 

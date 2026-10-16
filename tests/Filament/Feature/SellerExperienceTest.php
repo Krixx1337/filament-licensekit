@@ -6,6 +6,7 @@ use LicenseKit\Core\Models\LicensePlan;
 use LicenseKit\Filament\Pages\ConnectYourApp;
 use LicenseKit\Filament\Resources\LicenseKeys\Pages\ManageLicenseKeys;
 use LicenseKit\Filament\Resources\Licenses\Pages\ManageLicenses;
+use LicenseKit\Filament\Support\TimeLeft;
 use LicenseKit\Tests\Filament\Fixtures\User;
 use Livewire\Livewire;
 
@@ -36,7 +37,7 @@ test('connect diagnostic shows access without locking device or changing clock',
     $license = License::factory()->create(['user_id' => $user->id]);
     $before = $license->fresh()->getAttributes();
     Livewire::test(ConnectYourApp::class)->callAction('check_customer', data: ['user_id' => $user->id, 'product_id' => $license->product_id, 'device' => 'pc'])
-        ->assertHasNoActionErrors()->assertSee('Allowed until');
+        ->assertHasNoActionErrors()->assertNotified('Allowed until '.TimeLeft::date($license->expires_at));
     expect($license->fresh()->getAttributes())->toBe($before);
     $this->assertDatabaseCount('licensekit_loader_sessions', 0);
 });

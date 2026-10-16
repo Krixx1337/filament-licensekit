@@ -3,10 +3,14 @@
 namespace LicenseKit\Filament\Resources\DeviceBans;
 
 use Filament\Actions\Action;
+use Filament\Notifications\Notification;
+use Filament\Support\Enums\FontFamily;
+use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use LicenseKit\Core\Actions\DeviceBans;
 use LicenseKit\Core\Models\DeviceBan;
+use LicenseKit\Core\Users\ConfiguredUserModel;
 use LicenseKit\Filament\AdminAccess;
 use LicenseKit\Filament\Navigation;
 use LicenseKit\Filament\Resources\LicensingResource;
@@ -27,12 +31,28 @@ class DeviceBanResource extends LicensingResource
 
     public static function table(Table $table): Table
     {
-        return $table->columns([TextColumn::make('device')->limit(24)->searchable(), TextColumn::make('product.name')->label('Product')->placeholder('All products'),
-            TextColumn::make('note')->searchable()->limit(60), TextColumn::make('created_by')->label('Banned by'),
-            TextColumn::make('created_at')->since()->dateTimeTooltip(config('app.timezone'))])
-            ->recordActions([Action::make('unban')->label('Unban')->requiresConfirmation()->authorize(fn () => AdminAccess::isAdmin())
+        return $table->columns([TextColumn::make('device')->label('PC fingerprint')->fontFamily(FontFamily::Mono)->limit(24)->searchable(['device', 'note'])
+            ->description(fn (DeviceBan $record): ?string => $record->note),
+            TextColumn::make('product.name')->label('Banned from')->placeholder('All products')->badge()->color('danger'),
+            TextColumn::make('created_by')->label('Banned by')->formatStateUsing(fn (string $state): string => self::banner($state)),
+            TextColumn::make('created_at')->label('When')->since()->dateTimeTooltip(timezone: config('app.timezone'))])
+            ->recordActions([Action::make('unban')->label('Unban')->icon(Heroicon::OutlinedLockOpen)->requiresConfirmation()->modalIcon(Heroicon::OutlinedLockOpen)
+                ->authorize(fn () => AdminAccess::isAdmin())
                 ->modalDescription('The PC can connect again. Suspended licenses remain suspended until you unsuspend them.')
-                ->action(fn (DeviceBan $record) => app(DeviceBans::class)->unban($record, AdminAccess::actor()))]);
+                ->action(function (DeviceBan $record): void {
+                    app(DeviceBans::class)->unban($record, AdminAccess::actor());
+                    Notification::make()->title('PC unbanned')->success()->send();
+                })])
+            ->emptyStateHeading('No banned PCs')->emptyStateIcon('heroicon-o-no-symbol')
+            ->emptyStateDescription('Ban a PC from a license\'s Manage menu. A banned PC cannot log in with any account.')
+            ->defaultSort('id', 'desc');
+    }
+
+    /** "user:5" becomes that person's name. */
+    private static function banner(string $actor): string
+    {
+        return str_starts_with($actor, 'user:')
+            ? (ConfiguredUserModel::query()->whereKey(substr($actor, 5))->value(config('licensekit.user_label')) ?? $actor) : $actor;
     }
 
     public static function getPages(): array

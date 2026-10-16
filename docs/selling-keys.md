@@ -4,13 +4,13 @@ Keys are vouchers for account access. Your store owns orders, payments and deliv
 
 ## Manual sales and refunds
 
-Use Keys / Generate keys. Pick product, plan and quantity; optional label identifies reseller or giveaway. Copy results or explicitly download `.txt`.
+Open **Keys → Generate keys**. Choose the product and plan, how many keys you need and an optional label (for example the reseller's name or "October giveaway"). Copy the keys or download them as a `.txt` file. You can also select keys in the list and choose **Download selected**.
 
-Key batches under Settings show unused, redeemed and cancelled counts. Download unused keys or cancel them after reseller dispute. Customers who redeemed keep their time. Cancel their license separately after refund; cancellation blocks paid/free access and renewal until staff restore it.
+**Key batches** shows each batch with its progress, such as "12 of 50 redeemed". From a batch's menu you can download its unused keys, or cancel them after a leak or a reseller dispute. Customers who already redeemed keep their time. To take access away from one customer after a refund, open their license and choose **Manage → Cancel license**. A cancelled license gets no paid or free access and cannot be renewed until you restore it.
 
 ## Store and reseller connections
 
-Settings / Store & reseller connections offers allowed products, max keys per request and Active. Connection can issue allowed products and read only batches attributed to it. No reseller user or token scopes.
+Open **Setup → Store connections → New store connection**. Choose which products it may sell, the most keys it can request at once, and whether it is active. A connection can create keys for its products and read only the batches it made.
 
 Copy token from one-time modal. Only SHA-256 hash is stored. Regenerate invalidates old token immediately. Disable connection to stop API access without changing keys/licenses.
 

@@ -31,6 +31,17 @@ class ActivityEntry extends Model
     /** @use HasFactory<ActivityEntryFactory> */
     use HasFactory;
 
+    /** What each event means, as it reads after the person's name. */
+    public const EVENTS = [
+        'key_redeemed' => 'redeemed a key', 'keys_generated' => 'generated keys', 'key_cancelled' => 'cancelled a key',
+        'batch_unused_cancelled' => 'cancelled unused keys', 'key_note_updated' => 'edited a key note',
+        'license_extended' => 'added time', 'product_time_added' => 'added time to a product', 'license_paused' => 'paused a license',
+        'license_resumed' => 'resumed a license', 'license_status_changed' => 'changed a license status', 'license_note_updated' => 'edited a license note',
+        'device_moved' => 'moved to a new PC', 'device_reset' => 'reset the PC', 'device_banned' => 'banned a PC', 'device_unbanned' => 'unbanned a PC',
+        'product_created' => 'created a product', 'product_saved' => 'updated a product',
+        'connection_saved' => 'saved a store connection', 'connection_token_regenerated' => 'made a new store token',
+    ];
+
     public function description(): string
     {
         return $this->summary().' on '.class_basename($this->subject_type).' #'.$this->subject_id;
@@ -39,15 +50,13 @@ class ActivityEntry extends Model
     /** Who did what, without the subject: "admin@example.com added time". */
     public function summary(): string
     {
-        $actor = $this->meta['actor_label'] ?? $this->actor;
-        $verb = match ($this->event) {
-            'key_redeemed' => 'redeemed a key', 'device_moved' => 'moved the device', 'device_reset' => 'reset the device',
-            'device_banned' => 'banned the device', 'device_unbanned' => 'unbanned the device',
-            'license_extended', 'product_time_added' => 'added time', 'license_paused' => 'paused the license',
-            'license_resumed' => 'resumed the license', 'license_status_changed' => 'changed the license status',
-            'keys_generated' => 'generated keys', 'product_created' => 'created a product', 'product_saved' => 'updated a product',
-            default => str_replace('_', ' ', $this->event),
+        $actor = $this->meta['actor_label'] ?? match ($this->actor) {
+            'system' => 'LicenseKit',
+            'api' => 'Your store',
+            'app' => 'Your app',
+            default => $this->actor,
         };
+        $verb = self::EVENTS[$this->event] ?? str_replace('_', ' ', $this->event);
 
         return $actor.' '.$verb;
     }
