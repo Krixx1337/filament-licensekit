@@ -40,15 +40,36 @@ test('bot stamps its owner and lists manual purchases without exposing other res
     $this->withToken($token)->getJson(route('licensekit.management.batches.keys', $foreign->id))->assertNotFound();
 });
 
-test('unavailable connection owner gets 403 on next API request', function (array $attributes) {
+test('suspended connection owner gets 403 on next API request', function () {
     $owner = User::factory()->create();
     $connection = ApiConnection::factory()->create(['user_id' => $owner->id]);
     $token = app(ManageApiConnections::class)->regenerate($connection, $owner);
-    $owner->update($attributes);
+    $owner->update(['is_suspended' => true]);
 
     $this->withToken($token)->getJson(route('licensekit.management.batches.index'))->assertForbidden()->assertJsonPath('error', 'user_unavailable');
     expect($connection->fresh()->last_used_at)->toBeNull();
-})->with(['suspended' => [['is_suspended' => true]], 'unverified' => [['email_verified_at' => null]]]);
+});
+
+test('an unverified owner\'s bot keeps working', function () {
+    $owner = User::factory()->create(['email_verified_at' => null]);
+    $connection = ApiConnection::factory()->create(['user_id' => $owner->id]);
+    $token = app(ManageApiConnections::class)->regenerate($connection, $owner);
+
+    $this->withToken($token)->getJson(route('licensekit.management.batches.index'))->assertOk();
+});
+
+test('deleting the owner disables their bot instead of leaving an unowned token', function () {
+    $owner = User::factory()->create();
+    $connection = ApiConnection::factory()->create(['user_id' => $owner->id]);
+    $shop = ApiConnection::factory()->create();
+    $token = app(ManageApiConnections::class)->regenerate($connection, $owner);
+
+    $owner->delete();
+
+    expect($connection->fresh())->user_id->toBeNull()->is_active->toBeFalse()
+        ->and($shop->fresh()->is_active)->toBeTrue();
+    $this->withToken($token)->getJson(route('licensekit.management.batches.index'))->assertUnauthorized();
+});
 
 test('changing reseller on same reference conflicts with 409', function () {
     $plan = LicensePlan::factory()->create();

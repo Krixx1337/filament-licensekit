@@ -25,7 +25,7 @@ curl -X POST 'https://your-site.test/api/licensekit/store/batches' \
   -d '{"plan_id":1,"quantity":10,"reference":"order-123","label":"October sale"}'
 ```
 
-New batches belong to the connection owner automatically. The bot can read its own batches and all batches assigned to its owner, including manual purchases. Other resellers' batches stay private. With `user_suspended_column` configured, suspending the owner's website account blocks the token on its next request with `user_unavailable` and HTTP 403. An owner must also satisfy the host's email verification requirement. An ownerless connection reads only its own batches.
+New batches belong to the connection owner automatically. The bot can read its own batches and all batches assigned to its owner, including manual purchases. Other resellers' batches stay private. With `user_suspended_column` configured, suspending the owner's website account blocks the token on its next request with `user_unavailable` and HTTP 403. Email verification does not affect bots. Deleting the owner's account turns their connections off. An ownerless connection reads only its own batches.
 
 Use a stable reference per order. Identical retries return the original batch and keys. Changing the plan, quantity, custom duration or reseller returns `batch_conflict` with HTTP 409. Each connection has its own reference namespace. Catalog reads respect allowed products; past batch reads remain available after product permissions change.
 

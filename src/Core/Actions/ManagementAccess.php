@@ -18,7 +18,8 @@ class ManagementAccess
         if ($connection === null) {
             throw new LicensingException('invalid_token', 401);
         }
-        if ($connection->user_id !== null && ($connection->user === null || ! app(UserAccess::class)->available($connection->user))) {
+        // Only suspension blocks a reseller's bot; email verification is a customer sign-in rule.
+        if ($connection->user_id !== null && ($connection->user === null || app(UserAccess::class)->suspended($connection->user))) {
             throw new LicensingException('user_unavailable', 403);
         }
         $connection->forceFill(['last_used_at' => now()])->save();
