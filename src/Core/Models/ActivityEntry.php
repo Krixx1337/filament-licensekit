@@ -4,6 +4,7 @@ namespace LicenseKit\Core\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use LicenseKit\Core\Actions\SignInProblems;
 use LicenseKit\Core\Casts\UtcDateTime;
 use LicenseKit\Database\Factories\Core\ActivityEntryFactory;
 
@@ -41,6 +42,7 @@ class ActivityEntry extends Model
         'device_moved' => 'moved to a new PC', 'device_reset' => 'reset the PC', 'device_banned' => 'banned a PC', 'device_unbanned' => 'unbanned a PC',
         'product_created' => 'created a product', 'product_saved' => 'updated a product',
         'connection_saved' => 'saved a store connection', 'connection_token_regenerated' => 'made a new store token',
+        SignInProblems::EVENT => "couldn't sign in",
     ];
 
     public function description(): string
@@ -58,6 +60,9 @@ class ActivityEntry extends Model
             default => $this->actor,
         };
         $verb = self::EVENTS[$this->event] ?? str_replace('_', ' ', $this->event);
+        if ($this->event === SignInProblems::EVENT && is_string($this->meta['code'] ?? null)) {
+            $verb .= ' ('.SignInProblems::reason($this->meta['code']).')';
+        }
 
         return $actor.' '.$verb;
     }

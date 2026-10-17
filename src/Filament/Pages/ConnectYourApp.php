@@ -24,10 +24,8 @@ use Filament\Support\Enums\FontFamily;
 use Filament\Support\Enums\TextSize;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Js;
-use LicenseKit\Core\Actions\AccessPolicy;
-use LicenseKit\Core\Actions\DeviceBans;
 use LicenseKit\Core\Actions\ResponseSigning;
-use LicenseKit\Core\Contracts\DeviceMatcher;
+use LicenseKit\Core\Actions\SignInCheck;
 use LicenseKit\Core\Exceptions\LicensingException;
 use LicenseKit\Core\Models\LoaderSession;
 use LicenseKit\Core\Models\Product;
@@ -101,13 +99,7 @@ class ConnectYourApp extends LicenseKitPage
         $user = ConfiguredUserModel::className()::findOrFail($data['user_id']);
         $product = Product::whereKey($data['product_id'])->firstOrFail();
         try {
-            $access = app(AccessPolicy::class)->authorize($user, $product);
-            if (! empty($data['device'])) {
-                app(DeviceBans::class)->assertAllowed($product, $data['device']);
-                if ($product->device_lock && $access->license?->device !== null && ! app(DeviceMatcher::class)->matches($product, $access->license->device, $data['device'])) {
-                    throw new LicensingException('device_mismatch');
-                }
-            }
+            $access = app(SignInCheck::class)->check($user, $product, $data['device'] ?? null);
             Notification::make()->success()->title($access->validUntil === null ? 'Allowed: lifetime access' : 'Allowed until '.TimeLeft::date($access->validUntil))->send();
         } catch (LicensingException $exception) {
             Notification::make()->danger()->title('Not allowed')->body($exception->friendlyMessage())->send();

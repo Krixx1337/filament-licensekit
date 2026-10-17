@@ -13,6 +13,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use LicenseKit\Core\Actions\SignInProblems;
 use LicenseKit\Core\Models\ActivityEntry;
 use LicenseKit\Core\Models\License;
 use LicenseKit\Core\Models\Product;
@@ -64,6 +65,8 @@ class ActivityEntryResource extends LicensingResource
         ])->filters([
             Filter::make('pc_changes')->label('PC changes only')->toggle()
                 ->query(fn ($query) => $query->whereIn('event', PcHistory::EVENTS)),
+            Filter::make('sign_in_problems')->label('Sign-in problems only')->toggle()
+                ->query(fn ($query) => $query->where('event', SignInProblems::EVENT)),
             SelectFilter::make('event')->label('Type')->multiple()
                 ->options(collect(ActivityEntry::EVENTS)->map(fn (string $verb): string => ucfirst($verb))->sort()->all()),
             SelectFilter::make('product_id')->label('Product')->options(fn () => Product::pluck('name', 'id'))

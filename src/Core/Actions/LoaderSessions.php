@@ -2,6 +2,7 @@
 
 namespace LicenseKit\Core\Actions;
 
+use Closure;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Model;
@@ -26,6 +27,7 @@ class LoaderSessions
         private LicenseClock $clock,
         private UserAccess $users,
         private ClaimLicense $claims,
+        private SignInProblems $problems,
     ) {}
 
     /** @return array<string, mixed> */
@@ -34,12 +36,17 @@ class LoaderSessions
         $provider = Auth::createUserProvider(ConfiguredUserModel::provider());
         $credentials = [(string) config('licensekit.client_login_column') => $login, 'password' => $password];
         $user = $provider?->retrieveByCredentials($credentials);
-        if (! $user instanceof Model || ! $provider->validateCredentials($user, $credentials)) {
+        if (! $user instanceof Model) {
+            throw new LicensingException('invalid_credentials', 401);
+        }
+        if (! $provider->validateCredentials($user, $credentials)) {
+            $this->problems->record($user, $product, 'invalid_credentials', $device);
+
             throw new LicensingException('invalid_credentials', 401);
         }
         $fingerprint = $this->fingerprint($user);
 
-        return DB::transaction(function () use ($product, $user, $fingerprint, $device, $move): array {
+        return $this->noting(fn (): Model => $user, $product, $device, fn (): array => DB::transaction(function () use ($product, $user, $fingerprint, $device, $move): array {
             $user = $user->fresh() ?? throw new LicensingException('invalid_credentials', 401);
             if (! hash_equals($fingerprint, $this->fingerprint($user))) {
                 throw new LicensingException('invalid_credentials', 401);
@@ -62,25 +69,25 @@ class LoaderSessions
                 'expires_at' => now()->addMinutes(15), 'last_seen_at' => now()]);
 
             return [...$result, 'token' => $token, 'expires_at' => $session->expires_at->toIso8601String(), 'heartbeat_seconds' => 60];
-        }, 3);
+        }, 3));
     }
 
     /** @return array<string, mixed> */
     public function heartbeat(Product $product, #[\SensitiveParameter] string $token, string $device): array
     {
-        return DB::transaction(function () use ($product, $token, $device): array {
+        return $this->noting(fn (): ?Model => $this->tokenUser($product, $token), $product, $device, fn (): array => DB::transaction(function () use ($product, $token, $device): array {
             [$session, $user] = $this->session($product, $token, $device);
             $result = $this->accessResult($user, $product, $device);
             $session->update(['last_seen_at' => now(), 'expires_at' => now()->addMinutes(15)]);
 
             return [...$result, 'expires_at' => $session->expires_at->toIso8601String(), 'heartbeat_seconds' => 60];
-        }, 3);
+        }, 3));
     }
 
     /** @return array<string, mixed> */
     public function redeem(Product $product, #[\SensitiveParameter] string $token, string $key): array
     {
-        return DB::transaction(function () use ($product, $token, $key): array {
+        return $this->noting(fn (): ?Model => $this->tokenUser($product, $token), $product, null, fn (): array => DB::transaction(function () use ($product, $token, $key): array {
             [$session, $user] = $this->session($product, $token);
             $candidate = LicenseKey::where('key', app(SerialKey::class)->normalize($key))->first();
             if ($candidate === null || $candidate->batch->plan->product_id !== $product->id) {
@@ -89,7 +96,34 @@ class LoaderSessions
             $this->claims->claim($user, $key);
 
             return $this->accessResult($user, $product, $session->device);
-        }, 3);
+        }, 3));
+    }
+
+    /**
+     * Logs a refusal after the transaction has rolled back, so the log entry survives.
+     *
+     * @param  Closure(): ?Model  $user
+     * @param  Closure(): array<string, mixed>  $call
+     * @return array<string, mixed>
+     */
+    private function noting(Closure $user, Product $product, ?string $device, Closure $call): array
+    {
+        try {
+            return $call();
+        } catch (LicensingException $exception) {
+            if (($customer = $user()) !== null) {
+                $this->problems->record($customer, $product, $exception->error, $device);
+            }
+
+            throw $exception;
+        }
+    }
+
+    private function tokenUser(Product $product, #[\SensitiveParameter] string $token): ?Model
+    {
+        $session = LoaderSession::where('token_hash', hash('sha256', $token))->where('product_id', $product->id)->first();
+
+        return $session === null ? null : ConfiguredUserModel::query()->whereKey($session->user_id)->first();
     }
 
     /** @return array{0: LoaderSession, 1: Model} */

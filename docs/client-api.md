@@ -13,6 +13,7 @@ Call the [stable PHP API](extending.md#stable-php-api) from your own controllers
 3. Issue your own session token. Store it however you like.
 4. Every heartbeat: `LicensedDevices::verify(...)` again. It rechecks account, license, bans and PC.
 5. Listen for `AccessRevoked` and end that license's sessions (reset, move, suspension, cancellation).
+   Refusals are logged for support automatically; wrong passwords are yours to log with `SignInProblems::record`.
 6. Optional: `moveDevice` for a new PC (product cooldown applies), `ClaimLicense::claim` to redeem keys.
 7. Sign responses your way, and pin the key or secret in your app.
 

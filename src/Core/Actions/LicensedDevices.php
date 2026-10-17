@@ -2,6 +2,7 @@
 
 namespace LicenseKit\Core\Actions;
 
+use Closure;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
@@ -21,26 +22,38 @@ class LicensedDevices
 {
     public const MAXIMUM_DEVICE_BYTES = 1024;
 
-    public function __construct(private AccessPolicy $access, private DeviceMatcher $matcher, private UserAccess $users, private ActivityLog $audit, private DeviceBans $bans) {}
+    public function __construct(
+        private AccessPolicy $access,
+        private DeviceMatcher $matcher,
+        private UserAccess $users,
+        private ActivityLog $audit,
+        private DeviceBans $bans,
+        private SignInProblems $problems,
+    ) {}
 
     /** Checks access and the saved device without changing anything. */
     public function verify(Model $user, Product $product, #[\SensitiveParameter] string $device): DeviceAuthorization
     {
-        return $this->authorize($user, $product, $device, false);
+        return $this->noting($user, $product, $device, fn (): DeviceAuthorization => $this->authorize($user, $product, $device, false));
     }
 
     /** Checks access and saves the device on first use; a different device is rejected. */
     public function bind(Model $user, Product $product, #[\SensitiveParameter] string $device): DeviceAuthorization
     {
-        return DB::transaction(function () use ($user, $product, $device): DeviceAuthorization {
+        return $this->noting($user, $product, $device, fn (): DeviceAuthorization => DB::transaction(function () use ($user, $product, $device): DeviceAuthorization {
             [$user, $product] = $this->lock($user, $product);
 
             return $this->authorize($user, $product, $device, true);
-        }, 3);
+        }, 3));
     }
 
     /** Customer self-service: moves the license to the device they are on now, subject to the product cooldown. */
     public function moveDevice(Model $user, Product $product, #[\SensitiveParameter] string $device): License
+    {
+        return $this->noting($user, $product, $device, fn (): License => $this->move($user, $product, $device));
+    }
+
+    private function move(Model $user, Product $product, string $device): License
     {
         $device = $this->validDevice($device);
         $this->bans->assertAllowed($product, $device);
@@ -128,6 +141,25 @@ class LicensedDevices
         }
 
         return new DeviceAuthorization($access->user, $access, $device);
+    }
+
+    /**
+     * Logs a refusal for support, then lets it through. Every protocol built on these calls gets the log.
+     *
+     * @template T
+     *
+     * @param  Closure(): T  $check
+     * @return T
+     */
+    private function noting(Model $user, Product $product, string $device, Closure $check): mixed
+    {
+        try {
+            return $check();
+        } catch (LicensingException $exception) {
+            $this->problems->record($user, $product, $exception->error, $device);
+
+            throw $exception;
+        }
     }
 
     private function assertCustomerMayChange(License $license, Product $product): void

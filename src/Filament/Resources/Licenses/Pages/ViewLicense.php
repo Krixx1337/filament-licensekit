@@ -8,6 +8,7 @@ use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\Support\Htmlable;
 use LicenseKit\Core\Models\License;
 use LicenseKit\Filament\Actions\LicensingActions;
+use LicenseKit\Filament\Actions\SignInHelp;
 use LicenseKit\Filament\Concerns\DisplaysLicensingErrors;
 use LicenseKit\Filament\Resources\Licenses\LicenseResource;
 use LicenseKit\Filament\Support\TimeLeft;
@@ -40,6 +41,7 @@ class ViewLicense extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
+            SignInHelp::make(),
             LicensingActions::extendLicense(),
             ActionGroup::make(LicensingActions::licenseMenu())->label('Manage')->button()->color('gray')->icon(Heroicon::OutlinedChevronDown)->iconPosition('after'),
         ];

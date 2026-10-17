@@ -7,11 +7,11 @@ Services: `LicenseKit\Core\Actions`. Models: `LicenseKit\Core\Models`. Authorize
 Build your own app protocol on these. From 1.0 they keep their signatures within a major version; until then, breaking changes are marked **Breaking** in the changelog.
 
 - `LicensedDevices`: `bind`, `verify`, `moveDevice`, `reset`, `adminReset`, `eligibility`
-- `AccessPolicy::authorize`, `ClaimLicense::claim`, `Keys::issue`
-- `ManageLicenses`, `ManageKeys`, `DeviceBans`, `CustomerLicenses`, `ResellerBatches`
+- `AccessPolicy::authorize`, `SignInCheck::check`, `ClaimLicense::claim`, `Keys::issue`
+- `ManageLicenses`, `ManageKeys`, `DeviceBans`, `CustomerLicenses`, `ResellerBatches`, `SignInProblems::record`
 - Events `KeyRedeemed`, `AccessRevoked`; `LicensingException` `error` and `status`
 
-Every check (account, license, PC lock, bans, expiry) runs inside these calls, so a custom protocol cannot skip one. Your protocol picks its routes, fields, tokens and signing. Full example: [CustomProtocolTest](../tests/Core/Feature/CustomProtocolTest.php) and [its controller](../tests/Core/Fixtures/CustomProtocolController.php).
+Every check (account, license, PC lock, bans, expiry) runs inside these calls, so a custom protocol cannot skip one. Refusals from `LicensedDevices` are logged for the license page's "Why can't they sign in?" (same problem once per 10 minutes); if you call them inside your own transaction, log rolled-back refusals yourself with `SignInProblems::record` after it ends. Your protocol picks its routes, fields, tokens and signing. Full example: [CustomProtocolTest](../tests/Core/Feature/CustomProtocolTest.php) and [its controller](../tests/Core/Fixtures/CustomProtocolController.php).
 
 ## Issue and redeem
 
