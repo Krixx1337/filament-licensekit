@@ -1,27 +1,62 @@
-![LicenseKit](art/licensekit-banner.png)
+![LicenseKit self-hosted software licensing](art/licensekit-banner.png)
 
-# LicenseKit
+# 🛡️ LicenseKit
 
-Self-hosted licensing for desktop software with HWID locks: game tools, mods, cheats and utilities. It runs inside your Laravel and Filament site.
+> **Your licenses. Your server. Your rules.**
 
-- **Sell anywhere.** Your own site, Stripe, Shopify, WooCommerce or Telegram resellers, all at once. Payments stay outside LicenseKit, so losing a payment processor never touches your licenses.
-- **Your protocol, our core.** LicenseKit runs every check: account, license, PC lock, bans and expiry. Your app talks to it however you like; a signed example API gets you started.
-- **Account-first.** Buyers register once (two minutes) and redeem keys. You get a trail from key to reseller to player, one-click bans and self-service PC resets.
-- **Support built in.** See why a customer can't sign in, and paste the reply.
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Packagist](https://img.shields.io/packagist/v/licensekit/licensekit?include_prereleases)](https://packagist.org/packages/licensekit/licensekit)
+[![PHP](https://img.shields.io/badge/PHP-8.3%2B-777BB4.svg)](https://www.php.net/)
+[![Laravel](https://img.shields.io/badge/Laravel-12%20%7C%2013-FF2D20.svg)](https://laravel.com)
+[![Filament](https://img.shields.io/badge/Filament-4%20%7C%205-FDAE4B.svg)](https://filamentphp.com)
 
-| | Hosted services such as KeyAuth | LicenseKit |
-|---|---|---|
-| Runs on | Their servers | Your server |
-| Customer data | Their database | Your database |
-| App protocol | Same for every seller | Yours (example included) |
-| Stability | Their release schedule | Versioned API and stable PHP services |
-| Cost | Monthly plan | Free, MIT |
+Self-hosted licensing for **game tools, mods, cheats and desktop apps**, built right into your Laravel + Filament site.
 
-Requires PHP 8.3+ with sodium, Laravel 12/13, Filament 4.13.3+ or 5.8.3+.
+Stop paying monthly fees to a service that can change the rules, go down on a busy weekend, or break the app you already shipped. Run licensing on your own server, with your own data, and no middleman.
 
-Pre-release. This simplification changes PHP APIs, configuration and initial schema. Use a fresh development database; earlier alpha installs have no upgrade migration.
+I've run licensing for private desktop software since 2019. This is the package I wish I had when I started.
 
-## Quick start
+> **Pre-release.** APIs and configuration may change before 1.0. See the [changelog](CHANGELOG.md).
+
+## 🚀 Why sellers switch
+
+* **💳 Sell anywhere, all at once.** Your own site, Stripe, Shopify, WooCommerce, Telegram resellers. Payments never touch LicenseKit, so if a payment processor shuts down one store, your licenses keep working.
+* **🔒 HWID lock that customers don't hate.** One PC per license. Customers move to a new PC themselves, limited by your cooldown. Staff can override anytime.
+* **🚫 PC bans that catch alt accounts.** Ban the hardware, not just the account. LicenseKit warns you when that PC is used by other accounts too.
+* **🤝 Built for resellers.** Generate key batches, export a `.txt` in one click, and cancel unsold keys after a payment dispute. Customers who already redeemed keep their time. Resellers get their own page and a bot API. Suspend one account and their bots stop too.
+* **🕵️ Support in one click.** "Why can't they sign in?" shows exactly what the app would say, the recent refusals, and a reply ready to paste into Discord.
+* **⏸️ Vacation mode, free weekends, downtime credit.** Freeze a subscription and resume it later. Schedule a free weekend. Server was down? Add 6 hours to every active license of that product in one action.
+* **🧩 Your protocol, our core.** LicenseKit runs every check on the server: account, license, PC lock, bans, expiry. Your app talks to it any way you like, so there is no one-size-fits-all bypass tool. Starting out? Use the signed example API with ready-made Python, C# and C++ clients.
+* **📊 A dashboard you'll actually open.** Live stats, redemption charts, expiring licenses and suspicious PC changes, all in native Filament.
+
+## 📊 Quick comparison
+
+| | KeyAuth | Keygen | **LicenseKit** |
+| :--- | :---: | :---: | :---: |
+| **Runs on your server** | ❌ Hosted only | ✅ Self-hosted edition | **✅** |
+| **Uses your site's accounts** | ❌ | ❌ | **✅** |
+| **Your own app protocol** | ❌ Shared SDK protocol | ❌ Their API | **✅ Or use the example** |
+| **Admin panel in your Filament** | ❌ | ❌ | **✅** |
+| **Reseller tools** | ✅ | — | **✅ Batches, bot API, reseller page** |
+| **Price** | Monthly plans | Paid cloud, free self-hosted | **Free, MIT** |
+
+## 🛠️ From sale to running app
+
+1. **A sale happens.** Your store's webhook calls `Keys::issue()`. Webhook retries return the same key. [Store recipes](docs/selling-keys.md).
+2. **The customer redeems.** On your website with `<livewire:licensekit.my-licenses />`, or right inside your app.
+3. **Your app signs in.** The PC locks, and every heartbeat rechecks the license, bans and PC on the server. [Connect your app](docs/client-api.md).
+
+```php
+public function login(Request $request, Product $product, LicensedDevices $devices)
+{
+    // Check the password your way, then let LicenseKit decide.
+    $grant = $devices->bind($user, $product, $request->input('hwid'));
+
+    return ['token' => $yourSessionToken, 'until' => $grant->access->validUntil];
+}
+```
+
+## 📦 Quick start
 
 ```sh
 composer require licensekit/licensekit
@@ -30,32 +65,32 @@ php artisan migrate
 php artisan licensekit:check
 ```
 
-Register in your existing non-tenant Filament panel:
+Add it to your Filament panel:
 
 ```php
 $panel->plugin(\LicenseKit\LicenseKitPlugin::make());
 ```
 
-Open the Dashboard and follow its three-step checklist: create a product with a plan, generate keys, then open **Setup → Connect your app** for the addresses, the public key and example code.
+Open the dashboard and follow the checklist: create a product, generate keys, then open **Setup → Connect your app** for the addresses, public key and example code.
 
-Add to an authenticated Blade page:
+Every panel user is an admin by default. Define the `licensekit.admin` and `licensekit.support` gates before giving staff access.
 
-```blade
-<livewire:licensekit.my-licenses />
-```
+## ✅ Compatibility
 
-Every panel user is an admin by default. Define `licensekit.admin` and `licensekit.support` gates before giving staff access. Native model policies still apply.
+| | |
+| :--- | :--- |
+| **PHP** | 8.3+ with sodium |
+| **Laravel** | 12, 13 |
+| **Filament** | 4.13.3+ or 5.8.3+ |
 
-Sellers can generate and cancel unused keys, give licenses, add time, pause subscriptions, reset devices, ban PCs, schedule free access and connect stores with hashed tokens and safe issuance retries.
-
-## Guides
+## 📚 Guides
 
 - [Getting started](docs/getting-started.md)
 - [App and customer API](docs/client-api.md)
-- [Selling keys](docs/selling-keys.md)
+- [Selling keys and resellers](docs/selling-keys.md)
 - [PHP services and customization](docs/extending.md)
 - [Design decisions](docs/decisions.md)
 
-Maintainers: `composer test`, `composer analyse`, `php vendor/bin/pint --test`. CI also checks lowest dependencies, distribution contents and MySQL races. See [release checks](docs/releasing.md).
+Maintainers: `composer test`, `composer analyse`, `php vendor/bin/pint --test`. See [release checks](docs/releasing.md).
 
-[MIT license](LICENSE). [Security reporting](SECURITY.md).
+[MIT license](LICENSE) · [Security reporting](SECURITY.md)
