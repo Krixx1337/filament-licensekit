@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased
+## 0.1.0 - 2026-10-17
+
+First release outside alpha. Until 1.0, minor versions (0.2, 0.3) may include breaking changes; patch versions will not. Every breaking change is listed here.
+
+**Schema:** unchanged since 0.1.0-alpha.3, so databases built on alpha.3 keep working. Databases from earlier alphas must be rebuilt. From this release on, schema changes ship as new migrations.
 
 - **Breaking:** default app API paths move to `api/licensekit/v1/{product}/…`; within v1, responses only gain fields and codes. Store API paths are unchanged.
 - Documented the stable PHP API for custom app protocols, with a tested example protocol that uses its own tokens and HMAC signing.

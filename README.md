@@ -18,7 +18,7 @@ Stop paying monthly fees to a service that can change the rules, go down on a bu
 
 I've run licensing for private desktop software since 2019. This is the package I wish I had when I started.
 
-> **Pre-release.** APIs and configuration may change before 1.0. See the [changelog](CHANGELOG.md).
+> **0.x release.** Until 1.0, minor versions may include breaking changes. Every one is listed in the [changelog](CHANGELOG.md).
 
 ## 🚀 Why sellers switch
 

@@ -4,7 +4,7 @@ Package: `licensekit/licensekit`. Repository: [filament-licensekit](https://gith
 
 1. Run `composer check`, `php vendor/bin/pint --test`, `composer validate --strict` and `composer audit`.
 2. When publishing is requested, push a review branch and wait for every CI job: Laravel/Filament compatibility matrix, lowest-dependency consumers, archive contents and MySQL redemption/issuance races.
-3. Choose an unused release version. Add its date and changes to CHANGELOG.md. Keep pre-release warning and fresh-database requirement while this schema rewrite is unreleased.
+3. Choose an unused release version. Add its date and changes to CHANGELOG.md. Since 0.1.0 the schema is released: ship schema changes as new migrations and never edit a published one.
 4. Run CI on the exact release commit. Tag that tested commit only after release approval. Never move an existing published tag.
 5. After pushing the approved tag, verify it appears on [Packagist](https://packagist.org/packages/licensekit/licensekit). If needed, check [webhook setup](https://packagist.org/about#how-to-update-packages).
 6. Install that exact version in a supported host and complete [getting started](getting-started.md), including signed app login, first redemption, heartbeat and device reset.
