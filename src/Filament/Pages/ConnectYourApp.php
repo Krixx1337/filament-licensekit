@@ -126,8 +126,13 @@ class ConnectYourApp extends LicenseKitPage
         $publicKey = $this->publicKey();
 
         return $schema->components([
+            Callout::make('This is the default API, a simple example')->info()->icon(Heroicon::OutlinedLightBulb)
+                ->description('It works out of the box. For a product you ship, we recommend your own protocol: '
+                    .'LicenseKit still runs every check, and a protocol only your app speaks is harder to bypass.')
+                ->actions([Action::make('own_protocol')->label('Build your own')->openUrlInNewTab()
+                    ->url('https://github.com/Krixx1337/filament-licensekit/blob/main/docs/client-api.md#build-your-own-recommended')]),
             Flex::make([
-                $this->status('Loader API', config('licensekit.client_enabled') === true, 'On', 'Off'),
+                $this->status('Default API (example)', config('licensekit.client_enabled') === true, 'On', 'Off'),
                 $this->status('Signing key', $publicKey !== null, 'Ready', 'Missing: run php artisan licensekit:install'),
                 $this->status('First app login', LoaderSession::where('product_id', $product->id)->exists(), 'Seen', 'Not yet'),
             ])->from('md'),
@@ -152,7 +157,7 @@ class ConnectYourApp extends LicenseKitPage
                 ->description('Messages your app can show, and what each one means.')
                 ->schema([KeyValueEntry::make('errors')->hiddenLabel()->state(self::ERRORS)->keyLabel('Code')->valueLabel('What it means')]),
             Section::make('For your developer')->icon(Heroicon::OutlinedWrenchScrewdriver)->collapsible()->collapsed()->schema([
-                Text::make('Want your own protocol? Turn off client_enabled in config/licensekit.php and use the PHP services in docs/client-api.md.'),
+                Text::make('Own protocol: call the stable PHP services from your controllers (docs/client-api.md), then turn off client_enabled in config/licensekit.php.'),
                 Text::make('Website two-factor login does not apply to app logins.'),
             ]),
         ]);

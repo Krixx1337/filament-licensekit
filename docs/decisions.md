@@ -5,9 +5,9 @@
 | Decision | Reason |
 |---|---|
 | D1. Account-first; keys are vouchers. | One customer/product license supports renewal and devices. |
-| D2. Redeem on website or loader after login. | One atomic service; host owns registration. |
-| D3. Default replaceable loader API. | Sellers need no custom protocol to begin. |
-| D4. Loader move and website reset share cooldown. | Browser cannot read fingerprint; staff can override. |
+| D2. Redeem on website or app after login. | One atomic service; host owns registration. |
+| D3. Default replaceable app API. | Sellers need no custom protocol to begin. |
+| D4. App move and website reset share cooldown. | Browser cannot read fingerprint; staff can override. |
 | D5. Follow host MustVerifyEmail. | No second verification setting. |
 | D6. Built-in device bans. | Catch returning accounts; warn about shared PCs. |
 | D7. Scheduled per-product free window. | Set in admin, no host PHP parameter. |
@@ -30,5 +30,5 @@ Implementation defaults:
 - Hashed connection/session tokens replace Sanctum. Sessions store password fingerprint for invalidation.
 - Ed25519 signs exact bytes plus nonce/timestamp. Persistent key remains private.
 - Narrow row locks; issuance conflict recovery uses current MySQL reads to handle old host snapshots.
-- Website 2FA is outside default loader protocol. Custom protocols can add it.
+- Website 2FA is outside default app protocol. Custom protocols can add it.
 - No deployed users on branch. Rewrite initial migration; rebuild earlier disposable alpha databases.

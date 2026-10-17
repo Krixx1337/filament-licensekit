@@ -11,7 +11,7 @@ php artisan licensekit:check
 
 Register `\LicenseKit\LicenseKitPlugin::make()` in the panel's plugin list. Missing setup appears on a dedicated panel page.
 
-Installer publishes configuration and creates a private Ed25519 key at `storage/app/private/licensekit-signing.key`. Existing files are preserved. Back up this key with deployment secrets; all app instances need the same key. Replacing it requires shipping a new public key in loaders.
+Installer publishes configuration and creates a private Ed25519 key at `storage/app/private/licensekit-signing.key`. Existing files are preserved. Back up this key with deployment secrets; all app instances need the same key. Replacing it requires shipping a new public key in your app.
 
 ## First product and keys
 
@@ -33,7 +33,7 @@ Add to an authenticated Blade page:
 <livewire:licensekit.my-licenses />
 ```
 
-Website reset clears device lock and signs out old PC. Next loader login binds new PC. Loader move replaces lock immediately. Both share product cooldown; staff override it.
+Website reset clears device lock and signs out old PC. Next app login binds new PC. App move replaces lock immediately. Both share product cooldown; staff override it.
 
 Publish views for restyling:
 
@@ -47,7 +47,7 @@ Include package views in Tailwind source scan, for example from `resources/css/a
 @source '../../vendor/licensekit/licensekit/resources/views/**/*.blade.php';
 ```
 
-If host user model implements Laravel's `MustVerifyEmail`, verification is required for redemption and loader login. Otherwise verification is not required. Registration and verification emails remain host responsibilities.
+If host user model implements Laravel's `MustVerifyEmail`, verification is required for redemption and app login. Otherwise verification is not required. Registration and verification emails remain host responsibilities.
 
 ## Staff, time and access
 
@@ -61,4 +61,4 @@ Maintenance mode stops app access while license clocks keep running. Afterwards,
 
 Free window includes start and excludes end. Accounts and device rules still apply. Paid clocks continue; paused customers keep saved time. Suspended and cancelled licenses remain denied.
 
-Pause saves remaining seconds and ends sessions. Redemptions and credits add to saved time. Pause until resumes on next loader login/heartbeat, starting saved time from that moment. Lifetime redemption clears pause immediately.
+Pause saves remaining seconds and ends sessions. Redemptions and credits add to saved time. Pause until resumes on next app login/heartbeat, starting saved time from that moment. Lifetime redemption clears pause immediately.

@@ -4,7 +4,7 @@
 
 Self-hosted licensing for Laravel and Filament. Customers sign in with their website account, redeem keys, and use their license on one PC.
 
-Includes signed loader API, customer website component, device bans and seller dashboard. Your app owns users, registration and payments.
+Includes a signed example app API (or build your own protocol on the PHP services), customer website component, device bans and seller dashboard. Your app owns users, registration and payments.
 
 Requires PHP 8.3+ with sodium, Laravel 12/13, Filament 4.13.3+ or 5.8.3+.
 
@@ -40,7 +40,7 @@ Sellers can generate and cancel unused keys, give licenses, add time, pause subs
 ## Guides
 
 - [Getting started](docs/getting-started.md)
-- [Loader and customer API](docs/client-api.md)
+- [App and customer API](docs/client-api.md)
 - [Selling keys](docs/selling-keys.md)
 - [PHP services and customization](docs/extending.md)
 - [Design decisions](docs/decisions.md)
