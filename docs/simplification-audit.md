@@ -19,12 +19,12 @@ These were settled after the first draft. The rest of the document follows them.
 
 | # | Decision | Consequence |
 |---|---|---|
-| D1 | **Account-first.** The primary user is a game-tool or cheat seller who sells keys through a storefront or resellers. Every customer has an account and redeems keys into it. **Key-only activation (no account) is out of scope**, not an optional mode. | Keys stay vouchers. A license is one row per customer and product. Model B from the first draft is dropped. |
+| D1 | **Account-first.** The primary user is a game-tool or desktop software seller who sells keys through a storefront or resellers. Every customer has an account and redeems keys into it. **Key-only activation (no account) is out of scope**, not an optional mode. | Keys stay vouchers. A license is one row per customer and product. Model B from the first draft is dropped. |
 | D2 | **Customers redeem keys on the website *or* in the loader, after logging in.** Registration stays on the website, because the host app owns users. | One redeem operation (`ClaimLicense::claim($user, $key)`), reached from both places. |
 | D3 | **Ship an ultra-simple default loader API (login, heartbeat, redeem) that sellers can turn off and replace.** | Thin controllers over public PHP services. A seller who needs custom behavior disables the routes and copies a short controller. See F23. |
 | D4 | **Customers can fix their own device lock from the loader *and* from the seller's website, limited by a per-product cooldown. Support can always override.** | The loader *moves* the license to the PC it runs on, in one step. The website *clears* the lock, because a browser can't read a hardware ID, and the next loader login binds the new PC. Both share one cooldown. The package ships the website button as a drop-in component. See F4, F23 and F23a. |
 | D5 | **LicenseKit has no email-verification setting of its own.** It follows the host's user model: if the model implements Laravel's `MustVerifyEmail`, unverified customers can't redeem or log in to the loader; otherwise nothing is checked. | Delete `licensekit.user.require_verified` and its diagnostics. Laravel starter kits leave `MustVerifyEmail` off, so in practice verification is off unless the seller enabled it for their website. A block always shows a clear `email_not_verified` message. |
-| D6 | **Hardware (device) bans are a built-in feature.** Banned cheaters and chargeback abusers come back on new accounts, so sellers in this market expect to ban the PC, not just the account. | A small `device_bans` table and a "Ban device" action, enforced on loader login, heartbeat and move. Replaces the host-only `HwidHandler::assertAllowed` hook. See F4a. |
+| D6 | **Hardware (device) bans are a built-in feature.** Banned rule-breakers and chargeback abusers come back on new accounts, so sellers in this market expect to ban the PC, not just the account. | A small `device_bans` table and a "Ban device" action, enforced on loader login, heartbeat and move. Replaces the host-only `HwidHandler::assertAllowed` hook. See F4a. |
 | D7 | **Free access is a per-product, scheduled "free weekend" window** (`free_from`, `free_until`), set in the admin. | Replaces the `freeUntil` PHP parameter. Accounts, device lock and bans still apply. See F5. |
 | D8 | **Keep the current support matrix:** PHP 8.3+, Laravel 12 and 13, Filament 4.13.3+ and 5.8.3+. | CI keeps testing both Filament majors. Only the Sanctum-specific jobs go, once Sanctum is removed (F19). See T2. |
 | D9 | **The temporary internal docs are deleted** (`docs/internal/`, done 2026-10-16). | Findings below that cite them are kept as history. Their content is replaced by the docs plan in §6. |
@@ -64,7 +64,7 @@ Estimated result: **about 50% less source, about 45% fewer tables (16 to 9), abo
 
 ## 2. What LicenseKit is today (understanding)
 
-**Purpose (from the README and the former internal architecture notes):** a self-hosted alternative to KeyAuth or Keygen for indie sellers of desktop software, game mods and cheats. It provides key generation, redemption, HWID node-locking, reseller distribution and downtime compensation inside an existing Laravel and Filament app.
+**Purpose (from the README and the former internal architecture notes):** a self-hosted alternative to KeyAuth or Keygen for indie sellers of desktop software, game mods and tools. It provides key generation, redemption, HWID node-locking, reseller distribution and downtime compensation inside an existing Laravel and Filament app.
 
 **Stated design principles:**
 - The host owns users, authentication, client protocols, sessions, commerce and distribution. LicenseKit owns "rights" and device locks.

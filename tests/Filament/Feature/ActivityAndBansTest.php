@@ -26,10 +26,10 @@ test('the activity log reads as sentences and filters by type and date', functio
 test('banned PCs list who banned them and can be unbanned with a confirmation', function () {
     $admin = adminUser();
     Livewire::test(ManageDeviceBans::class)->assertSee('No banned PCs');
-    $license = License::factory()->create(['user_id' => User::factory()->create()->id, 'device' => 'cheater-pc']);
+    $license = License::factory()->create(['user_id' => User::factory()->create()->id, 'device' => 'banned-pc']);
     $ban = app(DeviceBans::class)->ban($license, $admin, note: 'Chargeback');
 
-    Livewire::test(ManageDeviceBans::class)->assertSee(['cheater-pc', 'Chargeback', $admin->email, $license->product->name])
+    Livewire::test(ManageDeviceBans::class)->assertSee(['banned-pc', 'Chargeback', $admin->email, $license->product->name])
         ->callTableAction('unban', $ban)->assertNotified('PC unbanned');
     $this->assertDatabaseCount('licensekit_device_bans', 0);
 });

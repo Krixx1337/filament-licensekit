@@ -205,7 +205,7 @@ class LicensingActions
     {
         return self::finish(Action::make('ban_device')->label('Ban this PC')->icon(Heroicon::OutlinedNoSymbol)->color('danger')->requiresConfirmation()
             ->modalIcon(Heroicon::OutlinedNoSymbol)->modalHeading('Ban this PC')
-            ->modalDescription('This PC can no longer log in, even with another account. Use it for cheaters and chargebacks.')
+            ->modalDescription('This PC can no longer log in, even with another account. Use it for abuse and chargebacks.')
             ->authorize(fn (License $record): bool => self::mayChange($record))->visible(fn (License $record): bool => $record->device !== null)
             ->schema([
                 Text::make(function (License $record): string {

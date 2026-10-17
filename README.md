@@ -10,7 +10,7 @@
 [![Laravel](https://img.shields.io/badge/Laravel-12%20%7C%2013-FF2D20.svg)](https://laravel.com)
 [![Filament](https://img.shields.io/badge/Filament-4%20%7C%205-FDAE4B.svg)](https://filamentphp.com)
 
-Self-hosted licensing for **game tools, mods, cheats and desktop apps**, built right into your Laravel + Filament site.
+Self-hosted licensing for **game tools, mods and desktop apps**, built right into your Laravel + Filament site.
 
 Stop paying monthly fees to a service that can change the rules, go down on a busy weekend, or break the app you already shipped. Run licensing on your own server, with your own data, and no middleman.
 
