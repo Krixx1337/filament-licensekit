@@ -12,6 +12,8 @@
 
 Self-hosted licensing for **game tools, mods and desktop apps**, built right into your Laravel + Filament site.
 
+[![Watch the 28-second LicenseKit demo on YouTube](art/showreel.jpg)](https://www.youtube.com/watch?v=qwX112s_7ak)
+
 Stop paying monthly fees to a service that can change the rules, go down on a busy weekend, or break the app you already shipped. Run licensing on your own server, with your own data, and no middleman.
 
 I've run licensing for private desktop software since 2019. This is the package I wish I had when I started.
