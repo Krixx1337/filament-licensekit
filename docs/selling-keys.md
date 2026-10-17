@@ -71,8 +71,43 @@ Route::post('/webhooks/shop', function (Request $request) {
 | Stripe | `checkout.session.completed` | `Stripe-Signature` (verify with `Stripe\Webhook::constructEvent`) | session `id` |
 | Shopify | `orders/paid` | `X-Shopify-Hmac-Sha256` | order `id` |
 | WooCommerce | Order updated, when status is `processing` or `completed` | `X-WC-Webhook-Signature` | order `id` |
+| SellAuth | Dynamic delivery, set on the variant (see below) | `X-Signature` | invoice item `item.id` |
+| SellApp | Dynamic webhook, set on the variant (see below) | `Signature` | order id from the body |
 
 Prefix each store's references (`stripe:`, `shop:`) so they never collide. For refunds, cancel the unused key with `ManageKeys::revokeKey`, or the license if it was redeemed. Stores you cannot run code for, such as resellers' bots, use a store connection instead.
+
+## SellAuth or SellApp dynamic delivery
+
+Both stores can ask your server for the key at checkout and show your reply to the buyer. Set the variant's delivery type to dynamic and enter your route's URL. Keep your storefront; LicenseKit only issues the key.
+
+SellAuth sends one `POST` per invoice item, signed with HMAC-SHA256 of the raw body in `X-Signature`. Find the secret under **Developers > Overview**. A `200` marks the item delivered, and each line of the body is one deliverable. ([SellAuth docs](https://docs.sellauth.com/developers/dynamic-delivery))
+
+```php
+Route::post('/webhooks/sellauth', function (Request $request) {
+    // 1. Verify. SellAuth signs the raw body with your webhook secret.
+    $expected = hash_hmac('sha256', $request->getContent(), config('services.sellauth.secret'));
+    abort_unless(hash_equals($expected, (string) $request->header('X-Signature')), 401);
+
+    // 2. Map the variant to a plan.
+    $plan = LicensePlan::findOrFail(config('services.sellauth.plans')[$request->input('item.variant_id')]);
+
+    // 3. Issue. The invoice item id makes retries return the same keys.
+    $batch = app(Keys::class)->issue($plan, (int) $request->input('item.quantity', 1), new IssueContext(
+        source: 'app', reference: 'sellauth:'.$request->input('item.id'), label: 'SellAuth order',
+    ));
+
+    // 4. Reply with plain text, one key per line.
+    return response($batch->keys->pluck('key')->implode("\n"), 200)->header('Content-Type', 'text/plain');
+});
+```
+
+Use the invoice item id, not the invoice id: one invoice can hold several items, and each gets its own request. SellAuth retries on timeouts, `429` and `5xx`, up to 3 attempts, with a 10 second timeout. Any other status marks the item failed and shows your response body to the buyer.
+
+SellApp works the same way with three differences. ([SellApp docs](https://sell.app/docs/setting-up-dynamic-webhook))
+
+* The signature header is `Signature`: HMAC-SHA256 of the raw body with the secret from your store's developer settings.
+* Reply with plain text, or JSON such as `{"message": "Your key: ..."}`.
+* SellApp does not document the body's field names, only that it holds the order data. The webhook URL is set per variant, so pass the plan in the URL (`/webhooks/sellapp/{plan}`). Read the order id field from a real order in the developer settings' delivery logs; test deliveries send mock data.
 
 ## Your own wholesale page
 

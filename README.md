@@ -20,7 +20,7 @@ I've run licensing for private desktop software since 2019. This is the package 
 
 ## 🚀 Why sellers switch
 
-* **💳 Sell anywhere, all at once.** Your own site, Stripe, Shopify, WooCommerce, Telegram resellers. Payments never touch LicenseKit, so if a payment processor shuts down one store, your licenses keep working.
+* **💳 Sell anywhere, all at once.** Your own site, Stripe, Shopify, WooCommerce, SellAuth, SellApp, Telegram resellers. Payments never touch LicenseKit, so if a payment processor shuts down one store, your licenses keep working.
 * **🔒 HWID lock that customers don't hate.** One PC per license. Customers move to a new PC themselves, limited by your cooldown. Staff can override anytime.
 * **🚫 PC bans that catch alt accounts.** Ban the hardware, not just the account. LicenseKit warns you when that PC is used by other accounts too.
 * **🤝 Built for resellers.** Generate key batches, export a `.txt` in one click, and cancel unsold keys after a payment dispute. Customers who already redeemed keep their time. Resellers get their own page and a bot API. Suspend one account and their bots stop too.
