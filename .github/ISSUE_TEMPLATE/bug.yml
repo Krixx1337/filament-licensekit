@@ -4,7 +4,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        LicenseKit is pre-release software. Check whether the problem still occurs on the latest main commit.
+        LicenseKit is in 0.x. Check whether the problem still occurs on the latest release or main commit.
         Report security vulnerabilities [privately](https://github.com/Krixx1337/filament-licensekit/security/advisories/new).
         Remove API tokens, license keys, customer data, and other secrets from examples and logs.
   - type: input
