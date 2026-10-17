@@ -33,7 +33,7 @@ class ProductForm
         return $schema->columns(['lg' => 3])->components([
             Group::make([
                 Section::make('Product')->icon(Heroicon::OutlinedCube)->schema([
-                    TextInput::make('name')->label('Name')->required()->maxLength(255)->placeholder('For example: Aim Assist Pro')
+                    TextInput::make('name')->label('Name')->required()->maxLength(255)->placeholder('For example: Frame Booster')
                         ->live(onBlur: true)->afterStateUpdated(function ($state, Set $set, ?Model $record): void {
                             if ($record === null) {
                                 $set('slug', Str::slug((string) $state));
