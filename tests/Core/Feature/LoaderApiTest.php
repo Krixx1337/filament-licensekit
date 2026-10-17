@@ -180,3 +180,19 @@ test('logging in clears that customer\'s expired loader sessions', function () {
         ->and(LoaderSession::where('user_id', $user->id)->sole()->getRawOriginal('token_hash'))->toBe(hash('sha256', $fresh['token']))
         ->and(LoaderSession::where('user_id', $other->id)->count())->toBe(1);
 });
+
+test('default API response shapes stay fixed within v1', function () {
+    $license = License::factory()->create(['user_id' => User::factory()->create()->id]);
+    $product = $license->product;
+    expect(route('licensekit.client.login', $product->slug))->toEndWith('/api/licensekit/v1/'.$product->slug.'/login');
+    $session = ['access', 'code', 'access_valid_until', 'license' => ['status', 'expires_at', 'lifetime'], 'nonce', 'server_time'];
+
+    $login = loaderLogin($license->user, $product);
+    expect(array_keys($login))->toEqualCanonicalizing(['access', 'code', 'access_valid_until', 'license', 'token', 'expires_at', 'heartbeat_seconds', 'nonce', 'server_time']);
+    $this->postJson(route('licensekit.client.heartbeat', $product->slug), loaderPayload(['token' => $login['token'], 'device' => 'pc']))
+        ->assertExactJsonStructure([...$session, 'expires_at', 'heartbeat_seconds']);
+    $this->postJson(route('licensekit.client.login', $product->slug), loaderPayload(['login' => $license->user->email, 'password' => 'password', 'device' => 'other']))
+        ->assertExactJsonStructure(['error', 'message', 'can_move', 'move_available_at', 'nonce', 'server_time']);
+    $this->postJson(route('licensekit.client.login', $product->slug), loaderPayload(['login' => $license->user->email, 'password' => 'wrong', 'device' => 'pc']))
+        ->assertExactJsonStructure(['error', 'message', 'nonce', 'server_time']);
+});

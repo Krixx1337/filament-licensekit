@@ -88,6 +88,34 @@ jobs:
           git archive --format=zip --output="$RUNNER_TEMP/licensekit.zip" HEAD
           php .github/scripts/check-archive.php "$RUNNER_TEMP/licensekit.zip"
 
+  snippets:
+    name: Python example against default API
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
+        with:
+          php-version: '8.3'
+          extensions: intl, mbstring, pdo_sqlite, sodium, zip
+          tools: composer:v2
+          coverage: none
+      - name: Install dependencies
+        run: |
+          composer update --prefer-dist --no-interaction --no-progress
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install --quiet requests pynacl
+      - name: Run Python example
+        env:
+          SNIPPET_DIR: ${{ runner.temp }}/snippets
+        run: |
+          php .github/scripts/snippet-server.php setup
+          php -S 127.0.0.1:8000 .github/scripts/snippet-server.php > "$RUNNER_TEMP/server.log" 2>&1 &
+          for i in $(seq 1 20); do curl -s -o /dev/null http://127.0.0.1:8000/ && break; sleep 0.5; done
+          "$RUNNER_TEMP/venv/bin/python" "$SNIPPET_DIR/client.py" || { cat "$RUNNER_TEMP/server.log"; exit 1; }
+
   minimum-runtime:
     name: Lowest secure runtime / Laravel ${{ matrix.laravel }}
     runs-on: ubuntu-latest

@@ -2,12 +2,14 @@
 
 Default loader routes are on. Change `client_prefix` or set `client_enabled=false` to replace them. `{product}` is product slug. Use JSON over HTTPS.
 
+The default API is a working example, not a hardened protocol. Its paths carry `v1`: within v1, responses only gain fields and error codes, so shipped apps keep working. Ignore unknown fields and treat unknown codes as a failure. Prefer [your own protocol](#custom-controllers-and-openapi).
+
 | POST endpoint | Body, plus nonce |
 |---|---|
-| `/api/licensekit/{product}/login` | `login`, `password`, `device` |
-| `/api/licensekit/{product}/heartbeat` | `token`, `device` |
-| `/api/licensekit/{product}/redeem` | `token`, `key` |
-| `/api/licensekit/{product}/move-device` | `login`, `password`, `device` |
+| `/api/licensekit/v1/{product}/login` | `login`, `password`, `device` |
+| `/api/licensekit/v1/{product}/heartbeat` | `token`, `device` |
+| `/api/licensekit/v1/{product}/redeem` | `token`, `key` |
+| `/api/licensekit/v1/{product}/move-device` | `login`, `password`, `device` |
 
 Credentials use host Laravel provider. `client_login_column` defaults to `email`; `username` is supported. Registration stays on website. Website 2FA does not apply to loader password login.
 
@@ -61,7 +63,7 @@ Host web session, CSRF protection and license ownership checks apply. Prefer sup
 
 ## Custom controllers and OpenAPI
 
-Disable `client_enabled`, copy thin [loader controller](../src/Core/Http/Controllers/LoaderController.php) into host and adapt routes. Call `LoaderSessions::login`, `heartbeat`, `redeem`; use `move: true` for movement. Retain signing and rate limits for this protocol. See [PHP services](extending.md).
+Build on the [stable PHP API](extending.md#stable-php-api); it runs every check. [CustomProtocolTest](../tests/Core/Feature/CustomProtocolTest.php) is a full example with its own routes, tokens and HMAC signing. Or disable `client_enabled`, copy thin [loader controller](../src/Core/Http/Controllers/LoaderController.php) into host and adapt routes. Call `LoaderSessions::login`, `heartbeat`, `redeem`; use `move: true` for movement. Retain signing and rate limits for this protocol. See [PHP services](extending.md).
 
 Generate specification for enabled host routes:
 

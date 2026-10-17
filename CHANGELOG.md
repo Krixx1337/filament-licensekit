@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **Breaking:** default app API paths move to `api/licensekit/v1/{product}/…`; within v1, responses only gain fields and codes. Store API paths are unchanged.
+- Documented the stable PHP API for custom app protocols, with a tested example protocol that uses its own tokens and HMAC signing.
+
 ## 0.1.0-alpha.3 - 2026-10-16
 
 Pre-release APIs and configuration may change before the first stable release.

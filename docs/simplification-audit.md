@@ -546,7 +546,7 @@ The most common support request in this market is "here's my key, it doesn't wor
 | `docs/extending.md` | Laravel dev | PHP services, device matcher, events | ≤120 |
 | `docs/decisions.md` | maintainer | short ADR-style log: decision, reason, date. No precedence rules. | ≤200 |
 
-The internal set, with its governance rules, KX reference protocols and Windows HWID research, is already deleted (D9). The remaining public docs (`client.md`, `shops.md`, `importing.md`, `installation.md`) should be rewritten into the files above. Keep `decisions.md` in git as the short, durable record of decisions D1–D9.
+The internal set, with its governance rules, reference protocols and Windows HWID research, is already deleted (D9). The remaining public docs (`client.md`, `shops.md`, `importing.md`, `installation.md`) should be rewritten into the files above. Keep `decisions.md` in git as the short, durable record of decisions D1–D9.
 
 ---
 

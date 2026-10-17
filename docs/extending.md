@@ -2,6 +2,17 @@
 
 Services: `LicenseKit\Core\Actions`. Models: `LicenseKit\Core\Models`. Authorize in controller/Filament action; actor parameters only attribute activity.
 
+## Stable PHP API
+
+Build your own app protocol on these. From 1.0 they keep their signatures within a major version; until then, breaking changes are marked **Breaking** in the changelog.
+
+- `LicensedDevices`: `bind`, `verify`, `moveDevice`, `reset`, `adminReset`, `eligibility`
+- `AccessPolicy::authorize`, `ClaimLicense::claim`, `Keys::issue`
+- `ManageLicenses`, `ManageKeys`, `DeviceBans`, `CustomerLicenses`, `ResellerBatches`
+- Events `KeyRedeemed`, `AccessRevoked`; `LicensingException` `error` and `status`
+
+Every check (account, license, PC lock, bans, expiry) runs inside these calls, so a custom protocol cannot skip one. Your protocol picks its routes, fields, tokens and signing. Full example: [CustomProtocolTest](../tests/Core/Feature/CustomProtocolTest.php) and [its controller](../tests/Core/Fixtures/CustomProtocolController.php).
+
 ## Issue and redeem
 
 ```php

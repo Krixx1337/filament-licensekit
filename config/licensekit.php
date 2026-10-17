@@ -4,7 +4,7 @@ use LicenseKit\Core\Actions\ExactDeviceMatcher;
 
 return [
     'client_enabled' => true,
-    'client_prefix' => 'api/licensekit',
+    'client_prefix' => 'api/licensekit/v1',
     'client_login_column' => 'email',
     'store_api_enabled' => false,
     'store_api_prefix' => 'api/licensekit/store',
