@@ -2,6 +2,8 @@
 
 Keys are vouchers for account access. Your store owns orders, payments and delivery. There is no account-free activation mode.
 
+Sell through several stores at once. Payments never touch LicenseKit, so if a payment processor closes one store, your licenses keep working.
+
 ## Manual sales and refunds
 
 Open **Keys → Generate keys**. Choose the product and plan, how many keys you need and an optional label (for example the reseller's name or "October giveaway"). Copy the keys or download them as a `.txt` file. You can also select keys in the list and choose **Download selected**.
@@ -36,6 +38,41 @@ Use a stable reference per order. Identical retries return the original batch an
 | GET | `/batches`, `/batches/{batch}`, `/batches/{batch}/keys` |
 
 Lists paginate, default 25, maximum 100. Key statuses are `all`, `unused`, `redeemed`, `cancelled`. Quantity is bounded by the connection cap and `max_batch_size`. Disable the connection to stop its API access.
+
+## Stripe, Shopify, WooCommerce or any store webhook
+
+When your site receives the store's paid-order webhook, issue a key and deliver it. Put the route in `routes/api.php` (no CSRF).
+
+```php
+use LicenseKit\Core\Actions\Keys;
+use LicenseKit\Core\Data\IssueContext;
+use LicenseKit\Core\Models\LicensePlan;
+
+Route::post('/webhooks/shop', function (Request $request) {
+    // 1. Verify the store's signature. Each store documents its header; Shopify's looks like this.
+    $expected = base64_encode(hash_hmac('sha256', $request->getContent(), config('services.shop.secret'), true));
+    abort_unless(hash_equals($expected, (string) $request->header('X-Shopify-Hmac-Sha256')), 401);
+
+    // 2. Map what they bought to a plan, for example by SKU.
+    $plan = LicensePlan::findOrFail(config('services.shop.plans')[$request->input('line_items.0.sku')]);
+
+    // 3. Issue. The order id makes webhook retries return the same key instead of a new one.
+    $batch = app(Keys::class)->issue($plan, 1, new IssueContext(source: 'app', reference: 'shop:'.$request->input('id'), label: 'Shop order'));
+
+    // 4. Deliver it your way: email, order note or download page.
+    Mail::to($request->input('email'))->send(new LicenseKeyMail($batch->keys[0]->key));
+
+    return response()->noContent();
+});
+```
+
+| Store | Webhook | Signature header | Order reference |
+|---|---|---|---|
+| Stripe | `checkout.session.completed` | `Stripe-Signature` (verify with `Stripe\Webhook::constructEvent`) | session `id` |
+| Shopify | `orders/paid` | `X-Shopify-Hmac-Sha256` | order `id` |
+| WooCommerce | Order updated, when status is `processing` or `completed` | `X-WC-Webhook-Signature` | order `id` |
+
+Prefix each store's references (`stripe:`, `shop:`) so they never collide. For refunds, cancel the unused key with `ManageKeys::revokeKey`, or the license if it was redeemed. Stores you cannot run code for, such as resellers' bots, use a store connection instead.
 
 ## Your own wholesale page
 

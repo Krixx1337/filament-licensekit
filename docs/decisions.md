@@ -15,6 +15,14 @@
 | D9. Delete temporary internal docs. | Replace contradictions with task guides. |
 | D10. Keep pause/resume with banked time. | Redemptions and credits remain useful while paused. |
 
+2026-10-17. Positioning.
+
+| Decision | Reason |
+|---|---|
+| D11. Resellers are website accounts (reverses audit F13). | Suspending one account stops their bots; batches show who sold each key. |
+| D12. No client SDKs; the default API is an example. | App protocols are app-specific; a per-seller protocol has no universal bypass. Stable PHP services carry compatibility. |
+| D13. Say "app", not "loader". | Most products are one executable with the check built in. |
+
 Owner clarifications during planning:
 
 - Unlicensed login returns restricted redemption session. Token never implies software access.

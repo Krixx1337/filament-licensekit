@@ -6,6 +6,7 @@
 - Documented the stable PHP API for custom app protocols, with a tested example protocol that uses its own tokens and HMAC signing.
 - App guide now starts with building your own protocol; the default API is labelled as an example in docs and on Connect your app. User-facing text says "app" instead of "loader".
 - Added "Why can't they sign in?" on the license page: what the app would say now, recent refusals, PC changes and a reply to paste to the customer. App sign-in refusals, including wrong passwords, are logged once per 10 minutes for default and custom protocols, with a "Sign-in problems only" activity filter. Check a customer and the new action share `SignInCheck`.
+- Docs: store webhook recipe for Stripe, Shopify and WooCommerce, a `KeyRedeemed` listener example, a README aimed at desktop software sellers, and decisions D11-D13.
 
 ## 0.1.0-alpha.3 - 2026-10-16
 

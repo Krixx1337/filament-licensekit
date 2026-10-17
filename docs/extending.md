@@ -56,7 +56,18 @@ Bans match exact presented string by hash independently of fuzzy matcher. Spoofe
 
 `ManageLicenses` handles time, pause/resume, suspend/unsuspend, cancel/restore and notes. `ManageKeys` handles unused-key/batch cancellation, export and notes. Reasons optional.
 
-`KeyRedeemed($keyId, $licenseId)` fires after commit. Use for notifications; it is not durable delivery. Rollback dispatches nothing. `AccessRevoked($license)` fires synchronously so default sessions delete in same transaction. Custom protocols should listen and recheck host account state each heartbeat.
+`KeyRedeemed($keyId, $licenseId)` fires after commit. Use for notifications (thank-you mail, Discord post); it is not durable delivery. Rollback dispatches nothing. `AccessRevoked($license)` fires synchronously so default sessions delete in same transaction. Custom protocols should listen and recheck host account state each heartbeat.
+
+```php
+use Illuminate\Support\Facades\Event;
+use LicenseKit\Core\Events\KeyRedeemed;
+use LicenseKit\Core\Models\LicenseKey;
+
+Event::listen(function (KeyRedeemed $event): void {
+    $key = LicenseKey::with('license.user', 'batch.plan.product')->find($event->keyId);
+    Mail::to($key->license->user)->send(new ThanksForBuying($key->batch->plan->product->name));
+});
+```
 
 Call `ActivityLog::record($actor, $event, $subject, $meta)` in your transaction. Actor can be `user:123` or application label. Direct Eloquent catalog writes no longer have implicit audit observer; log explicitly.
 

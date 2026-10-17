@@ -2,9 +2,20 @@
 
 # LicenseKit
 
-Self-hosted licensing for Laravel and Filament. Customers sign in with their website account, redeem keys, and use their license on one PC.
+Self-hosted licensing for desktop software with HWID locks: game tools, mods, cheats and utilities. It runs inside your Laravel and Filament site.
 
-Includes a signed example app API (or build your own protocol on the PHP services), customer website component, device bans and seller dashboard. Your app owns users, registration and payments.
+- **Sell anywhere.** Your own site, Stripe, Shopify, WooCommerce or Telegram resellers, all at once. Payments stay outside LicenseKit, so losing a payment processor never touches your licenses.
+- **Your protocol, our core.** LicenseKit runs every check: account, license, PC lock, bans and expiry. Your app talks to it however you like; a signed example API gets you started.
+- **Account-first.** Buyers register once (two minutes) and redeem keys. You get a trail from key to reseller to player, one-click bans and self-service PC resets.
+- **Support built in.** See why a customer can't sign in, and paste the reply.
+
+| | Hosted services such as KeyAuth | LicenseKit |
+|---|---|---|
+| Runs on | Their servers | Your server |
+| Customer data | Their database | Your database |
+| App protocol | Same for every seller | Yours (example included) |
+| Stability | Their release schedule | Versioned API and stable PHP services |
+| Cost | Monthly plan | Free, MIT |
 
 Requires PHP 8.3+ with sodium, Laravel 12/13, Filament 4.13.3+ or 5.8.3+.
 
