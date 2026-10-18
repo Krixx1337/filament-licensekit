@@ -1,4 +1,7 @@
-![LicenseKit self-hosted software licensing](art/licensekit-banner.png)
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="art/licensekit-banner-light.jpg">
+  <img alt="LicenseKit: sell your software with license keys" src="art/licensekit-banner-dark.jpg">
+</picture>
 
 # 🛡️ LicenseKit
 
