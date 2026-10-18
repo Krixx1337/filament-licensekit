@@ -1,13 +1,13 @@
 <picture>
-  <source media="(prefers-color-scheme: light)" srcset="art/licensekit-banner-light.jpg">
-  <img alt="LicenseKit: sell your software with license keys" src="art/licensekit-banner-dark.jpg">
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/Krixx1337/filament-licensekit/main/art/licensekit-banner-light.jpg">
+  <img alt="LicenseKit: sell your software with license keys" src="https://raw.githubusercontent.com/Krixx1337/filament-licensekit/main/art/licensekit-banner-dark.jpg">
 </picture>
 
 # 🛡️ LicenseKit
 
 > **Your licenses. Your server. Your rules.**
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/Krixx1337/filament-licensekit/blob/main/LICENSE)
 [![Packagist](https://img.shields.io/packagist/v/licensekit/licensekit?include_prereleases)](https://packagist.org/packages/licensekit/licensekit)
 [![PHP](https://img.shields.io/badge/PHP-8.3%2B-777BB4.svg)](https://www.php.net/)
 [![Laravel](https://img.shields.io/badge/Laravel-12%20%7C%2013-FF2D20.svg)](https://laravel.com)
@@ -21,7 +21,7 @@ Stop paying monthly fees to a service that can change the rules, go down on a bu
 
 I've run licensing for private desktop software since 2019. This is the package I wish I had when I started.
 
-> **0.x release.** Until 1.0, minor versions may include breaking changes. Every one is listed in the [changelog](CHANGELOG.md).
+> **0.x release.** Until 1.0, minor versions may include breaking changes. Every one is listed in the [changelog](https://github.com/Krixx1337/filament-licensekit/blob/main/CHANGELOG.md).
 
 ## 🚀 Why sellers switch
 
@@ -47,9 +47,9 @@ I've run licensing for private desktop software since 2019. This is the package 
 
 ## 🛠️ From sale to running app
 
-1. **A sale happens.** Your store's webhook calls `Keys::issue()`. Webhook retries return the same key. [Store recipes](docs/selling-keys.md).
+1. **A sale happens.** Your store's webhook calls `Keys::issue()`. Webhook retries return the same key. [Store recipes](https://github.com/Krixx1337/filament-licensekit/blob/main/docs/selling-keys.md).
 2. **The customer redeems.** On your website with `<livewire:licensekit.my-licenses />`, or right inside your app.
-3. **Your app signs in.** The PC locks, and every heartbeat rechecks the license, bans and PC on the server. [Connect your app](docs/client-api.md).
+3. **Your app signs in.** The PC locks, and every heartbeat rechecks the license, bans and PC on the server. [Connect your app](https://github.com/Krixx1337/filament-licensekit/blob/main/docs/client-api.md).
 
 ```php
 public function login(Request $request, Product $product, LicensedDevices $devices)
@@ -90,12 +90,12 @@ Every panel user is an admin by default. Define the `licensekit.admin` and `lice
 
 ## 📚 Guides
 
-- [Getting started](docs/getting-started.md)
-- [App and customer API](docs/client-api.md)
-- [Selling keys and resellers](docs/selling-keys.md)
-- [PHP services and customization](docs/extending.md)
-- [Design decisions](docs/decisions.md)
+- [Getting started](https://github.com/Krixx1337/filament-licensekit/blob/main/docs/getting-started.md)
+- [App and customer API](https://github.com/Krixx1337/filament-licensekit/blob/main/docs/client-api.md)
+- [Selling keys and resellers](https://github.com/Krixx1337/filament-licensekit/blob/main/docs/selling-keys.md)
+- [PHP services and customization](https://github.com/Krixx1337/filament-licensekit/blob/main/docs/extending.md)
+- [Design decisions](https://github.com/Krixx1337/filament-licensekit/blob/main/docs/decisions.md)
 
-Maintainers: `composer test`, `composer analyse`, `php vendor/bin/pint --test`. See [release checks](docs/releasing.md).
+Maintainers: `composer test`, `composer analyse`, `php vendor/bin/pint --test`. See [release checks](https://github.com/Krixx1337/filament-licensekit/blob/main/docs/releasing.md).
 
-[MIT license](LICENSE) · [Security reporting](SECURITY.md)
+[MIT license](https://github.com/Krixx1337/filament-licensekit/blob/main/LICENSE) · [Security reporting](https://github.com/Krixx1337/filament-licensekit/blob/main/SECURITY.md)
