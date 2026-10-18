@@ -1,7 +1,4 @@
-<picture>
-  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/Krixx1337/filament-licensekit/main/art/licensekit-banner-light.jpg">
-  <img alt="LicenseKit: sell your software with license keys" src="https://raw.githubusercontent.com/Krixx1337/filament-licensekit/main/art/licensekit-banner-dark.jpg">
-</picture>
+![LicenseKit: sell your software with license keys](https://raw.githubusercontent.com/Krixx1337/filament-licensekit/main/art/licensekit-banner-light.jpg)
 
 # 🛡️ LicenseKit
 
