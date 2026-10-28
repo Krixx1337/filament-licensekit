@@ -93,6 +93,7 @@ Errors return `{error, message}`, nonce and timestamp. Branch on code; show huma
 | `email_not_verified` | Verify on website |
 | `maintenance` | Try later |
 | `invalid_key`, `key_already_used` | Check key or contact seller |
+| `license_still_active` | Keep key, redeem after expiry (only when `stack_keys` is off) |
 
 Login limits use IP and login/IP pair. Other calls use session/IP. Hosts can redefine named `licensekit.login`, `licensekit.session`, `licensekit.management` limiters.
 

@@ -35,6 +35,7 @@ enum ErrorCode: string
     case KeyAlreadyUsed = 'key_already_used';
     case KeyGenerationFailed = 'key_generation_failed';
     case KeyRevocationForbidden = 'key_revocation_forbidden';
+    case LicenseStillActive = 'license_still_active';
     case LicensingUnavailable = 'licensing_unavailable';
     case Maintenance = 'maintenance';
     case MoveCooldown = 'move_cooldown';
@@ -51,7 +52,7 @@ enum ErrorCode: string
         return match ($this) {
             self::AlreadyLifetime, self::BatchConflict, self::CannotExtendLicense, self::CannotPauseLicense, self::CannotResumeLicense,
             self::CannotSuspendLicense, self::CannotUnsuspendLicense, self::CannotRestoreLicense, self::DeviceNotBound, self::KeyAlreadyUsed,
-            self::KeyRevocationForbidden, self::PlanProductIsImmutable => 409,
+            self::KeyRevocationForbidden, self::LicenseStillActive, self::PlanProductIsImmutable => 409,
             self::InvalidCredentials, self::InvalidToken => 401,
             self::KeyGenerationFailed, self::LicensingUnavailable, self::SigningUnavailable => 503,
             self::InvalidDevice, self::InvalidDuration, self::InvalidEligibilityDate, self::InvalidKey, self::InvalidKeyNote, self::InvalidKeyStatus, self::InvalidPageSize,

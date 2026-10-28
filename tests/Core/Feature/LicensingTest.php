@@ -88,6 +88,36 @@ test('renewal stacks on future expiry and restarts expired time from now', funct
     $this->assertDatabaseCount('licensekit_licenses', 1);
 })->with([[false, '2026-02-10'], [true, '2026-01-31']]);
 
+test('without stacking a timed key waits until the license runs out', function (array $state, bool $refused) {
+    config(['licensekit.stack_keys' => false]);
+    $user = User::factory()->create();
+    $plan = LicensePlan::factory()->create();
+    License::factory()->create(['user_id' => $user->id, 'product_id' => $plan->product_id, ...$state]);
+    $key = app(Keys::class)->issue($plan, 1, new IssueContext)->keys[0];
+
+    $claim = fn () => app(ClaimLicense::class)->claim($user, $key->key);
+
+    if ($refused) {
+        expect($claim)->toThrow(LicensingException::class, 'license still active');
+        expect($key->fresh()->redeemed_at)->toBeNull();
+    } else {
+        expect($claim()->expires_at->isFuture())->toBeTrue();
+    }
+})->with([
+    'running' => [['expires_at' => '+5 days'], true],
+    'paused' => [['expires_at' => null, 'status' => License::PAUSED, 'paused_at' => 'now', 'remaining_seconds' => 3600], true],
+    'expired' => [['expires_at' => '-1 day'], false],
+]);
+
+test('without stacking a lifetime key still upgrades a running license', function () {
+    config(['licensekit.stack_keys' => false]);
+    $user = User::factory()->create();
+    $plan = LicensePlan::factory()->lifetime()->create();
+    License::factory()->create(['user_id' => $user->id, 'product_id' => $plan->product_id, 'expires_at' => now()->addDays(5)]);
+
+    expect(app(ClaimLicense::class)->claim($user, app(Keys::class)->issue($plan, 1, new IssueContext)->keys[0]->key)->is_lifetime)->toBeTrue();
+});
+
 test('lifetime upgrade uses batch snapshot and never consumes another key', function () {
     $user = User::factory()->create();
     $plan = LicensePlan::factory()->lifetime()->create();

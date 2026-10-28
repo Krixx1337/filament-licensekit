@@ -73,8 +73,8 @@ Call `ActivityLog::record($actor, $event, $subject, $meta)` in your transaction.
 
 ## Configuration
 
-Flat API keys: `client_enabled`, `client_prefix`, `store_api_enabled`, `store_api_prefix`, `portal_api_enabled`, `portal_api_prefix`. Other options: `client_login_column`, `device_matcher`, `max_batch_size`, `user_label`, `user_guard`, `user_suspended_column`, `signing_key_path`.
+Flat API keys: `client_enabled`, `client_prefix`, `store_api_enabled`, `store_api_prefix`, `portal_api_enabled`, `portal_api_prefix`. Other options: `client_login_column`, `device_matcher`, `max_batch_size`, `stack_keys`, `user_label`, `user_guard`, `user_suspended_column`, `signing_key_path`.
 
-Null user_guard follows host default. Null user_suspended_column adds no suspension check. Runtime settings such as free access and device rules live on products.
+Null user_guard follows host default. Null user_suspended_column adds no suspension check. `stack_keys` (default true) adds each key's time onto the license; false refuses a timed key with `license_still_active` while time is left, so customers keep it for later. Lifetime keys always redeem. Runtime settings such as free access and device rules live on products.
 
 Diagnostics run in `licensekit:check` and panel setup flow. Core services perform no schema checks or full config validation per call. Rebuild route/config caches after changing API registration.

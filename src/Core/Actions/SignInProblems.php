@@ -26,7 +26,7 @@ class SignInProblems
         'email_not_verified' => 'email not verified', 'maintenance' => 'product in maintenance', 'device_mismatch' => 'locked to another PC',
         'device_banned' => 'banned PC', 'device_not_bound' => 'no PC locked yet', 'move_cooldown' => 'PC move on cooldown',
         'customer_reset_disabled' => 'PC moves turned off', 'invalid_device' => 'bad PC fingerprint', 'invalid_key' => 'invalid key',
-        'key_already_used' => 'key already used',
+        'key_already_used' => 'key already used', 'license_still_active' => 'key redeemed with time left',
     ];
 
     public function __construct(private ActivityLog $audit) {}

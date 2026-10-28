@@ -12,6 +12,7 @@ return [
     'portal_api_prefix' => 'account',
     'device_matcher' => ExactDeviceMatcher::class,
     'max_batch_size' => 1000,
+    'stack_keys' => true,
     'user_label' => 'email',
     'user_guard' => null,
     'user_suspended_column' => null,

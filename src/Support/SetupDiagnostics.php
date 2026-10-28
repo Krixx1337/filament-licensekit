@@ -31,6 +31,9 @@ final class SetupDiagnostics
         if (! is_string($matcher) || ! is_a($matcher, DeviceMatcher::class, true)) {
             $errors[] = 'licensekit.device_matcher must implement DeviceMatcher.';
         }
+        if (! is_bool(config('licensekit.stack_keys'))) {
+            $errors[] = 'licensekit.stack_keys must be true or false.';
+        }
         foreach (['client', 'store_api', 'portal_api'] as $api) {
             if (! is_bool(config('licensekit.'.$api.'_enabled'))) {
                 $errors[] = 'licensekit.'.$api.'_enabled must be true or false.';

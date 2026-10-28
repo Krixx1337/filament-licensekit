@@ -16,6 +16,7 @@ return [
     'key_already_used' => 'This key has already been used.',
     'invalid_token' => 'Your session has ended. Please sign in again.',
     'user_unavailable' => 'Your account is unavailable. Contact support for help.',
+    'license_still_active' => 'Your license still has time left. Redeem this key once it runs out. The key has not been used.',
     'already_lifetime' => 'This customer already has lifetime access. The key has not been used.',
     'batch_conflict' => 'This order reference was already used with different details.',
     'cannot_extend_license' => 'This license cannot receive more time in its current state.',

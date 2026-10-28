@@ -48,8 +48,12 @@ class ClaimLicense
             if ($license->is_lifetime) {
                 throw new LicensingException('already_lifetime', 409);
             }
+            $days = $key->batch->getRawOriginal('duration_days');
+            if (! config('licensekit.stack_keys') && $days !== null && ($license->expires_at?->isFuture() || $license->remaining_seconds > 0)) {
+                throw new LicensingException('license_still_active');
+            }
             $before = $license->only(['expires_at', 'is_lifetime', 'remaining_seconds', 'status']);
-            $this->clock->grant($license, LicenseDuration::seconds($key->batch->getRawOriginal('duration_days')));
+            $this->clock->grant($license, LicenseDuration::seconds($days));
             $key->update(['license_id' => $license->id, 'redeemed_at' => now()]);
             $this->audit->record($actor ?? 'user:'.$user->getKey(), 'key_redeemed', $license, ['before' => $before, 'after' => [...$license->only(['expires_at', 'is_lifetime',
                 'remaining_seconds', 'status']), 'key_id' => $key->id], 'note' => null]);
