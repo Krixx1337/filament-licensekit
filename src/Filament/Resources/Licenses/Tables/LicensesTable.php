@@ -16,6 +16,7 @@ use Filament\Tables\Table;
 use Illuminate\Support\Collection;
 use LicenseKit\Core\Actions\ManageLicenses;
 use LicenseKit\Core\Models\License;
+use LicenseKit\Core\Models\Product;
 use LicenseKit\Filament\Actions\LicensingActions;
 use LicenseKit\Filament\AdminAccess;
 use LicenseKit\Filament\Enums\LicenseState;
@@ -36,11 +37,17 @@ class LicensesTable
                 TextColumn::make('expires_at')->label('Time left')->state(fn (License $record): string => TimeLeft::for($record))
                     ->tooltip(fn (License $record): ?string => $record->expires_at === null ? null : 'Ends '.TimeLeft::date($record->expires_at))
                     ->sortable(),
-                IconColumn::make('device_locked')->label('PC')->state(fn (License $record): bool => $record->device !== null)
+                // Hosts that keep their own PC lock turn it off on every product, so the column would only mislead.
+                IconColumn::make('device_locked')->label('PC')
+                    ->state(fn (License $record): ?bool => $record->product->device_lock ? $record->device !== null : null)
                     ->icon(fn (bool $state): Heroicon => $state ? Heroicon::OutlinedLockClosed : Heroicon::OutlinedLockOpen)
                     ->color(fn (bool $state): string => $state ? 'success' : 'gray')
-                    ->tooltip(fn (License $record): string => $record->device === null ? 'Not locked to a PC yet'
-                        : 'Locked to a PC since '.TimeLeft::date($record->device_bound_at))->visibleFrom('md'),
+                    ->tooltip(fn (License $record): ?string => match (true) {
+                        ! $record->product->device_lock => null,
+                        $record->device === null => 'Not locked to a PC yet',
+                        default => 'Locked to a PC since '.TimeLeft::date($record->device_bound_at),
+                    })
+                    ->visible(fn (): bool => Product::where('device_lock', true)->exists())->visibleFrom('md'),
                 TextColumn::make('keys_count')->label('Keys redeemed')->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('created_at')->label('First seen')->since()->dateTimeTooltip(timezone: config('app.timezone'))
                     ->toggleable(isToggledHiddenByDefault: true),

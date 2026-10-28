@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Added the `stack_keys` option. Set it to false to refuse timed keys while a license still has time left.
+- The Licenses table hides its PC column when no product locks licenses to a PC, and leaves the cell empty for products without a PC lock.
+
 ## 0.1.0 - 2026-10-17
 
 First release outside alpha. Until 1.0, minor versions (0.2, 0.3) may include breaking changes; patch versions will not. Every breaking change is listed here.

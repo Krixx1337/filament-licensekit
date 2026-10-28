@@ -48,6 +48,17 @@ test('license page actions refresh the page and confirm with the customer name',
         ->assertActionVisible('resume')->assertActionHidden('pause');
 });
 
+test('the PC column appears only when a product locks licenses to a PC', function () {
+    adminUser();
+    $license = License::factory()->create(['user_id' => User::factory()->create()->id]);
+    $license->product->update(['device_lock' => false]);
+
+    Livewire::test(ManageLicenses::class)->assertTableColumnHidden('device_locked');
+
+    $license->product->update(['device_lock' => true]);
+    Livewire::test(ManageLicenses::class)->assertTableColumnVisible('device_locked');
+});
+
 test('the manage menu only offers actions that apply', function () {
     adminUser();
     $license = License::factory()->create(['user_id' => User::factory()->create()->id, 'status' => License::REVOKED]);
