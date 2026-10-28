@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.1 - 2026-10-28
 
 - Added the `stack_keys` option. Set it to false to refuse timed keys while a license still has time left.
 - The Licenses table hides its PC column when no product locks licenses to a PC, and leaves the cell empty for products without a PC lock.
