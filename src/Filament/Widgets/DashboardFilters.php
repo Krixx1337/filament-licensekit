@@ -5,6 +5,7 @@ namespace LicenseKit\Filament\Widgets;
 use Illuminate\Database\Eloquent\Builder;
 use LicenseKit\Core\Models\License;
 use LicenseKit\Core\Models\LicenseKey;
+use LicenseKit\Filament\AdminAccess;
 
 /** Reads the dashboard's product and period filters. */
 trait DashboardFilters
@@ -26,12 +27,13 @@ trait DashboardFilters
     /** @return Builder<License> */
     protected function licenses(): Builder
     {
-        return License::query()->when($this->productId(), fn (Builder $query, int $id) => $query->where('product_id', $id));
+        return AdminAccess::scope(License::query())->when($this->productId(), fn (Builder $query, int $id) => $query->where('product_id', $id));
     }
 
     /** @return Builder<LicenseKey> */
     protected function keys(): Builder
     {
-        return LicenseKey::query()->when($this->productId(), fn (Builder $query, int $id) => $query->whereHas('batch.plan', fn (Builder $plan) => $plan->where('product_id', $id)));
+        return AdminAccess::scope(LicenseKey::query(), through: 'batch.plan')
+            ->when($this->productId(), fn (Builder $query, int $id) => $query->whereHas('batch.plan', fn (Builder $plan) => $plan->where('product_id', $id)));
     }
 }

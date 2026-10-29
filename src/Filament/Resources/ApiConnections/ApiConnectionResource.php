@@ -31,6 +31,8 @@ class ApiConnectionResource extends LicensingResource
 
     protected static ?string $model = ApiConnection::class;
 
+    protected static bool $global = true;
+
     protected static bool $editable = true;
 
     protected static string|\UnitEnum|null $navigationGroup = Navigation::SETUP;

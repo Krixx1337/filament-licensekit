@@ -10,6 +10,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use LicenseKit\Core\Models\Batch;
 use LicenseKit\Filament\Actions\LicensingActions;
+use LicenseKit\Filament\AdminAccess;
 use LicenseKit\Filament\Resources\Batches\Pages\ManageBatches;
 use LicenseKit\Filament\Resources\LicenseKeys\LicenseKeyResource;
 use LicenseKit\Filament\Resources\LicensingResource;
@@ -62,7 +63,7 @@ class BatchResource extends LicensingResource
     /** @return Builder<Batch> */
     public static function getEloquentQuery(): Builder
     {
-        return Batch::query()->with(['plan.product', 'apiConnection', 'reseller'])->withCount([
+        return AdminAccess::scope(Batch::query(), through: 'plan')->with(['plan.product', 'apiConnection', 'reseller'])->withCount([
             'keys as redeemed_count' => fn (Builder $query) => $query->whereNotNull('redeemed_at'),
             'keys as unused_count' => fn (Builder $query) => $query->whereNull('redeemed_at')->whereNull('cancelled_at'),
             'keys as cancelled_count' => fn (Builder $query) => $query->whereNotNull('cancelled_at'),

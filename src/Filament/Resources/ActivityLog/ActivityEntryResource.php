@@ -36,6 +36,8 @@ class ActivityEntryResource extends LicensingResource
 
     protected static ?string $model = ActivityEntry::class;
 
+    protected static bool $global = true;
+
     protected static string $access = AdminAccess::SUPPORT;
 
     protected static ?string $navigationLabel = 'Activity log';

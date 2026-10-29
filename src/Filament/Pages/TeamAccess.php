@@ -41,6 +41,7 @@ class TeamAccess extends LicenseKitPage
             ]),
             Section::make('For your developer')->icon(Heroicon::OutlinedWrenchScrewdriver)->columnSpanFull()->collapsible()->schema([
                 Text::make('Every panel user is an Admin until you change it. Define the licensekit.admin and licensekit.support gates in your app to choose who gets which role.'),
+                Text::make('To limit someone to some products, also define licensekit.product. They then see only those products and none of the pages that cover every product.'),
                 Text::make('Your normal model policies, for example from Filament Shield, still apply on top.'),
             ]),
         ]);

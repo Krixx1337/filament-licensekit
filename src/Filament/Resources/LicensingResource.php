@@ -17,6 +17,9 @@ abstract class LicensingResource extends Resource
     /** Support staff may browse resources marked AdminAccess::SUPPORT; everything else is admin-only. */
     protected static string $access = AdminAccess::ADMIN;
 
+    /** Resources spanning every product, which staff limited to some products never see. */
+    protected static bool $global = false;
+
     protected static string|UnitEnum|null $navigationGroup = Navigation::LICENSING;
 
     protected static bool $isScopedToTenant = false;
@@ -30,6 +33,8 @@ abstract class LicensingResource extends Resource
             'create', 'update' => static::$editable && AdminAccess::isAdmin(),
             default => false,
         };
+        $allowed = $allowed && (! static::$global || ! AdminAccess::isScoped())
+            && ($record === null || AdminAccess::allowsRecord($record));
 
         return $allowed ? parent::getAuthorizationResponse($action, $record) : Response::deny();
     }

@@ -40,7 +40,7 @@ class LicenseResource extends LicensingResource
     /** @return Builder<Model> */
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()->with(['user', 'product'])->withCount('keys');
+        return AdminAccess::scope(parent::getEloquentQuery())->with(['user', 'product'])->withCount('keys');
     }
 
     public static function form(Schema $schema): Schema
@@ -72,7 +72,7 @@ class LicenseResource extends LicensingResource
 
     public static function getNavigationBadge(): ?string
     {
-        $count = License::query()->effectiveStatus('expiring')->count();
+        $count = AdminAccess::scope(License::query())->effectiveStatus('expiring')->count();
 
         return $count === 0 ? null : (string) $count;
     }

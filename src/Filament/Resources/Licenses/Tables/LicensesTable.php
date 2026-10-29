@@ -47,12 +47,12 @@ class LicensesTable
                         $record->device === null => 'Not locked to a PC yet',
                         default => 'Locked to a PC since '.TimeLeft::date($record->device_bound_at),
                     })
-                    ->visible(fn (): bool => Product::where('device_lock', true)->exists())->visibleFrom('md'),
+                    ->visible(fn (): bool => AdminAccess::scope(Product::query(), 'id')->where('device_lock', true)->exists())->visibleFrom('md'),
                 TextColumn::make('keys_count')->label('Keys redeemed')->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('created_at')->label('First seen')->since()->dateTimeTooltip(timezone: config('app.timezone'))
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
-            ->filters([SelectFilter::make('product_id')->label('Product')->relationship('product', 'name')])
+            ->filters([SelectFilter::make('product_id')->label('Product')->options(fn (): array => AdminAccess::productOptions())])
             ->toolbarActions([
                 BulkAction::make('add_time')->label('Add time')->icon(Heroicon::OutlinedPlusCircle)->authorize(fn () => AdminAccess::isSupport())
                     ->schema([TextInput::make('days')->label('Days to add')->integer()->minValue(1)->maxValue(3650)->required()])

@@ -43,7 +43,7 @@ class LicensingActions
 {
     public static function mayChange(Model $record, bool $support = false): bool
     {
-        if (! ($support ? AdminAccess::isSupport() : AdminAccess::isAdmin())) {
+        if (! ($support ? AdminAccess::isSupport() : AdminAccess::isAdmin()) || ! AdminAccess::allowsRecord($record)) {
             return false;
         }
         $gate = Gate::forUser(self::actor());
@@ -138,7 +138,7 @@ class LicensingActions
             ->modalHeading('Generate keys')->modalWidth('2xl')
             ->steps([
                 Step::make('What')->description('Product and plan')->icon(Heroicon::OutlinedCube)->schema([
-                    Select::make('product_id')->label('Product')->options(fn () => Product::where('status', '!=', Product::DISCONTINUED)->orderBy('name')->pluck('name', 'id'))
+                    Select::make('product_id')->label('Product')->options(fn (): array => AdminAccess::productOptions(Product::where('status', '!=', Product::DISCONTINUED)))
                         ->required()->live()
                         ->default(fn (?Model $record) => $record instanceof Product ? $record->id : ($record instanceof LicensePlan ? $record->product_id : null))
                         ->afterStateUpdated(fn (Set $set) => $set('plan_id', null)),
@@ -166,6 +166,7 @@ class LicensingActions
                     Text::make('You can copy the keys or download them as a text file on the next screen.'),
                 ]),
             ])->modalSubmitActionLabel('Generate keys')->action(function (array $data, $livewire): void {
+                abort_unless(AdminAccess::allowsProduct($data['product_id']), 403);
                 $plan = LicensePlan::where('product_id', $data['product_id'])->whereKey($data['plan_id'])->firstOrFail();
                 $reseller = empty($data['reseller_id']) ? null : ConfiguredUserModel::query()->whereKey($data['reseller_id'])->firstOrFail();
                 $batch = app(Keys::class)->issue($plan, (int) $data['quantity'], new IssueContext(source: 'admin', actor: self::actor(), reseller: $reseller, label: $data['label'] ?? null));
@@ -185,11 +186,12 @@ class LicensingActions
         return Action::make('give_license')->label('Give license')->icon(Heroicon::OutlinedGift)->authorize(fn (): bool => AdminAccess::isAdmin())
             ->modalDescription('Gives a customer a license right away, without a key. Use it for refunds, testers or giveaways.')
             ->schema([self::userSelect()->label('Customer'),
-                Select::make('product_id')->label('Product')->options(fn () => Product::pluck('name', 'id'))->live()->required(),
+                Select::make('product_id')->label('Product')->options(fn (): array => AdminAccess::productOptions())->live()->required(),
                 Select::make('plan_id')->label('Plan')->options(fn (Get $get) => LicensePlan::where('product_id', $get('product_id'))->where('is_active', true)->pluck('name', 'id'))
                     ->requiredWithout('custom_days'),
                 TextInput::make('custom_days')->label('Or a custom number of days')->integer()->minValue(1)->maxValue(LicenseDuration::MAXIMUM_DAYS),
             ])->action(function (array $data): void {
+                abort_unless(AdminAccess::allowsProduct($data['product_id']), 403);
                 DB::transaction(function () use ($data): void {
                     $plan = LicensePlan::where('product_id', $data['product_id'])->where('is_active', true)
                         ->when(! empty($data['plan_id']), fn ($q) => $q->whereKey($data['plan_id']))
@@ -206,7 +208,8 @@ class LicensingActions
         return self::finish(Action::make('ban_device')->label('Ban this PC')->icon(Heroicon::OutlinedNoSymbol)->color('danger')->requiresConfirmation()
             ->modalIcon(Heroicon::OutlinedNoSymbol)->modalHeading('Ban this PC')
             ->modalDescription('This PC can no longer log in, even with another account. Use it for abuse and chargebacks.')
-            ->authorize(fn (License $record): bool => self::mayChange($record))->visible(fn (License $record): bool => $record->device !== null)
+            // A ban can cover every product and lists accounts from all of them, so only owners ban PCs.
+            ->authorize(fn (License $record): bool => self::mayChange($record) && AdminAccess::isOwner())->visible(fn (License $record): bool => $record->device !== null)
             ->schema([
                 Text::make(function (License $record): string {
                     $others = app(DeviceBans::class)->sharedAccounts($record);
@@ -312,9 +315,9 @@ class LicensingActions
             ->authorize(fn (): bool => AdminAccess::isSupport())
             ->modalDescription('Blocks one customer from one product, even if they have not bought it yet.')
             ->schema([self::userSelect()->label('Customer'), Select::make('product_id')->label('Product')->required()
-                ->options(fn (): array => Product::query()->orderBy('name')->pluck('name', 'id')->all())->searchable(), ...self::suspensionFields()])
+                ->options(fn (): array => AdminAccess::productOptions())->searchable(), ...self::suspensionFields()])
             ->action(fn (array $data) => app(ManageLicenses::class)->suspendCustomer(ConfiguredUserModel::className()::findOrFail($data['user_id']),
-                Product::query()->whereKey($data['product_id'])->firstOrFail(), self::actor(), $data['reason'] ?? null, self::suspensionEnd($data)));
+                AdminAccess::scope(Product::query(), 'id')->whereKey($data['product_id'])->firstOrFail(), self::actor(), $data['reason'] ?? null, self::suspensionEnd($data)));
     }
 
     /** @return list<Field> */
@@ -409,7 +412,7 @@ class LicensingActions
     public static function addTime(): Action
     {
         return Action::make('add_time')->label('Add time')
-            ->authorize(fn (): bool => AdminAccess::isAdmin())
+            ->authorize(fn (Product $record): bool => AdminAccess::isAdmin() && AdminAccess::allowsRecord($record))
             ->modalHeading(fn (Product $record): string => 'Add time to '.$record->name)
             ->modalDescription('Use this after downtime or as a goodwill gift. Every running license gets the time added to its end date. Paused licenses keep it for later.')
             ->schema([

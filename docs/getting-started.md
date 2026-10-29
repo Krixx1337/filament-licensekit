@@ -53,6 +53,12 @@ If host user model implements Laravel's `MustVerifyEmail`, verification is requi
 
 Every panel user is an Admin until your app defines the `licensekit.admin` and `licensekit.support` gates. Support can look up licenses, add time, pause and resume, suspend and unsuspend, and reset a customer's PC. Admin can also manage products, generate keys, connect stores and ban PCs. **Setup → Team access** lists this for your team. Your normal model policies still apply on top.
 
+To limit someone to some products, define `licensekit.product`. They then see only those products' licenses, keys, batches and dashboard numbers, and only pick those products when generating keys or giving licenses. They don't see screens that span every product: store connections, banned PCs, the activity log, setup pages and creating products.
+
+```php
+Gate::define('licensekit.product', fn (User $user, Product $product): bool => ! $user->hasRole('partner') || $product->slug === 'my-app');
+```
+
 On **Licenses**, the tabs (Active, Expiring soon, Paused, Suspended, Expired, Cancelled) sort customers by status, and the sidebar badge counts licenses that run out within 7 days. **Add time** is the main button on every license; everything else is in its **Manage** menu. Each change shows a confirmation and is written to the activity log.
 
 Times are stored in UTC and shown in your app's timezone. Notes are optional.

@@ -8,7 +8,6 @@ use Filament\Pages\Dashboard\Concerns\HasFiltersForm;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Illuminate\Contracts\View\View;
-use LicenseKit\Core\Models\Product;
 use LicenseKit\Filament\AdminAccess;
 use LicenseKit\Filament\Navigation;
 use LicenseKit\Filament\Widgets\GetStarted;
@@ -44,7 +43,7 @@ class Dashboard extends BaseDashboard
     public function filtersForm(Schema $schema): Schema
     {
         return $schema->components([Section::make()->schema([
-            Select::make('product_id')->label('Product')->placeholder('All products')->options(fn (): array => Product::query()->orderBy('name')->pluck('name', 'id')->all()),
+            Select::make('product_id')->label('Product')->placeholder('All products')->options(fn (): array => AdminAccess::productOptions()),
             Select::make('period')->label('Period')->options(['7' => 'Last 7 days', '30' => 'Last 30 days', '90' => 'Last 90 days'])->default('30')->selectablePlaceholder(false),
         ])->columns(['md' => 2])->columnSpanFull()]);
     }

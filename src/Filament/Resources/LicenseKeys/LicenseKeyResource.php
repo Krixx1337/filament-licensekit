@@ -16,7 +16,6 @@ use Illuminate\Support\Collection;
 use LicenseKit\Core\Actions\SerialKey;
 use LicenseKit\Core\Models\Batch;
 use LicenseKit\Core\Models\LicenseKey;
-use LicenseKit\Core\Models\Product;
 use LicenseKit\Filament\Actions\LicensingActions;
 use LicenseKit\Filament\AdminAccess;
 use LicenseKit\Filament\Enums\KeyStatus;
@@ -68,9 +67,9 @@ class LicenseKeyResource extends LicensingResource
                 ->toggleable()->visibleFrom('lg'),
             TextColumn::make('created_at')->label('Created')->since()->dateTimeTooltip(timezone: config('app.timezone'))->toggleable(isToggledHiddenByDefault: true),
         ])->filters([
-            SelectFilter::make('product_id')->label('Product')->options(fn () => Product::pluck('name', 'id'))
+            SelectFilter::make('product_id')->label('Product')->options(fn (): array => AdminAccess::productOptions())
                 ->query(fn ($query, array $data) => $query->when($data['value'] ?? null, fn ($q, $id) => $q->whereHas('batch.plan', fn ($q) => $q->where('product_id', $id)))),
-            SelectFilter::make('batch_id')->label('Batch')->relationship('batch', 'id')->searchable()
+            SelectFilter::make('batch_id')->label('Batch')->relationship('batch', 'id', fn (Builder $query): Builder => AdminAccess::scope($query, through: 'plan'))->searchable()
                 ->getOptionLabelFromRecordUsing(fn (Batch $record): string => 'Batch #'.$record->id.($record->label !== null ? ' · '.$record->label : '')),
         ])->recordActions([
             ActionGroup::make([LicensingActions::claim(), LicensingActions::editNote(), LicensingActions::revokeKey()]),
@@ -87,7 +86,7 @@ class LicenseKeyResource extends LicensingResource
     /** @return Builder<LicenseKey> */
     public static function getEloquentQuery(): Builder
     {
-        return LicenseKey::query()->with(['batch.plan.product', 'batch.reseller', 'license.user']);
+        return AdminAccess::scope(LicenseKey::query(), through: 'batch.plan')->with(['batch.plan.product', 'batch.reseller', 'license.user']);
     }
 
     public static function getPages(): array

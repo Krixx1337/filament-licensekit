@@ -23,6 +23,12 @@
 | D12. No client SDKs; the default API is an example. | App protocols are app-specific; a per-seller protocol has no universal bypass. Stable PHP services carry compatibility. |
 | D13. Say "app", not "loader". | Most products are one executable with the check built in. |
 
+2026-10-29. Staff.
+
+| Decision | Reason |
+|---|---|
+| D14. One optional gate limits staff to some products; no per-field or per-action rules. | A partner can run one product without seeing the rest. Screens spanning every product stay with unrestricted admins. |
+
 Owner clarifications during planning:
 
 - Unlicensed login returns restricted redemption session. Token never implies software access.

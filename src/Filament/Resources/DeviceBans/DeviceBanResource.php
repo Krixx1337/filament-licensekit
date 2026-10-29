@@ -19,6 +19,8 @@ class DeviceBanResource extends LicensingResource
 {
     protected static ?string $model = DeviceBan::class;
 
+    protected static bool $global = true;
+
     protected static ?string $slug = 'licensekit/device-bans';
 
     protected static string|\UnitEnum|null $navigationGroup = Navigation::PROTECTION;

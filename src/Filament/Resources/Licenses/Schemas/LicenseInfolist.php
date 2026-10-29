@@ -16,6 +16,7 @@ use LicenseKit\Core\Models\ActivityEntry;
 use LicenseKit\Core\Models\License;
 use LicenseKit\Core\Models\LicenseKey;
 use LicenseKit\Core\Models\LoaderSession;
+use LicenseKit\Filament\AdminAccess;
 use LicenseKit\Filament\Enums\LicenseState;
 use LicenseKit\Filament\Resources\ActivityLog\ActivityEntryResource;
 use LicenseKit\Filament\Support\PcHistory;
@@ -126,6 +127,7 @@ class LicenseInfolist
         }
 
         return app(DeviceBans::class)->sharedAccounts($license)
+            ->filter(fn (License $other): bool => AdminAccess::allowsProduct($other->product_id))
             ->map(fn (License $other): string => ($other->user?->getAttribute(config('licensekit.user_label')) ?? 'Deleted customer').' · '.$other->product->name)
             ->unique()->values()->all();
     }

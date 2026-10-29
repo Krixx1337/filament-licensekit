@@ -15,6 +15,7 @@ use Filament\Widgets\Widget;
 use LicenseKit\Core\Models\Batch;
 use LicenseKit\Core\Models\LoaderSession;
 use LicenseKit\Core\Models\Product;
+use LicenseKit\Filament\AdminAccess;
 use LicenseKit\Filament\Pages\ConnectYourApp;
 use LicenseKit\Filament\Resources\LicenseKeys\LicenseKeyResource;
 use LicenseKit\Filament\Resources\Products\ProductResource;
@@ -35,7 +36,8 @@ class GetStarted extends Widget implements HasActions, HasSchemas
 
     public static function canView(): bool
     {
-        return in_array(false, array_column(self::steps(), 'done'), true);
+        // Setup covers every product, so staff limited to some products never see it.
+        return ! AdminAccess::isScoped() && in_array(false, array_column(self::steps(), 'done'), true);
     }
 
     /** @return list<array{done: bool, heading: string, description: string, button: string, url: string}> */

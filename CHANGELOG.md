@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.2 - 2026-10-29
+
+- Added the optional `licensekit.product` gate to limit staff to some products. Limited staff see only those products' licenses, keys, batches, products and dashboard numbers, pick only those products in forms, and cannot open screens that span every product (store connections, banned PCs, activity log, setup pages, creating products or banning PCs). Without the gate, nothing changes.
+
 ## 0.1.1 - 2026-10-28
 
 - Added the `stack_keys` option. Set it to false to refuse timed keys while a license still has time left.

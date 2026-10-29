@@ -12,6 +12,7 @@ abstract class LicenseKitPage extends Page
 
     public static function canAccess(): bool
     {
-        return AdminAccess::isSupport();
+        // Setup, connection and team pages cover every product.
+        return AdminAccess::isSupport() && ! AdminAccess::isScoped();
     }
 }

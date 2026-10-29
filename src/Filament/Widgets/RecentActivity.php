@@ -15,6 +15,12 @@ class RecentActivity extends TableWidget
 
     protected int|string|array $columnSpan = 'full';
 
+    /** The activity log covers every product, so staff limited to some products never see it. */
+    public static function canView(): bool
+    {
+        return ActivityEntryResource::canViewAny();
+    }
+
     public function table(Table $table): Table
     {
         return $table->heading('Recent activity')

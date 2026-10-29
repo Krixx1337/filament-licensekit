@@ -7,6 +7,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use LicenseKit\Core\Models\License;
 use LicenseKit\Core\Models\Product;
+use LicenseKit\Filament\AdminAccess;
 use LicenseKit\Filament\Resources\LicensingResource;
 use LicenseKit\Filament\Resources\Products\Pages\CreateProduct;
 use LicenseKit\Filament\Resources\Products\Pages\EditProduct;
@@ -41,7 +42,14 @@ class ProductResource extends LicensingResource
     /** @return Builder<Product> */
     public static function getEloquentQuery(): Builder
     {
-        return Product::query()->with('plans')->withCount(['licenses as active_licenses_count' => fn (Builder $query) => (new License)->scopeEffectiveStatus($query, License::ACTIVE)]);
+        return AdminAccess::scope(Product::query(), 'id')->with('plans')
+            ->withCount(['licenses as active_licenses_count' => fn (Builder $query) => (new License)->scopeEffectiveStatus($query, License::ACTIVE)]);
+    }
+
+    /** New products would fall outside a limited staff member's products, so only owners create them. */
+    public static function canCreate(): bool
+    {
+        return AdminAccess::isOwner() && parent::canCreate();
     }
 
     public static function getPages(): array
