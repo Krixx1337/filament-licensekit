@@ -4,7 +4,7 @@
         @forelse ($batches as $batch)
             <article wire:key="batch-{{ $batch->id }}" class="space-y-3 rounded border p-4">
                 <h3 class="font-semibold">{{ $batch->label ?? 'Batch #'.$batch->id }}</h3>
-                <p>{{ $batch->plan->product->name }} · {{ $batch->plan->name }}</p>
+                <p>{{ $batch->plan->product->name }} · {{ $batch->planLabel() }}</p>
                 <p>{{ $batch->total_count }} bought · {{ $batch->redeemed_count }} redeemed · {{ $batch->unused_count }} left</p>
                 <button wire:click="download({{ $batch->id }})" wire:loading.attr="disabled" class="underline">Download unused keys</button>
             </article>

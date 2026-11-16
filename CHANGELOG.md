@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Generate keys takes an optional custom length in days that overrides the plan, for example 1-day giveaway keys. Batch, key and reseller lists show the length next to the plan name when it differs.
+- Give license now always asks for a plan; the custom length overrides it.
+
 ## 0.1.2 - 2026-10-29
 
 - Added the optional `licensekit.product` gate to limit staff to some products. Limited staff see only those products' licenses, keys, batches, products and dashboard numbers, pick only those products in forms, and cannot open screens that span every product (store connections, banned PCs, activity log, setup pages, creating products or banning PCs). Without the gate, nothing changes.

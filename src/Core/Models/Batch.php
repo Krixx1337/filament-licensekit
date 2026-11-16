@@ -75,4 +75,15 @@ class Batch extends Model
     {
         return $this->belongsTo(LicensePlan::class, 'plan_id');
     }
+
+    /** The plan name, plus this batch's own length when it differs from the plan, for example "Monthly · 1 day". */
+    public function planLabel(): string
+    {
+        $days = $this->duration_days;
+        if ($days === $this->plan->duration_days) {
+            return $this->plan->name;
+        }
+
+        return $this->plan->name.' · '.($days === null ? 'lifetime' : $days.' '.($days === 1 ? 'day' : 'days'));
+    }
 }

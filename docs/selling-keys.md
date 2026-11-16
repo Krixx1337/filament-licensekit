@@ -6,7 +6,7 @@ Sell through several stores at once. Payments never touch LicenseKit, so if a pa
 
 ## Manual sales and refunds
 
-Open **Keys → Generate keys**. Choose the product and plan, how many keys you need and an optional label (for example the reseller's name or "October giveaway"). Copy the keys or download them as a `.txt` file. You can also select keys in the list and choose **Download selected**.
+Open **Keys → Generate keys**. Choose the product and plan, how many keys you need, an optional custom length in days that overrides the plan (for example 1 day for a giveaway) and an optional label (for example the reseller's name or "October giveaway"). Copy the keys or download them as a `.txt` file. You can also select keys in the list and choose **Download selected**.
 
 **Key batches** shows each batch with its progress, such as "12 of 50 redeemed". From a batch's menu you can download its unused keys, or cancel them after a leak or a reseller dispute. Customers who already redeemed keep their time. To take access away from one customer after a refund, open their license and choose **Manage → Cancel license**. A cancelled license gets no paid or free access and cannot be renewed until you restore it.
 
@@ -29,7 +29,7 @@ curl -X POST 'https://your-site.test/api/licensekit/store/batches' \
 
 New batches belong to the connection owner automatically. The bot can read its own batches and all batches assigned to its owner, including manual purchases. Other resellers' batches stay private. With `user_suspended_column` configured, suspending the owner's website account blocks the token on its next request with `user_unavailable` and HTTP 403. Email verification does not affect bots. Deleting the owner's account turns their connections off. An ownerless connection reads only its own batches.
 
-Use a stable reference per order. Identical retries return the original batch and keys. Changing the plan, quantity, custom duration or reseller returns `batch_conflict` with HTTP 409. Each connection has its own reference namespace. Catalog reads respect allowed products; past batch reads remain available after product permissions change.
+Use a stable reference per order. Identical retries return the original batch and keys. Changing the plan or quantity returns `batch_conflict` with HTTP 409. Each connection has its own reference namespace. Catalog reads respect allowed products; past batch reads remain available after product permissions change.
 
 | Method | Endpoint under `/api/licensekit/store` |
 |---|---|

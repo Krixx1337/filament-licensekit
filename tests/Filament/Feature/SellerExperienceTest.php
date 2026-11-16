@@ -24,7 +24,7 @@ test('give license issues and redeems in one transaction', function () {
     $user = User::factory()->create();
     $plan = LicensePlan::factory()->create();
     Livewire::test(ManageLicenses::class)->callAction('give_license', data: [
-        'user_id' => $user->id, 'product_id' => $plan->product_id, 'custom_days' => 3,
+        'user_id' => $user->id, 'product_id' => $plan->product_id, 'plan_id' => $plan->id, 'custom_days' => 3,
     ])->assertHasNoActionErrors();
     expect(License::sole()->user_id)->toBe($user->id);
     $this->assertDatabaseCount('licensekit_batches', 1);

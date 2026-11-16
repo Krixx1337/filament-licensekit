@@ -147,6 +147,7 @@ class LicensingActions
                             ->mapWithKeys(fn (LicensePlan $plan): array => [$plan->id => $plan->name.' · '.self::planLength($plan)])->all())
                         ->default(fn (?Model $record) => $record instanceof LicensePlan ? $record->id : null)
                         ->helperText('Each key gives the customer this much time when redeemed.'),
+                    self::customDays()->live(onBlur: true)->helperText('Overrides the plan, for example 1 for a giveaway.'),
                 ]),
                 Step::make('How many')->description('Amount and label')->icon(Heroicon::OutlinedHashtag)->schema([
                     TextInput::make('quantity')->label('How many keys')->integer()->minValue(1)->maxValue(config('licensekit.max_batch_size'))->default(1)->required()->live(onBlur: true)
@@ -161,7 +162,7 @@ class LicensingActions
                         $count = (int) $get('quantity');
 
                         return $plan === null ? 'Choose a product and plan first.' : 'You are about to generate '.$count.' '.($count === 1 ? 'key' : 'keys').' for '
-                            .$plan->product->name.' · '.$plan->name.'. Each key gives '.self::planLength($plan).'.';
+                            .$plan->product->name.' · '.$plan->name.'. Each key gives '.self::planLength($plan, self::days($get('custom_days'))).'.';
                     }),
                     Text::make('You can copy the keys or download them as a text file on the next screen.'),
                 ]),
@@ -169,16 +170,27 @@ class LicensingActions
                 abort_unless(AdminAccess::allowsProduct($data['product_id']), 403);
                 $plan = LicensePlan::where('product_id', $data['product_id'])->whereKey($data['plan_id'])->firstOrFail();
                 $reseller = empty($data['reseller_id']) ? null : ConfiguredUserModel::query()->whereKey($data['reseller_id'])->firstOrFail();
-                $batch = app(Keys::class)->issue($plan, (int) $data['quantity'], new IssueContext(source: 'admin', actor: self::actor(), reseller: $reseller, label: $data['label'] ?? null));
+                $batch = app(Keys::class)->issue($plan, (int) $data['quantity'], new IssueContext(source: 'admin', actor: self::actor(), reseller: $reseller,
+                    label: $data['label'] ?? null, customDays: self::days($data['custom_days'] ?? null)));
                 $livewire->replaceMountedAction('result', ['text' => $batch->keys->pluck('key')->implode("\n")]);
             });
     }
 
-    private static function planLength(LicensePlan $plan): string
+    private static function planLength(LicensePlan $plan, ?int $customDays = null): string
     {
-        $days = $plan->getRawOriginal('duration_days');
+        $days = $customDays ?? $plan->getRawOriginal('duration_days');
 
         return $days === null ? 'lifetime access' : TimeLeft::duration((int) $days * 86400);
+    }
+
+    private static function customDays(): TextInput
+    {
+        return TextInput::make('custom_days')->label('Custom length in days (optional)')->integer()->minValue(1)->maxValue(LicenseDuration::MAXIMUM_DAYS);
+    }
+
+    private static function days(mixed $value): ?int
+    {
+        return blank($value) ? null : (int) $value;
     }
 
     public static function giveLicense(): Action
@@ -188,15 +200,13 @@ class LicensingActions
             ->schema([self::userSelect()->label('Customer'),
                 Select::make('product_id')->label('Product')->options(fn (): array => AdminAccess::productOptions())->live()->required(),
                 Select::make('plan_id')->label('Plan')->options(fn (Get $get) => LicensePlan::where('product_id', $get('product_id'))->where('is_active', true)->pluck('name', 'id'))
-                    ->requiredWithout('custom_days'),
-                TextInput::make('custom_days')->label('Or a custom number of days')->integer()->minValue(1)->maxValue(LicenseDuration::MAXIMUM_DAYS),
+                    ->required(),
+                self::customDays()->helperText('Overrides the plan.'),
             ])->action(function (array $data): void {
                 abort_unless(AdminAccess::allowsProduct($data['product_id']), 403);
                 DB::transaction(function () use ($data): void {
-                    $plan = LicensePlan::where('product_id', $data['product_id'])->where('is_active', true)
-                        ->when(! empty($data['plan_id']), fn ($q) => $q->whereKey($data['plan_id']))
-                        ->firstOrFail();
-                    $batch = app(Keys::class)->issue($plan, 1, new IssueContext(source: 'admin', actor: self::actor(), customDays: empty($data['custom_days']) ? null : (int) $data['custom_days']));
+                    $plan = LicensePlan::where('product_id', $data['product_id'])->whereKey($data['plan_id'])->firstOrFail();
+                    $batch = app(Keys::class)->issue($plan, 1, new IssueContext(source: 'admin', actor: self::actor(), customDays: self::days($data['custom_days'] ?? null)));
                     app(ClaimLicense::class)->claimFor(self::actor(), ConfiguredUserModel::className()::findOrFail($data['user_id']), $batch->keys->firstOrFail());
                 });
                 Notification::make()->title('License given')->body('The customer can use the product now.')->success()->send();

@@ -2,6 +2,7 @@
 
 use LicenseKit\Core\Actions\Keys;
 use LicenseKit\Core\Data\IssueContext;
+use LicenseKit\Core\Models\Batch;
 use LicenseKit\Core\Models\LicenseKey;
 use LicenseKit\Core\Models\LicensePlan;
 use LicenseKit\Filament\Resources\Batches\Pages\ManageBatches;
@@ -30,6 +31,19 @@ test('the generate keys wizard creates the keys and shows them once', function (
         ->callMountedAction()->assertHasNoActionErrors()->assertSet('mountedActions.0.name', 'result');
 
     $this->assertDatabaseCount('licensekit_keys', 3);
+});
+
+test('generate keys can override the plan length and the lists show it', function () {
+    adminUser();
+    $plan = LicensePlan::factory()->create(['name' => 'Monthly', 'duration_days' => 30]);
+
+    Livewire::test(ManageLicenseKeys::class)->mountAction('create_keys')
+        ->fillForm(['product_id' => $plan->product_id, 'plan_id' => $plan->id, 'quantity' => 2, 'custom_days' => 1])
+        ->callMountedAction()->assertHasNoActionErrors();
+
+    expect(Batch::sole()->duration_days)->toBe(1);
+    Livewire::test(ManageBatches::class)->assertSee('Monthly · 1 day');
+    Livewire::test(ManageLicenseKeys::class)->assertSee('Monthly · 1 day');
 });
 
 test('generate keys from a product row starts with that product selected', function () {

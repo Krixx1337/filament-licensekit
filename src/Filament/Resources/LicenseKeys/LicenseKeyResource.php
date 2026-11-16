@@ -56,7 +56,7 @@ class LicenseKeyResource extends LicensingResource
                 ->description(fn (LicenseKey $record): ?string => $record->note)
                 ->searchable(query: fn ($query, string $search) => $query->where(fn ($q) => $q
                     ->where('key', 'like', '%'.strtoupper(app(SerialKey::class)->searchTerm($search)).'%')->orWhere('note', 'like', '%'.$search.'%'))),
-            TextColumn::make('batch.plan.product.name')->label('Product')->description(fn (LicenseKey $record): string => $record->batch->plan->name)->searchable(),
+            TextColumn::make('batch.plan.product.name')->label('Product')->description(fn (LicenseKey $record): string => $record->batch->planLabel())->searchable(),
             TextColumn::make('status')->label('Status')->badge()->state(fn (LicenseKey $record): KeyStatus => KeyStatus::for($record)),
             TextColumn::make('license.user.'.config('licensekit.user_label'))->label('Redeemed by')->placeholder('Not redeemed')->searchable()
                 ->description(fn (LicenseKey $record): ?string => $record->redeemed_at?->diffForHumans())

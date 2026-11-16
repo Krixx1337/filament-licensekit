@@ -36,7 +36,7 @@ class BatchResource extends LicensingResource
                 ->formatStateUsing(fn ($state, Batch $record): string => $record->label ?? 'Batch #'.$state)
                 ->description(fn (Batch $record): string => 'Batch #'.$record->id.' · by '.$record->created_by.', '.$record->created_at?->diffForHumans())
                 ->searchable(['label', 'reference']),
-            TextColumn::make('plan.product.name')->label('Product')->description(fn (Batch $record): string => $record->plan->name),
+            TextColumn::make('plan.product.name')->label('Product')->description(fn (Batch $record): string => $record->planLabel()),
             TextColumn::make('redeemed_count')->label('Redeemed')
                 ->formatStateUsing(fn ($state, Batch $record): string => $state.' of '.$record->quantity)
                 ->description(fn (Batch $record): string => $record->unused_count.' unused'.($record->cancelled_count > 0 ? ', '.$record->cancelled_count.' cancelled' : '')),
